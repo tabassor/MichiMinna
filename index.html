@@ -151,6 +151,9 @@ button.stat{font:inherit;width:100%}
 .crow .cread{display:block;font-family:var(--disp);font-size:0.75rem;color:var(--dim);margin-top:1px}
 .crow .cgo{color:var(--dim);font-size:1.125rem;flex:0 0 auto}
 .wd{border-bottom:1px dotted transparent;cursor:pointer;border-radius:3px}
+.trq{border:1px solid var(--line);background:var(--surf2);color:var(--mut);border-radius:8px;
+  font-family:var(--disp);font-size:0.75rem;padding:2px 7px;margin-left:6px;vertical-align:middle;line-height:1.4}
+.trq:active{border-color:var(--ai);color:var(--ai)}
 .wd:active{background:color-mix(in srgb,var(--ai) 18%,transparent)}
 html[data-gloss="1"] .wd{border-bottom-color:color-mix(in srgb,var(--ai) 45%,transparent)}
 html[data-gloss="1"] .wd .kj{border-bottom-color:transparent}
@@ -286,7 +289,7 @@ const D = {"vocab":{"1":[{"k":"わたし","j":"私","f":"je, moi","c":"pron"},{"
 
 /* ================= profils & stockage ================= */
 const UKEY="michi:users";
-const NEW = ()=>({ch:1,kstage:1,xp:0,streak:0,last:"",day:"",done:0,goal:20,theme:"ai",script:"kanji",furi:1,fs:1,input:"auto",hideOpts:1,gloss:1,tz:"auto",srs:{},fav:[],exos:{}});
+const NEW = ()=>({ch:1,kstage:1,xp:0,streak:0,last:"",day:"",done:0,goal:20,theme:"ai",script:"kanji",furi:1,fs:1,input:"auto",hideOpts:1,gloss:1,tz:"auto",tr:"demande",srs:{},fav:[],exos:{}});
 let USERS=[], UID=null, S=NEW(), memStore={};
 const HAS_AS = typeof window.storage!=="undefined" && window.storage && typeof window.storage.get==="function";
 let HAS_LS=false; try{ localStorage.setItem("michi:t","1"); localStorage.removeItem("michi:t"); HAS_LS=true; }catch(e){}
@@ -876,6 +879,9 @@ VIEWS.users=m=>{
   row("Objectif quotidien", S.goal+" questions", ()=>{S.goal=S.goal>=40?10:S.goal+10;save();render();});
   row("Mode grand débutant (kana)", S.kana?"Activé":"Désactivé",
       ()=>{S.kana=S.kana?0:1; poolCache=null; save(); render();});
+  row("Traductions françaises",
+      S.tr==="visible"?"Toujours affichées":"À la demande (bouton 訳)",
+      ()=>{S.tr=S.tr==="visible"?"demande":"visible";save();render();});
   row("Traduction des mots au toucher", S.gloss?"Activée":"Désactivée",
       ()=>{S.gloss=S.gloss?0:1;save();render();});
   row("Propositions masquées au départ", S.hideOpts?"Oui":"Non",
@@ -1143,7 +1149,7 @@ VIEWS.lecons=m=>{
     const c=el("div","card"+(lock?" lock":""));
     c.innerHTML=`<h3>第${L.n}課 <span class="tag">${esc(L.fr)}</span>${lock?' <span class="tag">verrouillé</span>':''}</h3>
       <div class="jpx" style="font-size:0.9375rem;color:var(--mut)">${lock?"—":jpn(L.jp)}</div>
-      ${(!lock&&L.jpfr)?`<div class="gtr" style="font-size:0.7812rem">${esc(L.jpfr)}</div>`:""}`;
+      ${(!lock&&L.jpfr&&S.tr==="visible")?`<div class="gtr" style="font-size:0.7812rem">${esc(L.jpfr)}</div>`:""}`;
     if(!lock) c.onclick=()=>go("lecon",L.n);
     m.appendChild(c);
   });
@@ -1152,12 +1158,16 @@ VIEWS.lecon=m=>{
   const L=D.lessons.find(x=>x.n===+param)||D.lessons[0];
   head(m,"第"+L.n+"課",L.fr);
   const c=el("div","card");
-  c.innerHTML=`<h3 class="jpx" style="font-size:1.1875rem">${jpw(L.jp)}</h3>
-    ${L.jpfr?`<div class="gtr">${esc(L.jpfr)}</div>`:""}
+  const vis=S.tr==="visible";
+  c.innerHTML=`<h3 class="jpx" style="font-size:1.1875rem">${jpw(L.jp)}<span id="tr1"></span></h3>
+    ${vis&&L.jpfr?`<div class="gtr">${esc(L.jpfr)}</div>`:""}
     <div style="font-size:0.8125rem;color:var(--mut);margin-top:10px">会話 — la conversation du chapitre</div>
-    <div class="jpx" style="font-size:1rem">${jpw(L.kaiwa)}</div>
-    ${L.kwfr?`<div class="gtr">${esc(L.kwfr)}</div>`:""}`;
-  c.onclick=e=>{ if(!e.target.closest(".kj")&&!e.target.closest(".wd")) say(L.jp); };
+    <div class="jpx" style="font-size:1rem">${jpw(L.kaiwa)}<span id="tr2"></span></div>
+    ${vis&&L.kwfr?`<div class="gtr">${esc(L.kwfr)}</div>`:""}`;
+  if(!vis){
+    $("#tr1",c).replaceWith(trBtn(L.jp,L.jpfr));
+    $("#tr2",c).replaceWith(trBtn(L.kaiwa,L.kwfr));
+  }
   m.appendChild(c);
 
   const g=el("div","card");
@@ -1165,11 +1175,21 @@ VIEWS.lecon=m=>{
   L.g.forEach((x,i)=>{
     const pat=x[0], txt=x[1]||"", ej=x[2]||"", ef=x[3]||"", tr=x[4]||"";
     const d=el("div","ex");
+    const vis=S.tr==="visible";
     d.innerHTML=`<div class="j" style="font-size:0.9375rem"><span style="color:var(--dim);font-size:0.75rem">${i+1}.</span> ${jp(pat)}</div>`+
-      (tr?`<div class="gtr">${esc(tr)}</div>`:"")+
+      (tr&&vis?`<div class="gtr">${esc(tr)}</div>`:"")+
       (txt?`<div class="gx">${jp(txt)}</div>`:"")+
-      (ej?`<div class="appl"><div class="j">${jpw(ej)}</div><div class="f">${esc(ef)}</div></div>`:"");
-    if(ej){ const a=d.querySelector(".appl"); a.onclick=e=>{ if(!e.target.closest(".kj")) say(ej); }; }
+      (ej?`<div class="appl"><div class="j">${jpw(ej)}<span class="trslot"></span></div>${
+        (vis&&ef)?`<div class="f">${esc(ef)}</div>`:""}</div>`:"");
+    if(!vis&&tr){
+      const h=d.querySelector(".j");
+      h.appendChild(trBtn(pat,tr));
+    }
+    if(ej){
+      const a=d.querySelector(".appl");
+      if(!vis){ const sl=a.querySelector(".trslot"); if(sl) sl.replaceWith(trBtn(ej,ef)); }
+      a.onclick=e=>{ if(!e.target.closest(".kj")&&!e.target.closest(".wd")&&!e.target.closest(".trq")) say(ej); };
+    }
     g.appendChild(d);
   });
   m.appendChild(g);
@@ -1178,8 +1198,13 @@ VIEWS.lecon=m=>{
   e.appendChild(el("h3",null,"Phrases modèles"));
   L.ex.forEach(([a,b])=>{
     const d=el("div","ex");
-    d.innerHTML=`<div class="j">${jpw(a)}</div><div class="f">${esc(b)}</div>`;
-    d.querySelector(".f").onclick=()=>say(a);
+    if(S.tr==="visible"){
+      d.innerHTML=`<div class="j">${jpw(a)}</div><div class="f">${esc(b)}</div>`;
+      d.querySelector(".f").onclick=()=>say(a);
+    }else{
+      d.innerHTML=`<div class="j">${jpw(a)}<span class="trslot"></span></div>`;
+      d.querySelector(".trslot").replaceWith(trBtn(a,b));
+    }
     e.appendChild(d);
   });
   m.appendChild(e);
@@ -1502,6 +1527,45 @@ function jpw(str,o){
   return out;
 }
 /* fiche éclair d'un mot */
+
+/* ---- traduction à la demande : analyse d'une phrase, élément par élément ---- */
+function sentenceSheet(jpText,fr){
+  const back=document.createElement("div");
+  back.className="sheet";
+  const segs=segment(String(jpText));
+  const lignes=segs.filter(([t,i])=>i&&!PUNCT.test(t)&&(i.f||i.c)).map(([t,i])=>{
+    const kanjis=[...t].filter(c=>isKanji(c)&&KIDX[c]);
+    const comp=kanjis.length?`<span class="cread">${kanjis.map(c=>esc(c)+" "+esc((KIDX[c].f||"").split(",")[0])).join(" · ")}</span>`:"";
+    return `<div class="crow" data-w="${esc(t)}">
+      <span class="cch jpx" style="font-size:1.1875rem;min-width:auto;padding-right:4px">${jp(t)}</span>
+      <span class="cdesc"><b>${esc(i.f||"—")}</b>${i.c?` <span class="tag">${esc(i.c)}</span>`:""}${
+        i.form?` <span class="tag" style="border-color:var(--ai);color:var(--ai)">${esc(i.form)}</span>`:""}${
+        i.l>0?` <span class="tag" style="border-color:var(--take);color:var(--take)">L${i.l}</span>`:""}
+        ${comp}</span><span class="cgo">›</span></div>`;
+  }).join("");
+  back.innerHTML=`<div class="sheetbox">
+    <div class="sheethead">
+      <div><div class="jpx" style="font-size:1.1875rem;line-height:1.5">${jp(jpText)}</div></div>
+      <button class="ico" id="ssSay">🔊</button><button class="ico" id="ssX">✕</button></div>
+    ${fr?`<div class="sheetfr">${esc(fr)}</div>`:""}
+    <div class="sec" style="margin:16px 0 4px">Élément par élément</div>
+    <div class="comp">${lignes||'<div class="note">Aucun élément reconnu dans cette phrase.</div>'}</div>
+  </div>`;
+  document.body.appendChild(back);
+  const close=()=>back.remove();
+  back.onclick=e=>{ if(e.target===back) close(); };
+  $("#ssX",back).onclick=close;
+  $("#ssSay",back).onclick=()=>say(jpText);
+  back.querySelectorAll(".crow").forEach(r=>r.onclick=()=>{ close(); wordSheet(r.dataset.w); });
+}
+/* bouton discret qui ouvre l'analyse au lieu d'afficher la traduction */
+function trBtn(jpText,fr){
+  const b=el("button","trq","訳");
+  b.title="Traduire et analyser";
+  b.onclick=e=>{ e.stopPropagation(); sentenceSheet(jpText,fr); };
+  return b;
+}
+
 function wordSheet(t){
   const info=buildLex().get(t);
   const back=document.createElement("div");
@@ -2733,14 +2797,17 @@ VIEWS.exo=m=>{
   c.innerHTML=`<div class="rei"><div class="lab">例 exemple</div>
       <div class="jpx" style="font-size:0.95rem">${jpw(x.ex[0])}</div>
       <div class="jpx" style="font-size:1.05rem;color:var(--ai);margin-top:4px">→ ${jpw(x.ex[1])}</div>
-      ${hEx?`<div class="gtr" style="margin-top:4px">${esc(hEx)}</div>`:""}</div>`;
+      ${(hEx&&S.tr==="visible")?`<div class="gtr" style="margin-top:4px">${esc(hEx)}</div>`:""}
+      <span class="trslot"></span></div>`;
+  if(hEx&&S.tr!=="visible"){ const sl=c.querySelector(".trslot"); if(sl) sl.replaceWith(trBtn(x.ex[1],hEx)); }
   x.q.forEach((qq,i)=>{
     const q=qq[0], a=qq[1], hint=qq[2]||exoHint(x,q,a);
     const key=x.key+"#"+i, st=mAns[key], shown=mRev[key]||!!st;
     const rec=e&&e.done&&e.done[i]!==undefined?e.done[i]:null;
     const d=el("div","ex");
-    d.innerHTML=`<div class="j" style="font-size:0.95rem">${i+1}. ${jp(q)}
-      ${rec===null?"":(rec?'<span class="tag" style="border-color:var(--take);color:var(--take)">✓</span>':'<span class="tag" style="border-color:var(--shu);color:var(--shu)">✗</span>')}</div>`;
+    d.innerHTML=`<div class="j" style="font-size:0.95rem">${i+1}. ${jpw(q)}
+      ${rec===null?"":(rec?'<span class="tag" style="border-color:var(--take);color:var(--take)">✓</span>':'<span class="tag" style="border-color:var(--shu);color:var(--shu)">✗</span>')}</div>`+
+      ((hint&&S.tr==="visible")?`<div class="gtr" style="margin-top:2px">${esc(hint)}</div>`:"");
     if(!shown){
       const wrap=el("div"); wrap.style.marginTop="6px";
       const inp=el("input","search"); inp.style.margin="0";
@@ -2770,7 +2837,8 @@ VIEWS.exo=m=>{
       const ans=el("div","j");
       ans.style.cssText="color:var(--take);margin-top:3px";
       ans.innerHTML="→ "+jpw(a);
-      ans.onclick=ev=>{ if(!ev.target.closest(".kj")) say(a); };
+      if(S.tr!=="visible"&&hint) ans.appendChild(trBtn(a,hint));
+      ans.onclick=ev=>{ if(!ev.target.closest(".kj")&&!ev.target.closest(".wd")&&!ev.target.closest(".trq")) say(a); };
       d.appendChild(ans);
     }
     c.appendChild(d);
