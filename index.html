@@ -703,18 +703,44 @@ function grade(k,ok){
           const hard=(it.w||0)>2?0.5:((it.w||0)>0?0.75:1);   /* ce qui a résisté revient plus tôt */
           it.d=Date.now()+IVL[it.b]*DAY*hard; }
   else  { it.w=(it.w||0)+1; it.b=0; it.d=Date.now(); it.ko=today(); }
-  /* une question ratée aujourd'hui reste dans « à revoir » toute la journée,
-     même si on la corrige deux questions plus loin */
-  if(ok&&it.ko===today()) it.d=Date.now();
+  /* it.ko marque « ratée aujourd'hui » : ce marqueur ne sert qu'à la liste « à revoir ».
+     L'échéance it.d suit les règles ordinaires de la répétition espacée, y compris
+     après correction — sinon la question reviendrait dans toutes les séances du jour. */
+  if(ok&&it.ko===today()) it.fixed=today();
   S.srs[k]=it;
 }
 function dueCount(pool){ const now=Date.now(); return pool.filter(q=>{const i=S.srs[q.key]; return i&&i.d<=now;}).length; }
 function freshCount(pool){ return pool.filter(q=>!S.srs[q.key]).length; }
-function dueList(pool){ const now=Date.now(), t=today();
-  return (pool||buildPool()).filter(q=>{const i=S.srs[q.key];return i&&(i.d<=now||i.ko===t);}); }
+/* échues au sens de la répétition espacée */
+function dueList(pool){
+  const now=Date.now(), vu=new Set(), out=[];
+  (pool||buildPool()).forEach(q=>{
+    const i=S.srs[q.key];
+    if(!i||i.d>now) return;
+    if(vu.has(q.key)) return;
+    vu.add(q.key); out.push(q);
+  });
+  return out;
+}
+/* ratées aujourd'hui, corrigées ou non : le vivier du rattrapage */
+function koList(pool){
+  const t=today(), vu=new Set(), out=[];
+  (pool||buildPool()).forEach(q=>{
+    const i=S.srs[q.key];
+    if(!i||i.ko!==t) return;
+    if(vu.has(q.key)) return;
+    vu.add(q.key); out.push(q);
+  });
+  return out;
+}
+function revueList(pool){
+  const p=pool||buildPool(), vu=new Set(), out=[];
+  dueList(p).concat(koList(p)).forEach(q=>{ if(!vu.has(q.key)){vu.add(q.key);out.push(q);} });
+  return out;
+}
 function dueNow(){
-  let n=dueList(buildPool()).length;
-  if(S.kana) n+=dueList(kanaPool()).length;
+  let n=revueList(buildPool()).length;
+  if(S.kana) n+=revueList(kanaPool()).length;
   return n;
 }
 function pickSRS(list,n){
@@ -1467,14 +1493,14 @@ function dicteePool(){
     words(50).forEach(w=>{
       if(!w.k||w.k.length<2||w.k.length>6) return;
       if(!dansLesKana(w.k)) return;
-      out.push({type:"dic",key:"dh:"+w.k,l:w.l,head:"Dictée",q:w.k,
+      out.push({type:"dic",key:"dh:"+(w.j||w.k)+":"+w.l,l:w.l,head:"Dictée",q:w.k,
         sub:"Écoutez et écrivez en kana — "+esc(w.f),a:w.k,alt:[],o:[]});
     });
     return out;
   }
   words().forEach(w=>{
     if(!w.k||w.k.length>10||w.k.indexOf("・")>=0||w.k.indexOf("～")>=0) return;
-    out.push({type:"dic",key:"d3:"+w.k,l:w.l,head:"Dictée",q:w.k,
+    out.push({type:"dic",key:"d3:"+(w.j||w.k)+":"+w.l,l:w.l,head:"Dictée",q:w.k,
       sub:"Écoutez et écrivez ce que vous entendez",a:w.k,alt:[w.j],o:[]});
   });
   return out;
@@ -2943,7 +2969,7 @@ function buildPool(){
       if(f.kanji&&f.kanji[t]) oj[f[t]]=f.kanji[t];
       const av=[f.kanji&&f.kanji[t]];
       if(DERIVED[t]){ av.push(polite(f[t])); if(f.kanji&&f.kanji[t]) av.push(polite(f.kanji[t])); }
-      out.push({type:"conj",key:"c:"+w.k+":"+t,l:Math.max(w.l,minL),head:"Conjugaison · "+lab,
+      out.push({type:"conj",key:"c:"+(w.j||w.k)+":"+w.l+":"+t,l:Math.max(w.l,minL),head:"Conjugaison · "+lab,
         q:w.j||w.k,sub:esc(w.f)+" — "+CATS[w.c],a:f[t],alt:av,
         o:opts(f[t],wrong.concat(pool)),oj:oj});
     });
@@ -2954,7 +2980,7 @@ function buildPool(){
     if(!a.ej.includes(form)) return;
     const same=D.adverbes.filter(x=>x.g===a.g&&x!==a).map(x=>x.j||x.k);
     const all=D.adverbes.map(x=>x.j||x.k);
-    out.push({type:"adv",key:"d2:"+a.k,l:a.l,head:"Adverbe"+(a.neg?" · à polarité négative":""),
+    out.push({type:"adv",key:"d2:"+(a.j||a.k)+":"+a.l+":"+a.g,l:a.l,head:"Adverbe"+(a.neg?" · à polarité négative":""),
       q:a.ej.replace(form,"［ ？ ］"),sub:esc(a.ef),a:form,o:optsRanked(form,same,all)});
   });
   const adjs=W.filter(w=>["ai","na"].includes(w.c));
@@ -2972,7 +2998,7 @@ function buildPool(){
         const a1=adjTable(v,false,true), a2=adjTable(v,false,false);
         const x1=a1&&a1.find(z=>z.lab===r.lab), x2=a2&&a2.find(z=>z.lab===r.lab);
         if(x1&&x2&&x1.val!==x2.val) oj[x1.val]=x2.val; });
-      out.push({type:"adj",key:"a:"+w.k+":"+r.lab,l:Math.max(w.l,r.l),head:"Adjectif · "+r.lab,
+      out.push({type:"adj",key:"a:"+(w.j||w.k)+":"+w.l+":"+r.lab,l:Math.max(w.l,r.l),head:"Adjectif · "+r.lab,
         q:w.j||w.k,sub:esc(w.f)+" — "+CATS[w.c],a:r.val,alt:[kv&&kv.val],
         o:opts(r.val,wrongPool.concat(others)),oj:oj});
     });
@@ -2988,7 +3014,7 @@ function buildPool(){
     /* deux mots peuvent partager la même traduction : on accepte l'un comme l'autre */
     const syn=[w.j];
     W.forEach(v=>{ if(v!==w && v.f===w.f){ syn.push(v.k); if(v.j) syn.push(v.j); } });
-    out.push({type:"voc",key:"v:"+w.k,l:w.l,head:"Vocabulaire",q:w.f,
+    out.push({type:"voc",key:"v:"+(w.j||w.k)+":"+w.l,l:w.l,head:"Vocabulaire",q:w.f,
       sub:"Leçon "+w.l+" · "+(CATS[w.c]||"")+(syn.length>1?" · plusieurs réponses possibles":""),
       a:w.k,alt:syn,o:opts(w.k,same.concat(W.map(v=>v.k))),oj:ojv});
   });
@@ -3023,17 +3049,28 @@ function buildPool(){
     out.push({type:"cnt",key:"n:"+c.c,l:c.l,head:"Compteur",q:c.u,sub:"Quel compteur employer ?",
       a:c.c,alt:[base,"～"+base],o:opts(c.c,D.compteurs.map(x=>x.c))});
   });
-  let res=out.filter(x=>x.l<=S.ch&&x.o&&x.o.length>=2);
+  const vu=new Set();
+  let res=out.filter(x=>{
+    if(x.l>S.ch||!x.o||x.o.length<2) return false;
+    if(vu.has(x.key)) return false;          /* homographes : une seule fiche par clé */
+    vu.add(x.key); return true;
+  });
   if(S.kana) res=kanaPool().concat(res);      /* uniquement si le mode débutant est actif */
   poolCache=res; poolCh=sig;
   return poolCache;
 }
 function startSession(mode){
   if(mode==="due"){
-    let d=dueList(buildPool());
-    if(S.kana) d=dueList(kanaPool()).concat(d);
+    let d=revueList(buildPool());
+    if(S.kana) d=revueList(kanaPool()).concat(d);
     if(d.length){
-      d.sort((a,b)=>S.srs[a.key].d-S.srs[b.key].d);
+      /* d'abord ce qui reste faux, puis ce qui a été corrigé aujourd'hui */
+      const t=today();
+      d.sort((a,b)=>{
+        const A=S.srs[a.key],B=S.srs[b.key];
+        const fa=(A.ko===t&&A.fixed!==t)?0:1, fb=(B.ko===t&&B.fixed!==t)?0:1;
+        return fa-fb || A.d-B.d;
+      });
       sess={qs:d.slice(0,30),i:0,res:[],mode:"due",ans:[],shown:{},typed:{}};
       go("shugyo",null,false); return;
     }
