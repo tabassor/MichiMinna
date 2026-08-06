@@ -1645,10 +1645,10 @@ function jlptPool(niv){
     if(k.f) out.push({type:"kan",key:"J"+niv+"k:"+k.c,l:0,head:"JLPT N"+niv+" · sens du kanji",
       q:k.c,sub:k.s+" traits",a:k.f,o:opts(k.f,ks.map(x=>x.f).filter(Boolean))});
     if(k.on&&k.on.length) out.push({type:"kanr",key:"J"+niv+"o:"+k.c,l:0,
-      head:"JLPT N"+niv+" · lecture ON 音",q:k.c,sub:esc(k.f)+" — lecture sino-japonaise",
+      head:"JLPT N"+niv+" · lecture ON 音",q:k.c,sub:"lecture sino-japonaise",hint:k.f,
       a:k.on[0],alt:k.on.slice(1),o:optsRanked(k.on[0],ks.flatMap(x=>x.on||[]),D.kanji.flatMap(x=>x.on||[]))});
     if(k.kun&&k.kun.length) out.push({type:"kanr",key:"J"+niv+"u:"+k.c,l:0,
-      head:"JLPT N"+niv+" · lecture KUN 訓",q:k.c,sub:esc(k.f)+" — lecture japonaise",
+      head:"JLPT N"+niv+" · lecture KUN 訓",q:k.c,sub:"lecture japonaise",hint:k.f,
       a:k.kun[0],alt:k.kun.slice(1),o:optsRanked(k.kun[0],ks.flatMap(x=>x.kun||[]),D.kanji.flatMap(x=>x.kun||[]))});
   });
   /* vocabulaire : mots courants n'employant que des kanji du niveau */
@@ -1666,7 +1666,7 @@ function jlptPool(niv){
       q:fr,sub:"Écrivez le mot en japonais",a:w[1],alt:[w[0]],
       o:opts(w[1],vocab.map(x=>x[1]))});
     out.push({type:"kanr",key:"J"+niv+"r:"+w[0],l:0,head:"JLPT N"+niv+" · lecture du mot",
-      q:w[0],sub:esc(fr),a:w[1],alt:[],
+      q:w[0],sub:"Comment se lit ce mot ?",hint:fr,a:w[1],alt:[],
       o:opts(w[1],vocab.map(x=>x[1]))});
   });
   return out;
@@ -3162,14 +3162,14 @@ function buildPool(){
     if(k.on&&k.on.length){
       const pool=D.kanji.flatMap(x=>x.on||[]).filter(Boolean);
       out.push({type:"kanr",key:"kro:"+k.c,l:k.l,head:"Kanji · lecture ON 音",q:k.c,
-        sub:esc(k.f)+" — lecture sino-japonaise (celle des mots composés)",
+        sub:"lecture sino-japonaise (celle des mots composés)",hint:k.f,
         a:k.on[0],alt:k.on.slice(1),
         o:optsRanked(k.on[0],pool.filter(r=>k.on.indexOf(r)<0),pool)});
     }
     if(k.kun&&k.kun.length){
       const pool=D.kanji.flatMap(x=>x.kun||[]).filter(Boolean);
       out.push({type:"kanr",key:"krk:"+k.c,l:k.l,head:"Kanji · lecture KUN 訓",q:k.c,
-        sub:esc(k.f)+" — lecture japonaise (celle du mot isolé)",
+        sub:"lecture japonaise (celle du mot isolé)",hint:k.f,
         a:k.kun[0],alt:k.kun.slice(1),
         o:optsRanked(k.kun[0],pool.filter(r=>k.kun.indexOf(r)<0),pool)});
     }
@@ -3178,7 +3178,7 @@ function buildPool(){
     if(!k.rad||!RIDX[k.rad]) return;
     const pool=D.radicaux.map(r=>r.c);
     out.push({type:"rad",key:"r:"+k.c,l:k.l,head:"Radical",q:k.c,
-      sub:esc(k.f)+" — quel est son radical ?",a:k.rad,o:optsRanked(k.rad,(k.cp||[]),pool)});
+      sub:"Quel est son radical ?",hint:k.f,a:k.rad,o:optsRanked(k.rad,(k.cp||[]),pool)});
   });
   D.compteurs.filter(c=>c.l<=S.ch).forEach(c=>{
     const base=c.c.replace(/^～/,"").split(" ")[0].split("／")[0];
@@ -3295,7 +3295,19 @@ VIEWS.shugyo=m=>{
                                 : txt(q.q);
   box.innerHTML=`<div class="qhead">${q.head} · ${sess.i+1}/${sess.qs.length}${
     q.again?' · <span style="color:var(--yama)">reprise</span>':""}</div>
-    <div class="qtext">${enonce}</div><div class="qsub">${q.sub}</div>`;
+    <div class="qtext">${enonce}</div><div class="qsub">${q.sub}</div>
+    ${q.hint?'<div class="qhint"></div>':""}`;
+  if(q.hint){
+    const h=box.querySelector(".qhint");
+    const montre=()=>{ h.innerHTML='<span class="qsub" style="color:var(--yama)">Sens : '+esc(q.hint)+"</span>"; };
+    if(done||sess.hint&&sess.hint[sess.i]) montre();
+    else{
+      const b2=el("button","btn","Voir le sens");
+      b2.style.cssText="padding:5px 11px;font-size:0.8125rem;margin-top:8px";
+      b2.onclick=()=>{ sess.hint=sess.hint||{}; sess.hint[sess.i]=1; montre(); };
+      h.appendChild(b2);
+    }
+  }
   m.appendChild(box);
   if(q.type==="dic"&&!done){
     const cc=el("div","ctrl");
