@@ -957,6 +957,9 @@ const VIEWS={};
    le bouton retour du téléphone remonte donc dans l'application
    au lieu de la quitter, et ne la quitte qu'une fois à la racine. */
 let navDir="fwd", sortie=0;
+/* le navigateur restaure sinon le défilement d'une vue longue sur une vue courte,
+   ce qui laisse l'écran apparemment vide */
+try{ if("scrollRestoration" in history) history.scrollRestoration="manual"; }catch(e){}
 /* petit bandeau passager, sans bloquer l'interface */
 function toast(txt){
   let t=document.getElementById("toast");
@@ -971,14 +974,14 @@ function go(v,p,push){
     stack.push([view,param]);
     try{ history.pushState({michi:stack.length},"",location.href); }catch(e){}
   }
-  view=v; param=np; window.scrollTo(0,0); render();
+  view=v; param=np; render(); requestAnimationFrame(()=>window.scrollTo(0,0));
 }
 function back(){
   navDir="back";
   if(stack.length){ try{ history.back(); return; }catch(e){} }
   const s=stack.pop();
-  if(s){ view=s[0]; param=s[1]; window.scrollTo(0,0); render(); }
-  else if(view!=="home"){ view="home"; param=null; window.scrollTo(0,0); render(); }
+  if(s){ view=s[0]; param=s[1]; render(); requestAnimationFrame(()=>window.scrollTo(0,0)); }
+  else if(view!=="home"){ view="home"; param=null; render(); requestAnimationFrame(()=>window.scrollTo(0,0)); }
 }
 window.addEventListener("popstate",()=>{
   navDir="back";
@@ -998,8 +1001,8 @@ window.addEventListener("popstate",()=>{
   }
   /* on remet une entrée dans l'historique : le retour ne débouche jamais sur du vide */
   try{ history.pushState({michi:stack.length},"",location.href); }catch(e){}
-  window.scrollTo(0,0);
   render();
+  requestAnimationFrame(()=>window.scrollTo(0,0));
   popping=false;
 });
 const NAV=[["home","家","Accueil"],["arbre","道","Le chemin"],["dico","辞","Dico"],["kanji","字","Kanji"],["shugyo","修","Entraîner"]];
@@ -2076,7 +2079,15 @@ const EL={}; D.elements.forEach(e=>EL[e.id]=e);
 const NIDX={}; D.arbre.forEach(n=>NIDX[n.id]=n);
 const RANG=r=>D.rangs[Math.max(0,Math.min(D.rangs.length-1,r))];
 
+const TREE_V=2;
 function tstate(){
+  /* une conversion antérieure ne validait pas les nœuds du rang courant :
+     on la refait, sans toucher à ce qui a été gagné en jouant */
+  if(S.tree && (S.tree.v||1)<TREE_V){
+    const joues={}; for(const k in S.tree.done) if(!S.tree.done[k].conv) joues[k]=S.tree.done[k];
+    S.tree=null;
+    S.tree_joues=joues;
+  }
   if(!S.tree){
     S.tree={rang:0,done:{},frag:{moku:0,ka:0,do:0,kin:0,sui:0},tests:{}};
     /* on ne repart pas de zéro : le chapitre atteint vaut un rang et ses nœuds */
@@ -2092,6 +2103,17 @@ function tstate(){
       S.tree.done[n.id]={d:Date.now(),s:100,conv:1};
       S.tree.frag[n.el]=(S.tree.frag[n.el]||0)+gainNoeud(n);
     });
+    /* on réintègre les nœuds réellement joués */
+    const j=S.tree_joues||{};
+    for(const k in j){
+      if(!S.tree.done[k]){
+        S.tree.done[k]=j[k];
+        const n=NIDX[k]; if(n) S.tree.frag[n.el]=(S.tree.frag[n.el]||0)+gainNoeud(n);
+      }
+    }
+    delete S.tree_joues;
+    S.tree.v=TREE_V;
+    save();
   }
   ["moku","ka","do","kin","sui"].forEach(k=>{ if(S.tree.frag[k]==null) S.tree.frag[k]=0; });
   return S.tree;
