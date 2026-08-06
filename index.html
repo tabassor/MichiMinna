@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
-<meta name="theme-color" content="#0B1322">
+<meta name="theme-color" content="#0E1116">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -14,20 +14,21 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.v2.png">
-<title>みち — compagnon Minna no Nihongo</title>
+<title>みち — compagnon d'étude du japonais</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@400;700;900&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@400;700;900&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Maru+Gothic:wght@400;500;700;900&family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#0B1322; --surf:#131F36; --surf2:#1B2B49; --line:#25395E;
   --tx:#E7EDF8; --mut:#8FA2C4; --dim:#5E7299;
   --ai:#5B8DEF; --take:#4FBF9B; --shu:#E0604B; --yama:#E3B23C;
   --disp:"Zen Old Mincho","Hiragino Mincho ProN","Yu Mincho",serif;
-  --ui:"Zen Kaku Gothic New",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-  --r:14px;
-  --r-sm:10px; --r-pill:12px; --r-cell:10px;
-  --pad:14px; --shadow:none; --bw:1px;
+  --ui:"Instrument Sans","Zen Kaku Gothic New",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --tit:"Instrument Serif","Zen Old Mincho",Georgia,serif;
+  --r:16px;
+  --r-sm:11px; --r-pill:999px; --r-cell:12px;
+  --pad:16px; --shadow:none; --bw:1px;
   --disp-w:700; --tile-jp:26px; --grain:.35;
 }
 
@@ -46,8 +47,8 @@ input,select{font-family:inherit;font-size:1rem;color:inherit}
 :focus-visible{outline:2px solid var(--ai);outline-offset:2px;border-radius:6px}
 header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:8px;
   padding:calc(10px + env(safe-area-inset-top)) 0 10px;background:linear-gradient(var(--bg) 72%,transparent)}
-.brand{font-family:var(--disp);font-size:1.1875rem;letter-spacing:.06em}
-.brand small{display:block;font-family:var(--ui);font-size:0.625rem;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+.brand{font-family:var(--disp);font-size:1.3125rem;letter-spacing:.06em;line-height:1.15}
+.brand small{display:block;font-family:var(--ui);font-size:0.5312rem;letter-spacing:.17em;text-transform:uppercase;color:var(--dim);margin-top:2px}
 .hbtn{margin-left:auto;display:flex;gap:6px;align-items:center}
 .chip{border:1px solid var(--line);background:var(--surf);border-radius:999px;padding:6px 11px;font-size:0.8125rem;color:var(--mut);white-space:nowrap}
 .chip.on{background:var(--ai);border-color:var(--ai);color:var(--on);font-weight:700}
@@ -123,7 +124,7 @@ button.stat{font:inherit;width:100%}
 .tag.due{border-color:var(--shu);color:var(--shu)}
 .filters{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
 .filters::-webkit-scrollbar{display:none}
-.search{width:100%;background:var(--surf);border:var(--bw) solid var(--line);border-radius:var(--r-pill);padding:11px 14px;margin-bottom:10px}
+.search{width:100%;background:var(--surf);border:var(--bw) solid var(--line);border-radius:var(--r-sm);padding:11px 14px;margin-bottom:10px}
 .word{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
 .word:last-child{border-bottom:0}
 .word .l{flex:1;min-width:0}
@@ -151,8 +152,8 @@ button.stat{font:inherit;width:100%}
 .crow .cread{display:block;font-family:var(--disp);font-size:0.75rem;color:var(--dim);margin-top:1px}
 .crow .cgo{color:var(--dim);font-size:1.125rem;flex:0 0 auto}
 .wd{border-bottom:1px dotted transparent;cursor:pointer;border-radius:3px}
-.trq{border:1px solid var(--line);background:var(--surf2);color:var(--mut);border-radius:8px;
-  font-family:var(--disp);font-size:0.75rem;padding:2px 7px;margin-left:6px;vertical-align:middle;line-height:1.4}
+.trq{border:1px solid color-mix(in srgb,var(--line) 70%,transparent);background:transparent;color:var(--dim);border-radius:6px;
+  font-family:var(--disp);font-size:0.6875rem;padding:1px 6px;margin-left:6px;vertical-align:middle;line-height:1.5;opacity:.8}
 .trq:active{border-color:var(--ai);color:var(--ai)}
 .wd:active{background:color-mix(in srgb,var(--ai) 18%,transparent)}
 html[data-gloss="1"] .wd{border-bottom-color:color-mix(in srgb,var(--ai) 45%,transparent)}
@@ -217,6 +218,69 @@ nav button .jp{font-family:var(--disp);font-size:1.1875rem;line-height:1}
 nav button .fr{font-size:0.5938rem;letter-spacing:.02em}
 nav button.on{color:var(--ai)}
 
+
+/* ---------- accueil refondu ---------- */
+.hero{background:var(--surf);border:var(--bw) solid var(--line);border-radius:var(--r);
+  padding:18px var(--pad) 16px;margin-bottom:14px;position:relative;overflow:hidden}
+.hero-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}
+.eyebrow{font-size:0.6875rem;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+.hero-mid{display:flex;gap:16px;align-items:center}
+.hero-txt{flex:1;min-width:0}
+.hero-txt h1{font-family:var(--tit);font-size:1.875rem;font-weight:400;line-height:1.05;margin:0}
+.hero-txt p{font-size:0.8438rem;color:var(--mut);margin:6px 0 0;line-height:1.5}
+/* la case de 原稿用紙 : le motif signature de l'application */
+.cellule{position:relative;width:88px;height:88px;flex:0 0 auto;border:1.5px solid var(--line);
+  border-radius:4px;display:grid;place-items:center;overflow:hidden;background:var(--surf2)}
+.cellule::before,.cellule::after{content:"";position:absolute;background:repeating-linear-gradient(
+  var(--line) 0 3px,transparent 3px 7px)}
+.cellule::before{left:50%;top:6%;bottom:6%;width:1px;transform:translateX(-.5px)}
+.cellule::after{top:50%;left:6%;right:6%;height:1px;transform:translateY(-.5px);
+  background:repeating-linear-gradient(90deg,var(--line) 0 3px,transparent 3px 7px)}
+.cell-fill{position:absolute;left:0;right:0;bottom:0;background:color-mix(in srgb,var(--ai) 20%,transparent);
+  transition:height .5s cubic-bezier(.4,0,.2,1)}
+.cellule b{position:relative;font-family:var(--disp);font-size:1.875rem;line-height:1;color:var(--tx)}
+.cellule u{position:relative;text-decoration:none;font-size:0.6875rem;color:var(--dim);margin-top:2px}
+.hero-bar{height:4px;border-radius:99px;background:var(--surf2);overflow:hidden;margin-top:16px}
+.hero-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--ai),var(--take));
+  transition:width .5s cubic-bezier(.4,0,.2,1)}
+.hero-act{display:flex;gap:8px;margin-top:14px}
+.hero-act .btn{flex:1}
+.btn.ghost{background:transparent;border-color:color-mix(in srgb,var(--shu) 55%,var(--line));color:var(--shu)}
+
+/* rubriques : des lignes, plus lisibles qu'une grille de tuiles */
+.rows{background:var(--surf);border:var(--bw) solid var(--line);border-radius:var(--r);
+  overflow:hidden;margin-bottom:16px}
+.nrow{display:flex;align-items:center;gap:14px;width:100%;padding:13px var(--pad);
+  border-bottom:1px solid var(--line);text-align:left;background:none}
+.nrow:last-child{border-bottom:0}
+.nrow:active{background:var(--surf2)}
+.nj{font-family:var(--disp);font-size:1.3125rem;line-height:1;color:var(--ai);
+  min-width:52px;flex:0 0 auto}
+.nt{flex:1;min-width:0}
+.nt b{display:block;font-weight:600;font-size:0.9375rem}
+.nt span{display:block;font-size:0.7812rem;color:var(--mut);margin-top:1px}
+.ngo{color:var(--dim);font-size:1.1875rem;flex:0 0 auto}
+.kanacard{display:block;cursor:pointer}
+.kanacard .l{display:flex;gap:14px;align-items:center}
+.kanacard .jpx.big{font-size:1.625rem;color:var(--ai);min-width:52px}
+.kanacard b{display:block;font-size:0.9375rem}
+.kanacard span{font-size:0.7812rem;color:var(--mut)}
+
+/* ---------- 漆 : laque, or et papier quadrillé ---------- */
+html[data-skin="urushi"]{ --grain:.5; }
+html[data-skin="urushi"] body::before{
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:26px 26px; opacity:.22;
+  -webkit-mask-image:radial-gradient(120% 60% at 50% 0%,#000 0%,transparent 70%);
+          mask-image:radial-gradient(120% 60% at 50% 0%,#000 0%,transparent 70%);
+}
+html[data-skin="urushi"] .card,html[data-skin="urushi"] .qbox,html[data-skin="urushi"] .goal,
+html[data-skin="urushi"] .dial,html[data-skin="urushi"] .tile{
+  background:linear-gradient(180deg,color-mix(in srgb,var(--surf) 96%,var(--tx)) 0%,var(--surf) 100%);
+}
+html[data-skin="urushi"] .sec{color:var(--ai);letter-spacing:.2em;font-weight:600}
+html[data-skin="urushi"] .sec::after{background:color-mix(in srgb,var(--ai) 30%,transparent)}
+
 /* ---------- Pop : géométrie franche, ombres portées nettes ---------- */
 html[data-skin="pop"]{
   --r:20px; --r-sm:14px; --r-pill:999px; --r-cell:16px; --pad:16px;
@@ -273,7 +337,7 @@ html[data-skin="retro"] .opt.no{box-shadow:0 0 12px color-mix(in srgb,var(--shu)
 <div id="app">
   <header>
     <button class="ava" id="avaBtn" aria-label="Profil">・</button>
-    <div class="brand">みち<small>Minna no Nihongo</small></div>
+    <div class="brand">みち<small>Compagnon d'étude du japonais</small></div>
     <div class="hbtn">
       <button class="chip sm" id="searchBtn" title="Rechercher">🔍</button>
       <button class="chip sm" id="scriptBtn" title="Kanji ou kana">漢</button>
@@ -289,7 +353,7 @@ const D = {"vocab":{"1":[{"k":"わたし","j":"私","f":"je, moi","c":"pron"},{"
 
 /* ================= profils & stockage ================= */
 const UKEY="michi:users";
-const NEW = ()=>({ch:1,kstage:1,xp:0,streak:0,last:"",day:"",done:0,goal:20,theme:"ai",script:"kanji",furi:1,fs:1,input:"auto",hideOpts:1,gloss:1,tz:"auto",tr:"demande",srs:{},fav:[],exos:{}});
+const NEW = ()=>({ch:1,kstage:1,xp:0,streak:0,last:"",day:"",done:0,goal:20,theme:"urushi",script:"kanji",furi:1,fs:1,input:"auto",hideOpts:1,gloss:1,tz:"auto",tr:"demande",srs:{},fav:[],exos:{}});
 let USERS=[], UID=null, S=NEW(), memStore={};
 const HAS_AS = typeof window.storage!=="undefined" && window.storage && typeof window.storage.get==="function";
 let HAS_LS=false; try{ localStorage.setItem("michi:t","1"); localStorage.removeItem("michi:t"); HAS_LS=true; }catch(e){}
@@ -340,6 +404,7 @@ function tickDay(){
 }
 
 const THEMES={
+"urushi":{n:"漆",f:"Laque et or",d:1,skin:1,v:{bg:"#0E1116",surf:"#161A21",surf2:"#1E232C",line:"#2C3340",tx:"#EFEBE1",mut:"#A3A79F",dim:"#71766F",ai:"#D9A441",take:"#4FBE93",shu:"#E2593F",yama:"#C9A227",on:"#101010",onG:"#101010",onR:"#101010"}},
 "ai":{n:"藍",f:"Indigo",d:1,v:{bg:"#0B1322",surf:"#131F36",surf2:"#1B2B49",line:"#25395E",tx:"#E7EDF8",mut:"#8FA2C4",dim:"#5E7299",ai:"#5B8DEF",take:"#4FBF9B",shu:"#E0604B",yama:"#E3B23C",on:"#101010",onG:"#101010",onR:"#101010"}},
 "washi":{n:"和紙",f:"Papier",d:0,v:{bg:"#EEF1F5",surf:"#FFFFFF",surf2:"#F5F7FA",line:"#D9E0EA",tx:"#122038",mut:"#55698A",dim:"#8496AF",ai:"#2F6BD8",take:"#0E7D5E",shu:"#C13A25",yama:"#96690F",on:"#FFFFFF",onG:"#FFFFFF",onR:"#FFFFFF"}},
 "sakura":{n:"桜",f:"Cerisier",d:0,v:{bg:"#FDF3F6",surf:"#FFFFFF",surf2:"#FBE9EF",line:"#F0CFDA",tx:"#381D29",mut:"#7E5163",dim:"#AE8494",ai:"#D23B7B",take:"#0F7C57",shu:"#C0392B",yama:"#96690F",on:"#FFFFFF",onG:"#FFFFFF",onR:"#FFFFFF"}},
@@ -353,7 +418,7 @@ const THEMES={
 "kawaii":{n:"かわいい",f:"Kawaii",d:0,skin:1,v:{bg:"#FFF3F8",surf:"#FFFFFF",surf2:"#FFE7F1",line:"#F5C6DC",tx:"#3B1E33",mut:"#7A4A66",dim:"#A97B93",ai:"#C0387E",take:"#0F7A55",shu:"#D9342B",yama:"#9A6A00",on:"#FFFFFF",onG:"#FFFFFF",onR:"#FFFFFF"}},
 "retro":{n:"レトロ",f:"Arcade",d:1,skin:1,v:{bg:"#12102A",surf:"#1B1840",surf2:"#252152",line:"#38326E",tx:"#F2EEFF",mut:"#B3A9E0",dim:"#7E74AE",ai:"#00E0FF",take:"#5CF07A",shu:"#FF5C8A",yama:"#FFD84D",on:"#101010",onG:"#101010",onR:"#101010"}}
 };
-const THORDER=["ai","washi","sakura","yuzu","sora","sumi","yozakura","shibuya","shinkai","pop","kawaii","retro"];
+const THORDER=["urushi","ai","washi","sakura","yuzu","sora","sumi","yozakura","shibuya","shinkai","pop","kawaii","retro"];
 function applyTheme(){
   const t=THEMES[S.theme]||THEMES.ai;
   const r=document.documentElement;
@@ -374,6 +439,7 @@ const rnd=a=>a[Math.floor(Math.random()*a.length)];
 function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function say(t){ try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(String(t).replace(/[（(].*?[)）]/g,""));u.lang="ja-JP";u.rate=.85;speechSynthesis.speak(u);}catch(e){} }
 const isKanji=c=>/[\u4e00-\u9fff\u3005]/.test(c);
+const VERSION="1.0";
 const KIDX={}; D.kanji.forEach(k=>KIDX[k.c]=k);
 const RIDX={}; D.radicaux.forEach(r=>RIDX[r.c]=r);
 
@@ -921,7 +987,14 @@ VIEWS.users=m=>{
   m.appendChild(ts);
 
   const lic=el("div","card");
-  lic.appendChild(el("h3",null,"Sources et licences"));
+  lic.appendChild(el("h3",null,"À propos et licences"));
+  lic.innerHTML+=`<div style="font-size:0.8125rem;color:var(--mut);line-height:1.6">
+    <p style="margin:6px 0"><b>みち</b> — compagnon d'étude du japonais. Version ${VERSION}.</p>
+    <p style="margin:6px 0">Interface, code, explications grammaticales, notes culturelles et traductions :
+    © ${new Date().getFullYear()} — tous droits réservés.</p>
+    <p style="margin:6px 0">Application indépendante, sans lien avec les éditeurs des manuels cités.
+    Les données linguistiques ci-dessous restent sous leurs licences respectives.</p>
+    </div>`;
   lic.innerHTML+=`<div style="font-size:0.8rem;color:var(--mut);line-height:1.6">
     <p style="margin:6px 0"><b>Tracés des kanji</b> — KanjiVG, © Ulrich Apel, sous licence
     Creative Commons Attribution-Partage dans les mêmes conditions 3.0.
@@ -1074,10 +1147,47 @@ VIEWS.welcome=m=>{
 
 /* ================= accueil ================= */
 VIEWS.home=m=>{
-  const nw=words().length, nk=kanjis().length;
+  const nw=words().length, nk=kanjis().length, due=dueNow();
+  const pc=Math.min(100,Math.round((S.done||0)/S.goal*100));
+  const u=USERS.find(x=>x.id===UID);
+
+  /* ---- bandeau du jour : une seule chose à faire, mise en avant ---- */
+  const hero=el("div","hero");
+  hero.innerHTML=`
+    <div class="hero-top">
+      <span class="eyebrow">${bonjour()}${u?", "+esc(u.n):""}</span>
+      <span class="eyebrow">${S.streak||0} jour${(S.streak||0)>1?"s":""} d'affilée</span>
+    </div>
+    <div class="hero-mid">
+      <div class="cellule" aria-hidden="true">
+        <i class="cell-fill" style="height:${pc}%"></i>
+        <b>${S.done||0}</b><u>/ ${S.goal}</u>
+      </div>
+      <div class="hero-txt">
+        <h1>${pc>=100?"Objectif atteint":"Séance du jour"}</h1>
+        <p>${pc>=100
+            ? "Vous pouvez continuer : chaque question consolide un peu plus."
+            : (due? due+" question"+(due>1?"s":"")+" à revoir, puis du nouveau."
+                  : "Tirage pondéré par vos hésitations passées.")}</p>
+      </div>
+    </div>
+    <div class="hero-bar"><i style="width:${pc}%"></i></div>
+    <div class="hero-act"></div>`;
+  const act=$(".hero-act",hero);
+  const b1=el("button","btn p","Commencer");
+  b1.onclick=()=>go("shugyo");
+  act.appendChild(b1);
+  if(due){
+    const b2=el("button","btn ghost",due+" à revoir");
+    b2.onclick=()=>startSession("due");
+    act.appendChild(b2);
+  }
+  m.appendChild(hero);
+
+  /* ---- où en êtes-vous : chapitre courant ---- */
   const d=el("div","dial");
   d.innerHTML=`<div class="sq"><div class="fill" style="height:${S.ch/50*100}%"></div><b>${S.ch}</b><i>課</i></div>
-  <div><h2>Où en êtes-vous ?</h2><p>Chapitre ${S.ch} sur 50 — tout le contenu jusqu'ici est ouvert.</p>
+  <div><h2>Chapitre ${S.ch} sur 50</h2><p>${nw} mots et ${nk} kanji ouverts.</p>
   <div class="step"><button id="mn" aria-label="Chapitre précédent">−</button>
   <input type="range" min="1" max="50" value="${S.ch}" id="rg" aria-label="Chapitre en cours">
   <button id="pl" aria-label="Chapitre suivant">+</button></div></div>`;
@@ -1086,53 +1196,54 @@ VIEWS.home=m=>{
   $("#mn",d).onclick=()=>set(S.ch-1); $("#pl",d).onclick=()=>set(S.ch+1);
   $("#rg",d).oninput=e=>set(+e.target.value);
 
-  const due=dueNow();
-  const r=el("div","row3");
-  r.innerHTML=`<div class="stat"><b>${nw}</b><span>MOTS</span></div>
-  <div class="stat"><b>${nk}</b><span>KANJI</span></div>`;
-  const rev=el("button","stat");
-  if(due) rev.style.borderColor="var(--shu)";
-  rev.innerHTML=`<b${due?' style="color:var(--shu)"':""}>${due}</b><span>À REVOIR</span>`;
-  rev.onclick=()=>{ if(due) startSession("due"); else go("shugyo"); };
-  r.appendChild(rev);
-  m.appendChild(r);
-
-  const g=el("div","goal");
-  const pc=Math.min(100,Math.round((S.done||0)/S.goal*100));
-  g.innerHTML=`<div class="top"><span>Objectif du jour</span><span>${S.done||0} / ${S.goal} questions</span></div>
-  <div class="bar"><i style="width:${pc}%"></i></div>
-  <div class="top" style="margin-top:8px"><span>${S.streak||0} jour${(S.streak||0)>1?"s":""} d'affilée</span><span>${S.xp||0} pts</span></div>`;
-  m.appendChild(g);
-
-  const t=el("div","tiles");
-  const tile=(v,j,fr,s,big)=>{
-    const b=el("button","tile"+(big?" big":""),
-      `<span class="jp">${j}</span><span><span class="fr"${big?' style="margin:0"':''}>${fr}</span><br><span class="sub">${s}</span></span>`);
-    b.onclick=()=>go(v); return b;
-  };
-  t.appendChild(tile("shugyo","修業の道","Séance du jour",due?due+" question"+(due>1?"s":"")+" à revoir aujourd'hui":"Tirage pondéré par vos erreurs passées",1));
   if(S.kana){
     const st=kStage(), sc=kStageScore();
-    t.appendChild(tile("kana","仮名","Hiragana et katakana",
-      "Étape "+st+"/"+KPATH.length+" · "+KPATH[st-1].t+" · "+sc.pc+" %",1));
+    const k=el("div","card kanacard");
+    k.innerHTML=`<div class="l"><span class="jpx big">仮名</span>
+      <div><b>Hiragana et katakana</b><span>Étape ${st} sur ${KPATH.length} · ${esc(KPATH[st-1].t)}</span>
+      <div class="hero-bar" style="margin-top:8px"><i style="width:${sc.pc}%"></i></div></div></div>`;
+    k.onclick=()=>go("kana"); m.appendChild(k);
   }
-  t.appendChild(tile("lecons","課","Leçons",S.ch+" résumés ouverts"));
-  t.appendChild(tile("dico","辞書","Dictionnaire",nw+" mots du manuel"));
-  t.appendChild(tile("jmdict","大辞典","Dictionnaire étendu","15 338 mots · JMdict"));
-  t.appendChild(tile("jlpt","JLPT","Préparation N5 · N4","Kanji, lectures et vocabulaire"));
-  t.appendChild(tile("gram","助詞","Grammaire",D.particules.filter(p=>p.l<=S.ch).length+" particules"));
-  t.appendChild(tile("expr","表現","Expressions",D.expressions.filter(e=>e.l<=S.ch).length+" familles"));
-  t.appendChild(tile("cnt","助数詞","Compteurs",D.compteurs.filter(c=>c.l<=S.ch).length+" compteurs"));
-  t.appendChild(tile("adv","副詞","Adverbes",D.adverbes.filter(a=>a.l<=S.ch).length+" classés par fonction"));
-  t.appendChild(tile("fiches","要点","Fiches pratiques",D.fiches.filter(f=>f.l<=S.ch).length+" fiches"));
-  t.appendChild(tile("kanji","漢字","Kanji & tracé",nk+" caractères"));
-  t.appendChild(tile("rads","部首","Radicaux",D.radicaux.filter(r=>r.k.some(c=>KIDX[c]&&KIDX[c].l&&KIDX[c].l<=S.ch)).length+" rencontrés"));
-  t.appendChild(tile("culture","文化","Contexte culturel",Math.min(S.ch,50)+" notes"));
-  t.appendChild(tile("audio","音声","Audio du manuel","Fichiers officiels 3A"));
-  t.appendChild(tile("minna","練習","Exercices Minna",D.minna.filter(x=>x.l<=S.ch).length+" séries"));
-  t.appendChild(tile("conjug","活用","Conjugueur","Toutes les formes d'un mot"));
-  m.appendChild(t);
+
+  /* ---- le reste, en rubriques : on cherche, on ne balaie plus ---- */
+  const groupe=(titre,items)=>{
+    m.appendChild(el("div","sec",titre));
+    const l=el("div","rows");
+    items.forEach(([v,j,fr,sub])=>{
+      const b=el("button","nrow");
+      b.innerHTML=`<span class="nj jpx">${j}</span>
+        <span class="nt"><b>${fr}</b><span>${sub}</span></span><span class="ngo">›</span>`;
+      b.onclick=()=>go(v); l.appendChild(b);
+    });
+    m.appendChild(l);
+  };
+  groupe("Étudier",[
+    ["lecons","課","Leçons",S.ch+" chapitres ouverts"],
+    ["fiches","要点","Fiches de grammaire",D.fiches.filter(f=>f.l<=S.ch).length+" points resserrés"],
+    ["culture","文化","Contexte culturel",Math.min(S.ch,50)+" notes"],
+    ["audio","音声","Audio du manuel","Vos fichiers, hors ligne"]]);
+  groupe("S'entraîner",[
+    ["minna","練習","Exercices",D.minna.filter(x=>x.l<=S.ch).length+" séries du manuel, et plus"],
+    ["jlpt","JLPT","Préparation N5 · N4","Kanji, lectures, vocabulaire"],
+    ["conjug","活用","Conjugueur","Toutes les formes d'un mot"]]);
+  groupe("Chercher",[
+    ["dico","辞書","Dictionnaire du manuel",nw+" mots classés"],
+    ["jmdict","大辞典","Dictionnaire étendu","15 338 mots, JMdict"],
+    ["kanji","漢字","Kanji et tracé",nk+" caractères"],
+    ["rads","部首","Radicaux",D.radicaux.filter(r=>r.k.some(c=>KIDX[c]&&KIDX[c].l&&KIDX[c].l<=S.ch)).length+" rencontrés"],
+    ["gram","助詞","Particules",D.particules.filter(p=>p.l<=S.ch).length+" particules"],
+    ["expr","表現","Expressions",D.expressions.filter(e=>e.l<=S.ch).length+" familles"],
+    ["cnt","助数詞","Compteurs",D.compteurs.filter(c=>c.l<=S.ch).length+" compteurs"],
+    ["adv","副詞","Adverbes",D.adverbes.filter(a=>a.l<=S.ch).length+" classés par fonction"]]);
+
+  m.appendChild(el("div","note","Votre progression reste sur cet appareil. Pensez à l'exporter de temps en temps depuis votre profil."));
 };
+function bonjour(){
+  let h=new Date().getHours();
+  try{ if(S.tz&&S.tz!=="auto")
+    h=+new Intl.DateTimeFormat("fr-FR",{timeZone:S.tz,hour:"2-digit",hour12:false}).format(new Date()); }catch(e){}
+  return h<5?"Bonne nuit":h<12?"Bonjour":h<18?"Bon après-midi":"Bonsoir";
+}
 
 /* ================= leçons ================= */
 VIEWS.lecons=m=>{

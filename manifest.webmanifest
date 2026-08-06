@@ -1,7 +1,7 @@
 {
-  "name": "みち — Minna no Nihongo",
+  "name": "みち — compagnon d'étude du japonais",
   "short_name": "みち",
-  "description": "Compagnon de révision Minna no Nihongo : vocabulaire, kanji, grammaire, entraînement espacé.",
+  "description": "Vocabulaire, kanji, grammaire et entraînement espacé pour apprendre le japonais.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
@@ -10,8 +10,8 @@
     "minimal-ui"
   ],
   "orientation": "portrait",
-  "background_color": "#0B1322",
-  "theme_color": "#0B1322",
+  "background_color": "#0E1116",
+  "theme_color": "#0E1116",
   "lang": "fr",
   "dir": "ltr",
   "categories": [
