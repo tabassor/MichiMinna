@@ -40,7 +40,7 @@ body{background:var(--bg);color:var(--tx);font-family:var(--ui);font-size:1rem;l
 body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:var(--grain);
   background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
   background-size:44px 44px;-webkit-mask-image:radial-gradient(circle at 50% 0%,#000 0%,transparent 62%);mask-image:radial-gradient(circle at 50% 0%,#000 0%,transparent 62%)}
-#app{position:relative;z-index:1;max-width:560px;margin:0 auto;padding:0 16px}
+#app{position:relative;z-index:1;width:100%;max-width:560px;margin:0 auto;padding:0 16px;box-sizing:border-box;overflow-x:hidden}
 h1,h2,h3{font-family:var(--disp);font-weight:700;margin:0;line-height:1.25}
 button{font-family:inherit;font-size:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 input,select{font-family:inherit;font-size:1rem;color:inherit}
@@ -226,16 +226,17 @@ nav button.on{color:var(--ai)}
 
 /* ================= animations ================= */
 @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-@keyframes slideIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
-@keyframes slideBack{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
+@keyframes slideIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes slideBack{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 @keyframes popIn{0%{transform:scale(.96);opacity:0}60%{transform:scale(1.01)}100%{transform:scale(1);opacity:1}}
-@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+@keyframes shake{0%,100%{transform:scale(1)}25%{transform:scale(.985)}50%{transform:scale(1.012)}75%{transform:scale(.995)}}
 @keyframes glow{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--take) 45%,transparent)}
   100%{box-shadow:0 0 0 14px transparent}}
 @keyframes sheetUp{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}
 
 /* entrée échelonnée des blocs d'une vue */
-main{overflow-x:clip}
+html,body{max-width:100%;overflow-x:hidden}
+main{overflow-x:hidden}
 main.anim>*{animation:rise .34s cubic-bezier(.22,.9,.28,1) both}
 main.anim>*:nth-child(1){animation-delay:.00s} main.anim>*:nth-child(2){animation-delay:.035s}
 main.anim>*:nth-child(3){animation-delay:.07s}  main.anim>*:nth-child(4){animation-delay:.10s}
@@ -347,10 +348,13 @@ main.fwd>*{animation-name:slideIn}
 .ech u{position:absolute;left:0;bottom:0;top:0;background:color-mix(in srgb,var(--ai) 30%,transparent);
   text-decoration:none;transition:width .6s cubic-bezier(.22,.9,.28,1)}
 .fragline{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
-.fchip{display:inline-flex;align-items:center;gap:4px;font-size:0.75rem;color:var(--mut);
-  border:1px solid color-mix(in srgb,var(--c) 40%,transparent);border-radius:999px;padding:2px 9px}
+.fchip{position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:4px;font-size:0.75rem;
+  color:var(--mut);border:1px solid color-mix(in srgb,var(--c) 40%,transparent);border-radius:999px;padding:2px 9px}
+.fchip i,.fchip span,.fchip u{position:relative;z-index:1}
 .fchip i{font-family:var(--disp);font-style:normal;color:var(--c);font-size:0.8125rem}
 .fchip u{text-decoration:none;color:var(--dim)}
+.fbar{position:absolute;left:0;top:0;bottom:0;z-index:0;background:color-mix(in srgb,var(--c) 22%,transparent);
+  transition:width .6s cubic-bezier(.22,.9,.28,1)}
 
 /* ---------- accueil refondu ---------- */
 .hero{background:var(--surf);border:var(--bw) solid var(--line);border-radius:var(--r);
@@ -984,14 +988,14 @@ function go(v,p,push){
     stack.push([view,param]);
     try{ history.pushState({michi:stack.length},"",location.href); }catch(e){}
   }
-  view=v; param=np; render(); requestAnimationFrame(()=>window.scrollTo(0,0));
+  view=v; param=np; render(); requestAnimationFrame(()=>{ window.scrollTo(0,0); if(window.scrollX) window.scrollTo(0,0); });
 }
 function back(){
   navDir="back";
   if(stack.length){ try{ history.back(); return; }catch(e){} }
   const s=stack.pop();
-  if(s){ view=s[0]; param=s[1]; render(); requestAnimationFrame(()=>window.scrollTo(0,0)); }
-  else if(view!=="home"){ view="home"; param=null; render(); requestAnimationFrame(()=>window.scrollTo(0,0)); }
+  if(s){ view=s[0]; param=s[1]; render(); requestAnimationFrame(()=>{ window.scrollTo(0,0); if(window.scrollX) window.scrollTo(0,0); }); }
+  else if(view!=="home"){ view="home"; param=null; render(); requestAnimationFrame(()=>{ window.scrollTo(0,0); if(window.scrollX) window.scrollTo(0,0); }); }
 }
 window.addEventListener("popstate",()=>{
   navDir="back";
@@ -1012,7 +1016,7 @@ window.addEventListener("popstate",()=>{
   /* on remet une entrée dans l'historique : le retour ne débouche jamais sur du vide */
   try{ history.pushState({michi:stack.length},"",location.href); }catch(e){}
   render();
-  requestAnimationFrame(()=>window.scrollTo(0,0));
+  requestAnimationFrame(()=>{ window.scrollTo(0,0); if(window.scrollX) window.scrollTo(0,0); });
   popping=false;
 });
 const NAV=[["home","家","Accueil"],["arbre","道","Le chemin"],["dico","辞","Dico"],["kanji","字","Kanji"],["shugyo","修","Entraîner"]];
@@ -1400,9 +1404,11 @@ VIEWS.home=m=>{
   const fl=$(".fragline",pv);
   D.elements.forEach(e=>{
     const b2=besoinRang(TS.rang)[e.id]||0, o=TS.frag[e.id]||0;
+    const pcf=b2?Math.min(100,Math.round(o/b2*100)):100;
     const sp=el("span","fchip");
     sp.style.setProperty("--c",e.c);
-    sp.innerHTML=`<i class="jpx">${esc(e.j)}</i>${o}${b2?"<u>/"+b2+"</u>":""}`;
+    sp.title=e.n+" — "+o+" sur "+b2;
+    sp.innerHTML=`<b class="fbar" style="width:${pcf}%"></b><i class="jpx">${esc(e.j)}</i><span>${o}</span>${b2?'<u>/'+b2+'</u>':""}`;
     fl.appendChild(sp);
   });
   pv.onclick=e=>{ if(!e.target.closest(".pvgo")) go("arbre"); };
@@ -2195,12 +2201,16 @@ function validerNoeud(id,score){
 function seuilRang(r){ return RANG(r).seuil||4; }
 /* on n'exige que les éléments réellement représentés dans le rang,
    et le seuil vaut la moitié de ce que le rang peut rapporter */
+/* Le seuil vaut la totalité de ce que le rang peut donner : les jauges se remplissent
+   donc au même rythme que les nœuds, et arrivent à terme en même temps qu'eux. */
+/* Les fragments s'accumulent d'un rang à l'autre : le seuil est donc cumulatif,
+   et vaut la totalité de ce que tous les rangs jusqu'ici peuvent donner.
+   Les jauges se remplissent ainsi exactement au rythme des nœuds acquis. */
 function besoinRang(r){
   const b={};
-  noeudsDuRang(r).forEach(n=>{ b[n.el]=(b[n.el]||0)+gainNoeud(n); });
-  const out={};
-  for(const k in b) out[k]=Math.max(2,Math.ceil(b[k]*0.6));
-  return out;
+  D.arbre.filter(n=>n.rang<=r).forEach(n=>{ b[n.el]=(b[n.el]||0)+gainNoeud(n); });
+  D.elements.forEach(e=>{ if(b[e.id]==null) b[e.id]=0; });
+  return b;
 }
 function fragManquants(r){
   const T=tstate(), b=besoinRang(r);
@@ -2208,8 +2218,10 @@ function fragManquants(r){
     .map(e=>({e:e,ont:T.frag[e.id]||0,faut:b[e.id]}))
     .filter(x=>x.ont<x.faut);
 }
-function testPret(r){
-  return !fragManquants(r).length && !noeudsDuRang(r).filter(n=>!estFait(n.id)).length;
+function testPret(r){ return !fragManquants(r).length; }
+/* ce qui reste à faire pour ouvrir l'épreuve, exprimé en nœuds */
+function resteRang(r){
+  return noeudsDuRang(r).filter(n=>!estFait(n.id)).length;
 }
 const progRang=r=>{
   const ns=noeudsDuRang(r); if(!ns.length) return 0;
@@ -4477,7 +4489,7 @@ function endSession(m){
       ? `<h3><span class="jpx" style="color:${e.c}">${esc(e.j)}</span> Nœud acquis</h3>
          <div style="font-size:0.875rem;color:var(--mut)">${esc(n.t)} — vous gagnez
          <b style="color:${e.c}">${sess.gain} fragments de ${esc(e.n)}</b>.</div>`
-      : `<h3>Pas encore</h3><div style="font-size:0.875rem;color:var(--mut)">Il faut 75 % pour acquérir
+      : `<h3>Pas encore</h3><div style="font-size:0.875rem;color:var(--mut)">Il faut ${Math.round(SEUIL_NOEUD*100)} % pour acquérir
          « ${esc(n?n.t:"")} ». Reprenez quand vous voulez.</div>`;
     m.appendChild(c0);
   }
