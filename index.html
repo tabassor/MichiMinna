@@ -3470,17 +3470,28 @@ function carteRang(rid,vidSel){
       });
     };
     cadre.addEventListener("pointerdown",ev=>{
-      drag={a0:angleDe(ev), r0:ensoAngle, bouge:false, x0:ev.clientX, y0:ev.clientY, id:ev.pointerId};
+      drag={a0:angleDe(ev), r0:ensoAngle, bouge:false, mode:null,
+            x0:ev.clientX, y0:ev.clientY, yPrec:ev.clientY, id:ev.pointerId};
     });
     cadre.addEventListener("pointermove",ev=>{
       if(!drag) return;
+      const dx=ev.clientX-drag.x0, dy=ev.clientY-drag.y0;
       if(!drag.bouge){
-        if(Math.hypot(ev.clientX-drag.x0, ev.clientY-drag.y0)<7) return;
+        if(Math.hypot(dx,dy)<8) return;
         drag.bouge=true;
-        /* on ne capture le pointeur qu'une fois le geste engagé :
-           sinon un simple toucher n'atteindrait jamais le nœud */
-        anneau.style.transition="none";
-        try{ cadre.setPointerCapture(drag.id); }catch(e){}
+        /* la direction du premier mouvement décide : vertical franc = on fait défiler
+           la page, sinon on tourne la roue. Le navigateur ne fait plus les deux. */
+        drag.mode=(Math.abs(dy)>Math.abs(dx)*1.5)?"defile":"tourne";
+        if(drag.mode==="tourne"){
+          anneau.style.transition="none";
+          try{ cadre.setPointerCapture(drag.id); }catch(e){}
+        }
+      }
+      if(drag.mode==="defile"){
+        /* on reproduit nous-mêmes le défilement, puisque le navigateur ne le fait plus */
+        window.scrollBy(0, drag.yPrec-ev.clientY);
+        drag.yPrec=ev.clientY;
+        return;
       }
       let d=angleDe(ev)-drag.a0;
       if(d>180) d-=360; if(d<-180) d+=360;
@@ -3489,16 +3500,16 @@ function carteRang(rid,vidSel){
     });
     const fin=()=>{
       if(!drag) return;
-      const bougea=drag.bouge; drag=null;
+      const bougea=drag.bouge, mode=drag.mode; drag=null;
       anneau.style.transition="";
-      if(!bougea) return;
+      if(!bougea||mode!=="tourne") return;
       svg._glisse=Date.now();
       viser(Math.round(-ensoAngle/pas));
     };
     cadre.addEventListener("pointerup",fin);
     cadre.addEventListener("pointercancel",fin);
     cadre.addEventListener("pointerleave",fin);
-    cadre.style.touchAction="pan-y";
+    cadre.style.touchAction="none";   /* le geste nous appartient entièrement */
     cadre.style.cursor="grab";
   };
   return svg;
