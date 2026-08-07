@@ -336,6 +336,16 @@ main.fwd>*{animation-name:slideIn}
   border:1px solid color-mix(in srgb,var(--c) 40%,transparent);border-radius:999px;padding:2px 9px}
 .legende i{font-family:var(--disp);font-style:normal;color:var(--c);font-size:0.8125rem}
 .voie-home{cursor:pointer}
+.echelle{display:flex;gap:4px;margin-top:12px;align-items:flex-end}
+.ech{flex:1;position:relative;height:26px;border-radius:7px;background:var(--surf2);
+  border:1px solid var(--line);display:grid;place-items:center;overflow:hidden;opacity:.45}
+.ech i{font-family:var(--disp);font-style:normal;font-size:0.75rem;color:var(--dim);position:relative;z-index:1}
+.ech.passe{opacity:1;background:color-mix(in srgb,var(--ai) 22%,var(--surf2));border-color:color-mix(in srgb,var(--ai) 45%,var(--line))}
+.ech.passe i{color:var(--ai)}
+.ech.ici{opacity:1;border-color:var(--ai);height:32px}
+.ech.ici i{color:var(--tx);font-size:0.875rem;font-weight:700}
+.ech u{position:absolute;left:0;bottom:0;top:0;background:color-mix(in srgb,var(--ai) 30%,transparent);
+  text-decoration:none;transition:width .6s cubic-bezier(.22,.9,.28,1)}
 .fragline{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
 .fchip{display:inline-flex;align-items:center;gap:4px;font-size:0.75rem;color:var(--mut);
   border:1px solid color-mix(in srgb,var(--c) 40%,transparent);border-radius:999px;padding:2px 9px}
@@ -1375,6 +1385,18 @@ VIEWS.home=m=>{
           nx.length?nx.length+" nœud"+(nx.length>1?"s":"")+" ouvert"+(nx.length>1?"s":""):"tout est fait, passez l'épreuve"}</span>
       </div><span class="ngo" style="color:var(--dim);font-size:1.1875rem">›</span></div>
     <div class="fragline"></div>`;
+  /* échelle des huit rangs, à la manière des jauges d'éléments */
+  const ech=el("div","echelle");
+  D.rangs.forEach((R2,i)=>{
+    const et=el("span","ech"+(i<TS.rang?" passe":(i===TS.rang?" ici":"")));
+    et.innerHTML=`<i class="jpx">${esc(R2.j)}</i>`;
+    et.title=R2.j+" "+R2.n+(R2.jlpt?" · N"+R2.jlpt:"");
+    if(i===TS.rang){
+      const f=el("u"); f.style.width=progRang(TS.rang)+"%"; et.appendChild(f);
+    }
+    ech.appendChild(et);
+  });
+  pv.querySelector(".l").insertAdjacentElement("afterend",ech);
   const fl=$(".fragline",pv);
   D.elements.forEach(e=>{
     const b2=besoinRang(TS.rang)[e.id]||0, o=TS.frag[e.id]||0;
@@ -2080,6 +2102,7 @@ const NIDX={}; D.arbre.forEach(n=>NIDX[n.id]=n);
 const RANG=r=>D.rangs[Math.max(0,Math.min(D.rangs.length-1,r))];
 
 const TREE_V=2;
+const SEUIL_NOEUD=0.90;   /* un nœud n'est acquis qu'à 90 % de réussite */
 function tstate(){
   /* une conversion antérieure ne validait pas les nœuds du rang courant :
      on la refait, sans toucher à ce qui a été gagné en jouant */
@@ -2604,14 +2627,20 @@ VIEWS.noeud=m=>{
   c.innerHTML=`<h3>${fait?"Nœud acquis":(op?"Prêt":"Verrouillé")}</h3>
     <div style="font-size:0.8438rem;color:var(--mut)">${
       fait?("Terminé à "+(T.done[n.id].s||0)+" %. Vous pouvez le refaire quand vous voulez.")
-        :(op?("Une séance de "+Math.min(16,Math.max(10,p.length))+" questions. 75 % suffisent pour l'acquérir.")
+        :(op?("Une séance de "+Math.min(16,Math.max(10,p.length))+" questions. Il faut "+Math.round(SEUIL_NOEUD*100)+" % de bonnes réponses pour l'acquérir.")
             :"Terminez le nœud précédent de la voie "+esc(e.n)+" pour l'ouvrir.")}</div>
     <div style="margin-top:10px;font-size:0.8125rem">Récompense : <b style="color:${e.c}">+${gainNoeud(n)} fragments de ${esc(e.n)}</b> ${esc(e.j)}</div>`;
   const cc=el("div","ctrl"); cc.style.marginTop="12px";
   const go1=el("button","btn p",fait?"Refaire":"Commencer");
   go1.disabled=!op; if(!op) go1.style.opacity=".5";
   go1.onclick=()=>lancerNoeud(n.id);
-  cc.appendChild(go1); c.appendChild(cc); m.appendChild(c);
+  cc.appendChild(go1);
+  if(n.ch&&n.ch[0]===n.ch[1]&&n.ch[0]>=1&&n.ch[0]<=50){
+    const b2=el("button","btn","Voir la leçon "+n.ch[0]);
+    b2.onclick=()=>go("lecon",n.ch[0]);
+    cc.appendChild(b2);
+  }
+  c.appendChild(cc); m.appendChild(c);
 
   /* aperçu du contenu, même verrouillé */
   const ap=el("div","card");
@@ -4240,8 +4269,10 @@ VIEWS.shugyo=m=>{
   const txt=t=>["voc","cnt"].includes(q.type)?esc(t):(done?jp(t):jpn(t));
   const box=el("div","qbox");
   /* en dictée, l'énoncé reste masqué tant qu'on n'a pas répondu */
-  const enonce = q.type==="dic" ? (done?jp(q.q):'<span style="color:var(--dim);letter-spacing:.2em">● ● ●</span>')
-                                : txt(q.q);
+  const enonce = q.type==="dic"
+    ? (done?jpw(q.q):'<span style="color:var(--dim);letter-spacing:.2em">● ● ●</span>')
+    : (["voc","cnt"].includes(q.type) ? esc(q.q)
+       : (done ? jpw(q.q) : jpn(q.q)));   /* une fois répondu, chaque mot s'ouvre */
   box.innerHTML=`<div class="qhead">${q.head} · ${sess.i+1}/${sess.qs.length}${
     q.again?' · <span style="color:var(--yama)">reprise</span>':""}</div>
     <div class="qtext">${enonce}</div><div class="qsub">${q.sub}</div>
@@ -4295,7 +4326,7 @@ VIEWS.shugyo=m=>{
     const ty=sess.typed[sess.i]||{};
     const c=el("div","card");
     c.innerHTML=`<div class="sec" style="margin-bottom:8px">${r?"Juste":"Réponse attendue"}</div>
-      <div class="qtext" style="color:var(--${r?"take":"shu"})">${jp(q.a)}</div>`+
+      <div class="qtext" style="color:var(--${r?"take":"shu"})">${jpw(q.a)}</div>`+
       ((q.alt&&q.alt[0]&&q.alt[0]!==q.a)?`<div class="qsub">en kanji : ${jp(q.alt[0])}</div>`:"")+
       (ty.k==="lecture"?`<div class="qsub" style="color:var(--take)">Accepté : vous aviez écrit <span class="jpx">${esc(ty.v)}</span>, même lecture.</div>`:"")+
       (ty.k==="ordre"?`<div class="qsub" style="color:var(--take)">Accepté : mêmes groupes, ordre différent — les deux se disent.</div>`:"")+
@@ -4325,6 +4356,7 @@ VIEWS.shugyo=m=>{
   q.o.forEach(o=>{
     const isA=o===q.a;
     const bt=el("button","opt"+(done?(isA?" ok":(o===chosen?" no":"")):""), showJ(o));
+    if(done&&isA){ bt.innerHTML=jpw(q.oj&&q.oj[o]?q.oj[o]:o); }
     bt.dataset.v=o;
     if(!done) bt.onclick=()=>{
       const ok=isA;
@@ -4423,7 +4455,7 @@ function endSession(m){
   if(sess&&sess.mode==="noeud"&&!sess.compte){
     sess.compte=1;
     const bons=sess.res.filter(Boolean).length, tot=sess.res.filter(x=>x!=null).length;
-    if(tot&&bons/tot>=0.75) sess.gain=validerNoeud(sess.noeud,Math.round(bons/tot*100));
+    if(tot&&bons/tot>=SEUIL_NOEUD) sess.gain=validerNoeud(sess.noeud,Math.round(bons/tot*100));
   }
   if(sess&&sess.mode==="test"&&!sess.compte){
     sess.compte=1;
