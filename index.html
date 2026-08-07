@@ -126,7 +126,7 @@ button.stat{font:inherit;width:100%}
 .filters{display:flex;gap:6px;overflow-x:auto;overscroll-behavior-x:contain;padding:2px 0 10px;scrollbar-width:none;max-width:100%}
 .filters::-webkit-scrollbar{display:none}
 .search{width:100%;background:var(--surf);border:var(--bw) solid var(--line);border-radius:var(--r-sm);padding:11px 14px;margin-bottom:10px}
-.word{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
+.word{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
 .word:last-child{border-bottom:0}
 .word .l{flex:1;min-width:0}
 .word .k{font-family:var(--disp);font-size:1.125rem}
@@ -135,9 +135,14 @@ button.stat{font:inherit;width:100%}
 .word .r{display:flex;gap:6px;align-items:center}
 .ico{width:32px;height:32px;border-radius:8px;border:1px solid var(--line);display:grid;place-items:center;font-size:0.875rem;color:var(--dim)}
 .ico.on{color:var(--yama);border-color:var(--yama)}
-.conj{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:0.875rem;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
-.conj span{color:var(--dim);font-size:0.75rem}
-.conj b{font-family:var(--disp);font-weight:400;font-size:1rem}
+/* le tableau des formes occupe toute la largeur, sous la ligne du mot */
+.conj{flex:0 0 100%;width:100%;box-sizing:border-box;
+  display:grid;grid-template-columns:minmax(88px,auto) minmax(0,1fr);gap:5px 12px;
+  font-size:0.875rem;margin-top:6px;padding-top:8px;border-top:1px dashed var(--line)}
+.conj span{align-self:center}
+.conj b{min-width:0;overflow-wrap:anywhere}
+.conj span{color:var(--dim);font-size:0.75rem;line-height:1.35}
+.conj b{font-family:var(--disp);font-weight:400;font-size:1rem;line-height:1.5}
 .kgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:8px;margin-bottom:16px}
 .kcell{aspect-ratio:1;border:var(--bw) solid var(--line);border-radius:var(--r-cell);background:var(--surf);display:grid;place-items:center;font-family:var(--disp);font-size:1.75rem;position:relative}
 .kcell:active{border-color:var(--ai)}
@@ -245,8 +250,8 @@ main.anim>*:nth-child(1){animation-delay:.00s} main.anim>*:nth-child(2){animatio
 main.anim>*:nth-child(3){animation-delay:.07s}  main.anim>*:nth-child(4){animation-delay:.10s}
 main.anim>*:nth-child(5){animation-delay:.13s}  main.anim>*:nth-child(6){animation-delay:.15s}
 main.anim>*:nth-child(7){animation-delay:.17s}  main.anim>*:nth-child(n+8){animation-delay:.19s}
-main.back>*{animation-name:slideBack}
-main.fwd>*{animation-name:slideIn}
+main.nav-back>*{animation-name:slideBack}
+main.nav-fwd>*{animation-name:slideIn}
 
 .tiles .tile{animation:rise .3s cubic-bezier(.22,.9,.28,1) both}
 .tiles .tile:nth-child(2){animation-delay:.04s}
@@ -359,6 +364,12 @@ main.fwd>*{animation-name:slideIn}
   border:1px solid color-mix(in srgb,var(--c) 35%,transparent);border-radius:999px;padding:1px 7px}
 .minifrag i{font-family:var(--disp);font-style:normal;color:var(--c);font-size:0.75rem}
 
+.chfini{border-color:color-mix(in srgb,var(--take) 55%,var(--line));
+  animation:apparait .5s cubic-bezier(.22,.9,.28,1) both}
+@keyframes apparait{0%{opacity:0;transform:translateY(-6px) scale(.98)}
+  60%{transform:translateY(0) scale(1.008)}100%{opacity:1;transform:none}}
+.chfini .jpx{animation:sceau .7s cubic-bezier(.3,1.4,.5,1) .2s both}
+@keyframes sceau{0%{transform:scale(.4) rotate(-12deg);opacity:0}100%{transform:none;opacity:1}}
 .voie-home{cursor:pointer}
 .echelle{display:flex;gap:4px;margin-top:12px;align-items:flex-end}
 .ech{flex:1;position:relative;height:26px;border-radius:7px;background:var(--surf2);
@@ -969,11 +980,9 @@ function revueList(pool){
   dueList(p).concat(koList(p)).forEach(q=>{ if(!vu.has(q.key)){vu.add(q.key);out.push(q);} });
   return out;
 }
-function dueNow(){
-  let n=revueList(buildPool()).length;
-  if(S.kana) n+=revueList(kanaPool()).length;
-  return n;
-}
+/* buildPool() inclut déjà les kana en mode débutant : les additionner
+   ferait compter deux fois les mêmes questions. */
+function dueNow(){ return revueList(buildPool()).length; }
 function pickSRS(list,n){
   const now=Date.now(), due=[], fresh=[], later=[];
   list.forEach(q=>{ const i=S.srs[q.key];
@@ -1068,7 +1077,7 @@ function render(){
   const memeVue = (m.dataset.vue===view+"|"+param);
   m.dataset.vue=view+"|"+param;
   m.className="";
-  if(!memeVue){ void m.offsetWidth; m.className="anim "+(navDir==="back"?"back":"fwd"); }
+  if(!memeVue){ void m.offsetWidth; m.className="anim "+(navDir==="back"?"nav-back":"nav-fwd"); }
   try{
     (VIEWS[view]||VIEWS.home)(m);
   }catch(err){
@@ -1400,6 +1409,28 @@ VIEWS.home=m=>{
     act.appendChild(b2);
   }
   m.appendChild(hero);
+
+  /* ---- chapitre terminé : on propose la suite ---- */
+  const chNoeuds=D.arbre.filter(n=>n.ch&&n.ch[0]===S.ch&&n.ch[1]===S.ch);
+  const chReste=chNoeuds.filter(n=>!estFait(n.id)).length;
+  if(chNoeuds.length && !chReste && S.ch<50 && S.chVu!==S.ch){
+    const fin=el("div","card chfini");
+    fin.innerHTML=`<div class="l" style="display:flex;gap:14px;align-items:center">
+        <span class="jpx" style="font-size:1.875rem;color:var(--take);min-width:52px;text-align:center">終</span>
+        <div style="flex:1;min-width:0">
+          <span class="eyebrow" style="color:var(--take)">Chapitre ${S.ch} terminé</span>
+          <b style="display:block;font-size:1rem">Les ${chNoeuds.length} nœuds sont acquis</b>
+          <span style="font-size:0.7812rem;color:var(--mut)">Le chapitre ${S.ch+1} vous attend.</span>
+        </div></div>`;
+    const cf=el("div","ctrl"); cf.style.marginTop="12px";
+    const b1=el("button","btn p","Passer au chapitre "+(S.ch+1));
+    b1.onclick=()=>{ S.ch=S.ch+1; S.chVu=null; poolCache=null; save(); render();
+                     toast("Chapitre "+S.ch+" ouvert"); };
+    const b2=el("button","btn","Rester ici");
+    b2.onclick=()=>{ S.chVu=S.ch; save(); render(); };
+    cf.appendChild(b1); cf.appendChild(b2); fin.appendChild(cf);
+    m.appendChild(fin);
+  }
 
   /* ---- le chemin : rang, fragments, prochain nœud ---- */
   const TS=tstate(), RG=RANG(TS.rang);
@@ -4277,7 +4308,6 @@ function buildPool(){
 function startSession(mode){
   if(mode==="due"){
     let d=revueList(buildPool());
-    if(S.kana) d=revueList(kanaPool()).concat(d);
     if(d.length){
       /* d'abord ce qui reste faux, puis ce qui a été corrigé aujourd'hui */
       const t=today();
