@@ -336,6 +336,26 @@ main.fwd>*{animation-name:slideIn}
 .legende span{display:inline-flex;align-items:center;gap:5px;font-size:0.6875rem;color:var(--mut);
   border:1px solid color-mix(in srgb,var(--c) 40%,transparent);border-radius:999px;padding:2px 9px}
 .legende i{font-family:var(--disp);font-style:normal;color:var(--c);font-size:0.8125rem}
+
+.rangrow{background:var(--surf);border:1px solid var(--line);border-radius:var(--r);
+  padding:14px var(--pad);margin-bottom:10px;cursor:pointer;transition:border-color .2s ease,opacity .2s}
+.rangrow.avenir{opacity:.5}
+.rangrow.ici{border-color:var(--ai);box-shadow:0 0 0 1px color-mix(in srgb,var(--ai) 35%,transparent)}
+.rangrow.passe .rr-j{color:var(--take)}
+.rangrow.ici .rr-j{color:var(--ai)}
+.rr-head{display:flex;align-items:center;gap:12px}
+.rr-j{font-family:var(--disp);font-size:1.625rem;min-width:56px;text-align:center;color:var(--dim);line-height:1}
+.rr-t{flex:1;min-width:0}
+.rr-t b{display:block;font-size:0.9375rem}
+.rr-t span{display:block;font-size:0.75rem;color:var(--mut)}
+.rr-p{font-family:var(--disp);font-size:0.9375rem;color:var(--mut)}
+.rr-desc{font-size:0.7812rem;color:var(--mut);margin-top:8px;line-height:1.45}
+.rr-meta{font-size:0.7188rem;color:var(--dim);margin-top:5px}
+.rr-frags{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+.minifrag{display:inline-flex;align-items:center;gap:3px;font-size:0.6875rem;color:var(--mut);
+  border:1px solid color-mix(in srgb,var(--c) 35%,transparent);border-radius:999px;padding:1px 7px}
+.minifrag i{font-family:var(--disp);font-style:normal;color:var(--c);font-size:0.75rem}
+
 .voie-home{cursor:pointer}
 .echelle{display:flex;gap:4px;margin-top:12px;align-items:flex-end}
 .ech{flex:1;position:relative;height:26px;border-radius:7px;background:var(--surf2);
@@ -1040,9 +1060,12 @@ function render(){
   if(!THEMES[S.theme])S.theme="urushi";
   applyTheme();
   const m=$("#v"); m.innerHTML="";
-  /* on relance l'animation d'entrée, dans le sens de la navigation */
-  m.className=""; void m.offsetWidth;
-  m.className="anim "+(navDir==="back"?"back":"fwd");
+  /* l'animation d'entrée ne se relance qu'en cas de changement de vue :
+     un simple rafraîchissement sur place ne doit pas faire clignoter la page */
+  const memeVue = (m.dataset.vue===view+"|"+param);
+  m.dataset.vue=view+"|"+param;
+  m.className="";
+  if(!memeVue){ void m.offsetWidth; m.className="anim "+(navDir==="back"?"back":"fwd"); }
   try{
     (VIEWS[view]||VIEWS.home)(m);
   }catch(err){
@@ -2411,6 +2434,11 @@ VIEWS.arbre=m=>{
   if(T.tests[T.rang]) tb.appendChild(el("div","note","Déjà réussi à "+T.tests[T.rang].s+" %."));
   m.appendChild(tb);
 
+  const bcarte=el("button","btn w","全体図  Voir tout le parcours");
+  bcarte.style.marginBottom="12px";
+  bcarte.onclick=()=>go("parcours");
+  m.appendChild(bcarte);
+
   /* repérage par chapitre du manuel */
   const chb=el("div","card");
   chb.appendChild(el("div","sec","Repérer un chapitre"));
@@ -2450,7 +2478,14 @@ VIEWS.arbre=m=>{
     const b=el("button","chip"+(arbreRang===r.id?" on":""));
     b.innerHTML=`<span class="jpx">${esc(r.j)}</span> ${fait?"✓":""}`;
     b.style.opacity=ouvertR?"1":".5";
-    b.title=r.n; b.onclick=()=>{arbreRang=r.id;render();};
+    b.title=r.n;
+    b.onclick=()=>{
+      const y=window.scrollY;
+      arbreRang=r.id;
+      render();
+      /* on reste où l'on était : seul le contenu du rang change */
+      requestAnimationFrame(()=>window.scrollTo(0,Math.min(y,document.body.scrollHeight-window.innerHeight)));
+    };
     f.appendChild(b);
   });
   m.appendChild(f);
@@ -2525,6 +2560,57 @@ function majSurbrillance(){
     }
   }
 }
+
+
+/* ================= la carte du chemin, du seuil à la maîtrise ================= */
+VIEWS.parcours=m=>{
+  const b=el("button","back","← Le chemin"); b.onclick=back; m.appendChild(b);
+  m.appendChild(el("h1",null,"全体図"));
+  m.appendChild(el("p",null,'<span style="font-size:0.8125rem;color:var(--mut)">La totalité du parcours, du premier kana au niveau N1.</span>'));
+  const T=tstate();
+
+  /* --- vue d'ensemble chiffrée --- */
+  const tot=D.arbre.length, faits=D.arbre.filter(n=>estFait(n.id)).length;
+  const res=el("div","card");
+  res.innerHTML=`<div class="l" style="display:flex;gap:16px;align-items:center">
+      <span class="jpx" style="font-size:2.125rem;color:var(--ai);min-width:60px;text-align:center">${esc(RANG(T.rang).j)}</span>
+      <div style="flex:1"><span class="eyebrow">Vous êtes ici</span>
+        <b style="display:block;font-size:1.0625rem">${esc(RANG(T.rang).n)} <span style="color:var(--mut);font-size:0.8125rem">${esc(RANG(T.rang).r)}</span></b>
+        <span style="font-size:0.7812rem;color:var(--mut)">${faits} nœuds acquis sur ${tot} · rang ${T.rang+1} sur ${D.rangs.length}</span></div></div>
+    <div class="hero-bar" style="margin-top:14px"><i style="width:${Math.round(faits/tot*100)}%"></i></div>`;
+  m.appendChild(res);
+
+  /* --- chaque rang, dans l'ordre --- */
+  D.rangs.forEach(R=>{
+    const ns=D.arbre.filter(n=>n.rang===R.id);
+    const ok=ns.filter(n=>estFait(n.id)).length;
+    const pc=ns.length?Math.round(ok/ns.length*100):0;
+    const etat = R.id<T.rang?"passe" : (R.id===T.rang?"ici":"avenir");
+    const c=el("div","rangrow "+etat);
+
+    const parEl={};
+    ns.forEach(n=>{ parEl[n.el]=(parEl[n.el]||0)+gainNoeud(n); });
+    const jauges=D.elements.filter(e=>parEl[e.id]).map(e=>
+      `<span class="minifrag" style="--c:${e.c}"><i class="jpx">${esc(e.j)}</i>${parEl[e.id]}</span>`).join("");
+
+    const ch=ns.filter(n=>n.ch).map(n=>n.ch[0]);
+    const plage=ch.length?("ch. "+Math.min(...ch)+" à "+Math.max(...ch)):null;
+
+    c.innerHTML=`<div class="rr-head">
+        <span class="rr-j jpx">${esc(R.j)}</span>
+        <span class="rr-t"><b>${esc(R.n)} <span style="color:var(--dim);font-size:0.75rem">${esc(R.r)}</span></b><span>${R.jlpt?"JLPT N"+R.jlpt:"avant le N5"}${plage?" · "+plage:""}</span></span>
+        <span class="rr-p">${pc} %</span></div>
+      <div class="hero-bar" style="margin-top:9px"><i style="width:${pc}%"></i></div>
+      <div class="rr-desc">${esc(R.d||"")}</div>
+      <div class="rr-meta">${ns.length} nœuds · ${ok} acquis${
+        R.maitre?' · <b style="color:var(--shu)">épreuve de maître</b>':" · épreuve de rang"}</div>
+      <div class="rr-frags">${jauges}</div>`;
+    c.onclick=()=>{ arbreRang=R.id; go("arbre"); };
+    m.appendChild(c);
+  });
+
+  m.appendChild(el("div","note","Chaque rang exige la totalité de ses nœuds — donc de ses fragments — avant d'ouvrir son épreuve. Les niveaux JLPT sont des verrous stricts : on ne les franchit qu'en passant l'épreuve de maître."));
+};
 
 /* ---- la carte : un vrai arbre, en SVG ---- */
 function carteRang(rid){
