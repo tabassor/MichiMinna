@@ -3053,7 +3053,7 @@ function lancerTest(r){
 
 
 /* ---- la carte du parcours ---- */
-let arbreRang=null, arbreCh=0, arbreVoie=null, arbreFocus=null;
+let arbreRang=null, arbreCh=0, arbreVoie=null, arbreFocus=null, ensoAngle=0, ensoCle=null, majBarre=()=>{};
 VIEWS.arbre=m=>{
   const T=tstate();
   if(arbreRang===null) arbreRang=T.rang;
@@ -3185,26 +3185,43 @@ VIEWS.arbre=m=>{
   const cb=el("div","cartebox");
   const svg=carteRang(arbreRang,arbreVoie);
   /* naviguer entre les nœuds jouables, sans jamais imposer l'ordre */
-  const dispo=ordreVoie(arbreRang,arbreVoie).filter(x=>ouvert(x)&&!estFait(x.id));
+  const tous=ordreVoie(arbreRang,arbreVoie);
+  const dispo=tous.filter(x=>ouvert(x)&&!estFait(x.id));
   const barre=el("div","ensoctl");
-  if(dispo.length){
-    const iC=Math.max(0,dispo.findIndex(x=>x.id===arbreFocus));
-    const saut=d=>{ const y=window.scrollY;
-      arbreFocus=dispo[(iC+d+dispo.length)%dispo.length].id; render();
-      requestAnimationFrame(()=>window.scrollTo(0,y)); };
+  const cpt=el("div","ensocpt");
+  if(dispo.length&&svg){
+    /* les flèches sautent au nœud jouable suivant, en tournant sur place */
+    const saut=d=>{
+      const iC=Math.max(0,dispo.findIndex(x=>x.id===arbreFocus));
+      const cible=dispo[(iC+d+dispo.length)%dispo.length];
+      svg._viser(tous.findIndex(x=>x.id===cible.id));
+    };
     const g1=el("button","btn rondbtn","◀"); g1.title="Nœud jouable précédent"; g1.onclick=()=>saut(-1);
     const go2=el("button","btn p","Commencer");
-    go2.onclick=()=>{ const f=NIDX[arbreFocus]; if(f&&ouvert(f)) go("noeud",f.id); };
+    go2.onclick=()=>{ const f=NIDX[arbreFocus]; if(f&&ouvert(f)) go("noeud",f.id);
+                      else toast("Ce nœud attend son tour"); };
     const d1=el("button","btn rondbtn","▶"); d1.title="Nœud jouable suivant"; d1.onclick=()=>saut(1);
     barre.appendChild(g1); barre.appendChild(go2); barre.appendChild(d1);
-    const cpt=el("div","ensocpt",(iC+1)+" sur "+dispo.length+" nœud"+(dispo.length>1?"s":"")+" jouable"+(dispo.length>1?"s":"")+" sur cette voie");
     barre.appendChild(cpt);
+    majBarre=()=>{
+      const f=NIDX[arbreFocus], jouable=f&&ouvert(f)&&!estFait(f.id);
+      const iC=dispo.findIndex(x=>x.id===arbreFocus);
+      go2.textContent = (f&&estFait(f.id)) ? "Refaire" : (jouable?"Commencer":"Verrouillé");
+      go2.disabled = !(f&&ouvert(f));
+      cpt.textContent = iC>=0
+        ? (iC+1)+" sur "+dispo.length+" nœud"+(dispo.length>1?"s":"")+" jouable"+(dispo.length>1?"s":"")+" sur cette voie"
+        : dispo.length+" nœud"+(dispo.length>1?"s":"")+" jouable"+(dispo.length>1?"s":"")+" sur cette voie";
+    };
+    majBarre();
   }else{
-    barre.appendChild(el("div","ensocpt","Cette voie est achevée — le cercle est refermé."));
+    cpt.textContent="Cette voie est achevée — le cercle est refermé.";
+    barre.appendChild(cpt);
+    majBarre=()=>{};
   }
   if(S.tree&&S.tree.neuf){ const nid=S.tree.neuf; setTimeout(()=>{ if(S.tree&&S.tree.neuf===nid){ delete S.tree.neuf; save(); } },1600); }
   if(svg){
     cb.appendChild(svg); cb.appendChild(barre); m.appendChild(cb);
+    if(svg._brancher) svg._brancher(cb);
     const lg=el("div","legende");
     lg.innerHTML=D.elements.filter(e=>D.arbre.some(n=>n.rang===arbreRang&&n.el===e.id))
       .map(e=>`<span style="--c:${e.c}"><i class="jpx">${esc(e.j)}</i>${esc(e.d)}</span>`).join("");
@@ -3335,8 +3352,10 @@ function carteRang(rid,vidSel){
   const H=RAYON*2+2*R+40;
   const CY=H/2;
   const pas=360/n;
-  /* on fait pivoter l'anneau pour amener le nœud choisi en haut */
-  const rot=-iF*pas;
+  /* l'angle s'accumule : on tourne toujours par le plus court chemin,
+     et jamais en sens inverse d'un tour complet */
+  if(ensoCle!==rid+"|"+vid){ ensoCle=rid+"|"+vid; ensoAngle=-iF*pas; }
+  let rot=ensoAngle;
 
   const NS="http://www.w3.org/2000/svg";
   const el2=(t,a)=>{ const x=document.createElementNS(NS,t); for(const k in a) x.setAttribute(k,a[k]); return x; };
@@ -3389,14 +3408,99 @@ function carteRang(rid,vidSel){
     num.textContent=i+1; g.appendChild(num);
     const ti=el2("title",{}); ti.textContent=nd.t+" — "+nd.s; g.appendChild(ti);
     g.onclick=()=>{
+      if(svg._glisse&&Date.now()-svg._glisse<300) return;
       if(nd.id===arbreFocus){ go("noeud",nd.id); return; }
       if(!op&&!fait){ toast("Ce nœud attend son tour"); return; }
-      const y2=window.scrollY; arbreFocus=nd.id; render();
-      requestAnimationFrame(()=>window.scrollTo(0,y2));
+      viser(i);
     };
     g.onkeydown=ev=>{ if(ev.key==="Enter") g.onclick(); };
     anneau.appendChild(g);
   });
+
+  const cases=[...anneau.querySelectorAll(".cv-n")];
+  /* amène le nœud i en haut, sans reconstruire quoi que ce soit */
+  function viser(i,anime){
+    i=((i%n)+n)%n;
+    const cible=-i*pas;
+    /* on ajuste par multiples de 360° pour prendre le chemin le plus court */
+    while(cible-ensoAngle>180) ensoAngle+=360;
+    while(cible-ensoAngle<-180) ensoAngle-=360;
+    ensoAngle=cible;
+    arbreFocus=ns[i].id;
+    anneau.style.transition=(anime===false)?"none":"";
+    anneau.setAttribute("transform","rotate("+ensoAngle+" "+CX+" "+CY+")");
+    cases.forEach((g2,k)=>{
+      g2.setAttribute("transform","translate("+
+        (CX+RAYON*Math.cos((-90+k*pas)*Math.PI/180)).toFixed(1)+","+
+        (CY+RAYON*Math.sin((-90+k*pas)*Math.PI/180)).toFixed(1)+") rotate("+(-ensoAngle)+")");
+      g2.classList.toggle("actif",k===i);
+      const r3=(k===i)?R*1.42:R;
+      g2.querySelectorAll("circle").forEach(c2=>{
+        if(c2.classList.contains("cv-c")) c2.setAttribute("r",r3);
+        else if(c2.classList.contains("cv-halo")) c2.setAttribute("r",r3+6);
+        else if(c2.classList.contains("cv-ring")) c2.setAttribute("r",r3+4.5);
+      });
+      const num2=g2.querySelector(".cv-num"); if(num2) num2.setAttribute("y",-r3-6);
+      const t2=g2.querySelector(".cv-t"); if(t2) t2.setAttribute("y",(k===i)?8:6);
+    });
+    const f2=ns[i];
+    nom.textContent=f2.t.length>16?f2.t.slice(0,15)+"…":f2.t;
+    det.textContent=f2.s.length>24?f2.s.slice(0,23)+"…":f2.s;
+    majBarre();
+  }
+  svg._viser=viser;
+  svg._index=()=>ns.findIndex(x=>x.id===arbreFocus);
+  svg._noeuds=ns;
+
+  /* rotation au doigt : le geste est capté par le cadre, qui reçoit les événements
+     partout — le SVG, lui, n'en reçoit que sur ses tracés. */
+  svg._brancher=cadre=>{
+    let drag=null;
+    const angleDe=ev=>{
+      const b2=svg.getBoundingClientRect();
+      const cx=b2.left+b2.width*(CX/W), cy=b2.top+b2.height*(CY/H);
+      return Math.atan2(ev.clientY-cy, ev.clientX-cx)*180/Math.PI;
+    };
+    const place=()=>{
+      anneau.setAttribute("transform","rotate("+ensoAngle+" "+CX+" "+CY+")");
+      cases.forEach((g2,k)=>{
+        const a2=(-90+k*pas)*Math.PI/180;
+        g2.setAttribute("transform","translate("+(CX+RAYON*Math.cos(a2)).toFixed(1)+","+
+          (CY+RAYON*Math.sin(a2)).toFixed(1)+") rotate("+(-ensoAngle)+")");
+      });
+    };
+    cadre.addEventListener("pointerdown",ev=>{
+      drag={a0:angleDe(ev), r0:ensoAngle, bouge:false, x0:ev.clientX, y0:ev.clientY, id:ev.pointerId};
+    });
+    cadre.addEventListener("pointermove",ev=>{
+      if(!drag) return;
+      if(!drag.bouge){
+        if(Math.hypot(ev.clientX-drag.x0, ev.clientY-drag.y0)<7) return;
+        drag.bouge=true;
+        /* on ne capture le pointeur qu'une fois le geste engagé :
+           sinon un simple toucher n'atteindrait jamais le nœud */
+        anneau.style.transition="none";
+        try{ cadre.setPointerCapture(drag.id); }catch(e){}
+      }
+      let d=angleDe(ev)-drag.a0;
+      if(d>180) d-=360; if(d<-180) d+=360;
+      ensoAngle=drag.r0+d; place();
+      ev.preventDefault();
+    });
+    const fin=()=>{
+      if(!drag) return;
+      const bougea=drag.bouge; drag=null;
+      anneau.style.transition="";
+      if(!bougea) return;
+      svg._glisse=Date.now();
+      viser(Math.round(-ensoAngle/pas));
+    };
+    cadre.addEventListener("pointerup",fin);
+    cadre.addEventListener("pointercancel",fin);
+    cadre.addEventListener("pointerleave",fin);
+    cadre.style.touchAction="pan-y";
+    cadre.style.cursor="grab";
+  };
   return svg;
 }
 
