@@ -385,6 +385,12 @@ main.nav-fwd>*{animation-name:slideIn}
 .ensoctl .btn.p{flex:1;max-width:180px}
 .rondbtn{width:44px;padding:0;height:44px;border-radius:999px;flex:0 0 auto}
 .ensocpt{flex:0 0 100%;text-align:center;font-size:0.7188rem;color:var(--dim);margin-top:2px}
+.sceau{display:grid;place-items:center;margin:8px auto 16px;width:104px;height:104px;border-radius:50%;
+  border:2px solid var(--shu);background:color-mix(in srgb,var(--shu) 14%,transparent);
+  animation:sceauN 1s cubic-bezier(.3,1.5,.4,1) both;overflow:hidden}
+.sceau span{font-family:var(--disp);color:var(--shu);line-height:1.05;
+  white-space:nowrap;display:block;text-align:center;
+  transform:scale(var(--k,1));transform-origin:center}
 .enso-ring{transition:transform .75s cubic-bezier(.3,.9,.25,1)}
 .enso-ring .cv-n{transition:transform .75s cubic-bezier(.3,.9,.25,1)}
 .enso-j{font-family:var(--disp);font-size:1.875rem;fill:var(--c);opacity:.85}
@@ -2049,6 +2055,19 @@ VIEWS.progres=m=>{
     <div class="note" style="margin-top:10px">${totN} nœud${totN>1?"s":""} acquis ce mois-ci.</div>`;
   m.appendChild(c2);
 
+  if(S.kana){
+    const st=kStage(), sc=kStageScore();
+    const ck=el("div","card");
+    ck.innerHTML=`<div class="sec">仮名 — le syllabaire</div>
+      <div class="l" style="display:flex;gap:14px;align-items:center;margin-top:8px">
+        <span class="jpx" style="font-size:1.625rem;color:var(--ai);min-width:46px;text-align:center">${esc(KPATH[st-1].t.slice(0,1))}</span>
+        <div style="flex:1;min-width:0"><b style="display:block;font-size:0.875rem">${esc(KPATH[st-1].t)}</b>
+        <span style="font-size:0.75rem;color:var(--mut)">Étape ${st} sur ${KPATH.length} · ${kUnlocked().length} kana ouverts sur ${D.kana.length}</span></div></div>
+      <div class="hero-bar" style="margin-top:10px"><i style="width:${Math.round(st/KPATH.length*100)}%"></i></div>`;
+    ck.style.cursor="pointer"; ck.onclick=()=>go("kana");
+    m.appendChild(ck);
+  }
+
   /* équilibre entre les cinq voies */
   const T=tstate(), bes=besoinRang(T.rang);
   const c3=el("div","card");
@@ -2882,6 +2901,8 @@ const gainNoeud=n=>Math.max(3,Math.min(5,Math.round((n.n||10)/5)));
 function validerNoeud(id,score){
   const T=tstate(), n=NIDX[id]; if(!n||T.done[id]) return 0;
   T.neuf=id; noteNoeud();
+  /* un nœud de kana acquis débloque les étapes correspondantes */
+  if(n.rang===0&&n.c&&n.c.kana) S.kstage=Math.max(S.kstage||1, Math.min(KPATH.length, n.c.kana[1]+1));
   const g=gainNoeud(n);
   T.done[id]={d:Date.now(),s:score};
   T.frag[n.el]=(T.frag[n.el]||0)+g;
@@ -3047,7 +3068,9 @@ function lancerTest(r){
   let p=[]; ns.forEach(n=>{ p=p.concat(poolNoeud(n)); });
   const vu=new Set(); p=p.filter(q=>{ if(vu.has(q.key))return false; vu.add(q.key); return true; });
   if(p.length<10){ alert("Pas assez de matière pour composer le test."); return; }
-  sess={qs:shuffle(p).slice(0,20),i:0,res:[],mode:"test",rangTest:r,ans:[],shown:{},typed:{}};
+  const R2=RANG(r), maitre=!!R2.maitre;
+  sess={qs:shuffle(p).slice(0,maitre?30:20),i:0,res:[],mode:"test",rangTest:r,
+        maitre:maitre,seuil:maitre?0.9:0.85,ans:[],shown:{},typed:{}};
   go("shugyo",null,false);
 }
 
@@ -3091,7 +3114,9 @@ VIEWS.arbre=m=>{
   const estMaitre=!!R.maitre;
   tb.innerHTML=`<h3>${estMaitre?"Épreuve de maître · N"+R.maitre:"Test de rang"}</h3>
     <div style="font-size:0.8438rem;color:var(--mut)">${
-      pret?"Vingt questions tirées de tout le rang. 85 % pour passer."
+      pret?(RA.maitre
+        ? "<b>Trente questions</b> tirées de tout le rang, <b>90 %</b> pour la franchir. C'est elle qui ouvre le niveau JLPT N"+RA.jlpt+"."
+        : "Vingt questions tirées de tout le rang. 85 % pour passer.")
         :(reste?reste+" nœud"+(reste>1?"s":"")+" à terminer"+(manque.length?", et ":".")
               :"")+(manque.length?"il vous manque "+manque.map(x=>x.faut-x.ont+" "+x.e.j).join(", ")+".":"")}</div>`;
   const tc=el("div","ctrl"); tc.style.marginTop="10px";
@@ -4045,7 +4070,17 @@ const KPATH=[
  {id:18, t:"Yōon sonores : ぎゃ, じゃ, びゃ, ぴゃ", rows:["gy","j","by","py"], sc:"b", d:"Dernière étape : les digrammes sonorisés."},
  {id:19, t:"Tout, en tirage libre",   rows:null,             sc:"b", rev:1, d:"Les 104 kana. Le parcours est bouclé."}
 ];
-function kStage(){ return Math.max(1, Math.min(KPATH.length, S.kstage||1)); }
+/* L'étape kana n'est plus une progression parallèle : elle découle des nœuds
+   du rang 入門 déjà acquis. Une seule avancée, deux façons de la voir. */
+function kStage(){
+  let mx=0;
+  if(S.tree&&S.tree.done){
+    D.arbre.filter(n=>n.rang===0&&n.c&&n.c.kana&&estFait(n.id))
+      .forEach(n=>{ mx=Math.max(mx,n.c.kana[1]); });
+  }
+  const parNoeuds=Math.min(KPATH.length, mx+1);
+  return Math.max(1, Math.min(KPATH.length, Math.max(parNoeuds, S.kstage||1)));
+}
 function kUnlocked(){                          /* les kana ouverts jusqu'à l'étape courante */
   const st=kStage(), rows=new Set();
   for(let i=0;i<st;i++){
@@ -4098,6 +4133,9 @@ VIEWS.kana=m=>{
   const go1=el("button","btn p","S'entraîner sur cette étape");
   go1.onclick=()=>startSession("kana");
   pc.appendChild(go1);
+  const gv=el("button","btn","Voir sur le chemin");
+  gv.onclick=()=>{ arbreRang=0; arbreVoie=null; arbreFocus=null; ensoCle=null; go("arbre"); };
+  pc.appendChild(gv);
   if(kCanAdvance()){
     const nx=el("button","btn g","Étape suivante ▶");
     nx.onclick=()=>{ S.kstage=st+1; save(); render(); };
@@ -4113,6 +4151,7 @@ VIEWS.kana=m=>{
     pc.appendChild(pv);
   }
   p0.appendChild(pc);
+  p0.appendChild(el("div","note","Les étapes de kana correspondent aux nœuds du rang 入門 : les valider sur le chemin fait avancer ce parcours, et inversement."));
   if(!kCanAdvance()&&st<KPATH.length)
     p0.appendChild(el("div","note","L'étape suivante s'ouvre à 80 % de réponses acquises — c'est-à-dire justes deux fois de suite à un jour d'intervalle."));
   m.appendChild(p0);
@@ -5283,6 +5322,8 @@ VIEWS.shugyo=m=>{
    assez tôt pour corriger avant d'oublier */
 function requeue(q){
   if(!sess) return;
+  /* une épreuve ne repose pas ses questions : on l'affronte une fois */
+  if(sess.mode==="test") return;
   const at=Math.min(sess.i+2, sess.qs.length);
   sess.qs.splice(at,0,Object.assign({},q,{again:true}));
 }
@@ -5362,13 +5403,16 @@ function endSession(m){
   if(sess&&sess.mode==="test"&&!sess.compte){
     sess.compte=1;
     const bons=sess.res.filter(Boolean).length, tot=sess.res.filter(x=>x!=null).length;
-    sess.reussi = tot && bons/tot>=0.85;
+    sess.reussi = tot && bons/tot>=(sess.seuil||0.85);
+    const T=tstate(), sc=tot?Math.round(bons/tot*100):0;
+    const anc=T.tests[sess.rangTest]||{};
+    T.tests[sess.rangTest]={d:Date.now(), s:Math.max(sc, sess.reussi?sc:(anc.s||0)),
+      dernier:sc, essais:(anc.essais||0)+1, ok:!!(sess.reussi||anc.ok)};
     if(sess.reussi){
-      const T=tstate();
-      T.tests[sess.rangTest]={d:Date.now(),s:Math.round(bons/tot*100)};
       if(T.rang===sess.rangTest) T.rang=Math.min(D.rangs.length-1,T.rang+1);
-      S.xp=(S.xp||0)+200; save();
+      S.xp=(S.xp||0)+200;
     }
+    save();
   }
   const good=sess.res.filter(Boolean).length,tot=sess.res.filter(x=>x!==null&&x!==undefined).length;
   if(sess.mode==="noeud"){
@@ -5388,13 +5432,44 @@ function endSession(m){
     const c0=el("div","card");
     c0.style.borderColor=sess.reussi?"var(--take)":"var(--shu)";
     c0.innerHTML=sess.reussi
-      ? `<h3><span class="jpx" style="color:var(--ai)">${esc(RANG(tstate().rang).j)}</span> Rang obtenu</h3>
-         <div style="font-size:0.875rem;color:var(--mut)">Vous êtes désormais
-         <b>${esc(RANG(tstate().rang).n)}</b> — ${esc(RANG(tstate().rang).r)}.</div>`
-      : `<h3>Épreuve non réussie</h3><div style="font-size:0.875rem;color:var(--mut)">
-         Il faut 85 %. Le test se recompose entièrement à chaque tentative : reprenez le rang,
-         puis retentez.</div>`;
+      ? (()=>{
+          const RG2=RANG(tstate().rang), nc=[...RG2.j].length;
+          /* le sceau adapte sa taille au nombre de caractères du rang */
+          const fs=(nc<=1)?46:((nc===2)?36:26);
+          if(!sess.maitre)
+            return `<h3><span class="jpx" style="color:var(--ai)">${esc(RG2.j)}</span> Rang obtenu</h3>
+              <div style="font-size:0.875rem;color:var(--mut)">Vous êtes désormais
+              <b>${esc(RG2.n)}</b> — ${esc(RG2.r)}.</div>`;
+          return `<div class="sceau"><span class="jpx" style="font-size:${fs}px">${esc(RG2.j)}</span></div>
+            <h3 style="text-align:center">Épreuve de maître franchie</h3>
+            <div style="font-size:0.875rem;color:var(--mut);text-align:center;line-height:1.6">
+            Le niveau <b>JLPT N${R.jlpt}</b> est acquis.<br>
+            Vous êtes désormais <b>${esc(RG2.n)}</b> — ${esc(RG2.r)}.</div>`;
+        })()
+      : (()=>{
+          const T2=tstate(), inf=T2.tests[sess.rangTest]||{};
+          const bons2=sess.res.filter(Boolean).length, tot2=sess.res.filter(x=>x!=null).length;
+          const manque=Math.ceil(tot2*(sess.seuil||0.85))-bons2;
+          return `<h3>Épreuve non franchie</h3>
+            <div style="font-size:0.875rem;color:var(--mut);line-height:1.6">
+            ${bons2} sur ${tot2} — il en fallait ${Math.ceil(tot2*(sess.seuil||0.85))}, soit ${manque} de plus.
+            L'épreuve se recompose entièrement à chaque tentative : rien ne sert de retenir les réponses.
+            ${inf.essais>1?"<br>Tentative n° "+inf.essais+".":""}</div>`;
+        })();
     m.appendChild(c0);
+    if(!sess.reussi){
+      const cc3=el("div","ctrl"); cc3.style.marginTop="12px";
+      const b5=el("button","btn p","Retenter l'épreuve");
+      b5.onclick=()=>lancerTest(sess.rangTest);
+      const b6=el("button","btn","Revoir mes erreurs");
+      b6.onclick=()=>{
+        const w2=sess.qs.filter((q,i)=>sess.res[i]===false);
+        if(!w2.length){ go("arbre"); return; }
+        sess={qs:shuffle(w2),i:0,res:[],mode:"durs",ans:[],shown:{},typed:{}};
+        go("shugyo");
+      };
+      cc3.appendChild(b5); cc3.appendChild(b6); c0.appendChild(cc3);
+    }
   }
   m.appendChild(el("h1",null,'<span class="jpx">修業の道</span>'));
   const c=el("div","card");
