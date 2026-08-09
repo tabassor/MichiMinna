@@ -3061,6 +3061,31 @@ function poolNoeud(n){
     });
     return r.filter(q=>q.o&&q.o.length>=2);
   }
+  if(c.src==="expr"){
+    /* les formules elles-mêmes, dans les deux sens */
+    const lo=c.lmin||1, hi=c.lmax||50;
+    const fams=D.expressions.filter(g=>g.l>=lo&&g.l<=hi);
+    const toutes=D.expressions.flatMap(g=>g.it);
+    const out2=[];
+    fams.forEach(g=>{
+      g.it.forEach(([j,f,ex],i)=>{
+        if(!j||!f) return;
+        out2.push({type:"expr",key:"xf:"+g.l+":"+g.g+":"+i,l:g.l,
+          head:"Expression · "+g.g,q:f,sub:"Quelle formule dit cela ?",a:j,
+          o:opts(j,toutes.map(x=>x[0]).filter(Boolean))});
+        out2.push({type:"expr",key:"xs:"+g.l+":"+g.g+":"+i,l:g.l,
+          head:"Expression · "+g.g,q:j,sub:"Que signifie cette formule ?",a:f,
+          o:opts(f,toutes.map(x=>x[1]).filter(Boolean))});
+        if(ex&&ex!=="―"&&ex.indexOf("→")>0){
+          const [jp2,fr2]=ex.split("→").map(x=>x.trim());
+          out2.push({type:"expr",key:"xe:"+g.l+":"+g.g+":"+i,l:g.l,
+            head:"En contexte · "+g.g,q:jp2,sub:esc(fr2),a:j,
+            o:opts(j,toutes.map(x=>x[0]).filter(Boolean))});
+        }
+      });
+    });
+    return out2.filter(q=>q.o&&q.o.length>=2);
+  }
   if(c.dicmots){
     const k=new Set(c.dicmots);
     return words(50).filter(w=>k.has(w.k+"|"+w.l)).map(w=>({
