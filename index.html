@@ -1800,11 +1800,11 @@ function inventaireLecon(m,n){
     c.appendChild(g); m.appendChild(c);
   };
   petit("Particules introduites",parts,p=>el("div","ex",
-    `<div class="j">${jp(p.p)}</div><div class="f">${esc(p.r)}</div>`));
+    `<div class="j">${jpw(p.p)}</div><div class="f">${esc(p.r)}</div>`));
   petit("Compteurs",cnts,c=>el("div","ex",
-    `<div class="j">${jp(c.c)}</div><div class="f">${esc(c.u)}</div>`));
+    `<div class="j">${jpw(c.c)}</div><div class="f">${esc(c.u)}</div>`));
   petit("Adverbes",advs,a=>el("div","ex",
-    `<div class="j">${jp(a.j||a.k)}</div><div class="f">${esc(a.f)}</div>`));
+    `<div class="j">${motCliquable(a.j,a.k)}</div><div class="f">${esc(a.f)}</div>`));
   petit("Familles d'expressions",exprs,e=>el("div","ex",
     `<div class="j">${esc(e.g)}</div><div class="f">${e.it.length} formules</div>`));
 }
@@ -1869,7 +1869,7 @@ VIEWS.lecon=m=>{
     const cc=el("div","card");
     cc.style.borderColor="var(--shu)";
     cc.innerHTML=`<h3><span class="jpx" style="color:var(--shu)">文化</span> ${esc(cu.t)}</h3>
-      <div style="font-size:0.875rem;color:var(--mut);line-height:1.65">${jp(cu.b)}</div>`;
+      <div style="font-size:0.875rem;color:var(--mut);line-height:1.65">${jpw(cu.b)}</div>`;
     m.appendChild(cc);
   }
 
@@ -4298,7 +4298,7 @@ VIEWS.culture=m=>{
     n++;
     const c=el("div","card");
     c.innerHTML=`<h3>${esc(cu.t)} <span class="tag">第${L.n}課</span></h3>
-      <div style="font-size:0.875rem;color:var(--mut);line-height:1.65">${jp(cu.b)}</div>`;
+      <div style="font-size:0.875rem;color:var(--mut);line-height:1.65">${jpw(cu.b)}</div>`;
     const b=el("button","chip","Voir la leçon");
     b.style.marginTop="10px"; b.onclick=()=>go("lecon",L.n);
     c.appendChild(b);
@@ -4742,7 +4742,7 @@ VIEWS.trace=m=>{
     k.ex.forEach(e0=>{
       const j=e0[0],kk=e0[1],f=e0[2],l=e0[3],kd=e0[4]||"";
       const d=el("div","ex");
-      d.innerHTML=`<div class="j">${rubyPair(j,(kk||"").split("・")[0])} <span style="font-size:0.8125rem;color:var(--mut)">${esc(kk)}</span></div>
+      d.innerHTML=`<div class="j">${motCliquable(j,(kk||"").split("・")[0])} <span style="font-size:0.8125rem;color:var(--mut)">${esc(kk)}</span></div>
         <div class="f">${esc(f)} ${l?`<span class="tag">L${l}</span>`:'<span class="tag">hors manuel</span>'}${
           kd==="on"?' <span class="tag" style="border-color:var(--ai);color:var(--ai)">ON 音</span>':
           (kd==="kun"?' <span class="tag" style="border-color:var(--take);color:var(--take)">KUN 訓</span>':"")}</div>`;
