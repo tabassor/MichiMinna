@@ -798,6 +798,13 @@ function jp(str,o){
 }
 const jpn=s=>jp(s,{link:false});
 /* pose la lecture connue sur le noyau en kanji, sans passer par la reconstruction */
+/* enveloppe un mot entier pour qu'il soit touchable, le furigana conservé */
+function motCliquable(j,k){
+  const inner=rubyPair(j,k);
+  const mot=(S.script==="kana"||!j)?k:j;
+  if(!S.gloss||!mot) return inner;
+  return '<span class="wd" data-w="'+esc(mot)+'">'+inner+"</span>";
+}
 function rubyPair(kanji,kana){
   if(!kanji) return esc(kana);
   const wrap=t=>[...t].map(c=>(isKanji(c)&&KIDX[c])?'<b class="kj" data-c="'+esc(c)+'">'+esc(c)+"</b>":esc(c)).join("");
@@ -1767,7 +1774,7 @@ function inventaireLecon(m,n){
     const g=el("div");
     mots.forEach(w=>{
       const d=el("div","word");
-      d.innerHTML=`<div class="l"><div class="k">${(S.script==="kana"||!w.j)?jp(w.k):rubyPair(w.j,w.k.split("・")[0])}</div>
+      d.innerHTML=`<div class="l"><div class="k">${motCliquable(w.j,w.k.split("・")[0])}</div>
         <div class="f">${esc(w.f)} <span class="tag">${CATS[w.c]||w.c}</span></div></div>
         <div class="r"><button class="ico">🔊</button></div>`;
       d.querySelector(".ico").onclick=e=>{e.stopPropagation();say(w.j||w.k);};
@@ -1933,7 +1940,7 @@ VIEWS.dico=m=>{
     ws.slice(0,300).forEach(w=>{
       const id=w.k+"|"+w.l, isf=S.fav.includes(id);
       const d=el("div","word");
-      d.innerHTML=`<div class="l"><div class="k">${(S.script==="kana"||!w.j)?jp(w.k):rubyPair(w.j,w.k.split("・")[0])} ${sub(w)?`<em>${esc(sub(w))}</em>`:""}</div>
+      d.innerHTML=`<div class="l"><div class="k">${motCliquable(w.j,w.k.split("・")[0])} ${sub(w)?`<em>${esc(sub(w))}</em>`:""}</div>
         <div class="f">${esc(w.f)} <span class="tag">${CATS[w.c]||w.c}</span> <span class="tag">L${w.l}</span>${
           (w.th||[]).map(t=>{const o=D.themes.find(x=>x.id===t);
             return o?` <span class="tag th">${esc(o.j)}</span>`:"";}).join("")}${
@@ -2490,7 +2497,7 @@ VIEWS.lecture=m=>{
   list.forEach(([id,t])=>{
     const fait=(S.lus||{})[id];
     const d=el("div","word");
-    d.innerHTML=`<div class="l"><div class="k">${jp(t.t)} ${fait?'<span class="tag" style="border-color:var(--take);color:var(--take)">'+fait+' %</span>':""}</div>
+    d.innerHTML=`<div class="l"><div class="k">${jpw(t.t)} ${fait?'<span class="tag" style="border-color:var(--take);color:var(--take)">'+fait+' %</span>':""}</div>
       <div class="f">${esc(t.f)} <span class="tag">N${t.n}</span>${t.l?' <span class="tag">dès L'+t.l+'</span>':""}
       <span class="tag">${t.q.length} questions</span></div></div><div class="r"><span class="ngo">›</span></div>`;
     d.onclick=()=>go("lire",id);
@@ -3917,7 +3924,7 @@ VIEWS.noeud=m=>{
     const W=words(50), l=el("div");
     cont.mots.forEach(cle=>{
       const [k,lv]=cle.split("|"); const w=W.find(x=>x.k===k&&x.l===+lv); if(!w) return;
-      const d=el("div","ex"); d.innerHTML=`<div class="j">${w.j?rubyPair(w.j,w.k.split("・")[0]):jp(w.k)}</div><div class="f">${esc(w.f)}</div>`;
+      const d=el("div","ex"); d.innerHTML=`<div class="j">${motCliquable(w.j,w.k.split("・")[0])}</div><div class="f">${esc(w.f)}</div>`;
       l.appendChild(d);
     });
     ap.appendChild(l);
@@ -4024,7 +4031,7 @@ VIEWS.jmdict=m=>{
     r.forEach(w=>{
       const has=words().find(x=>x.k===w[1]||(w[0]&&x.j===w[0]));
       const d=el("div","word");
-      d.innerHTML=`<div class="l"><div class="k">${rubyPair(w[0],w[1])}${
+      d.innerHTML=`<div class="l"><div class="k">${motCliquable(w[0],w[1])}${
           (w[0]&&S.script!=="kana")?` <em>${esc(w[1])}</em>`:""}</div>
         <div class="f">${esc(w[2].split(" ¶ ").join(" · "))}
           ${w[3]?`<span class="tag">${esc(w[3].split("").map(x=>JPOS[x]).filter(Boolean).join(", "))}</span>`:""}
@@ -4333,7 +4340,7 @@ VIEWS.search=m=>{
     const ws=words().filter(w=>hitJa(w.k)||hitJa(w.j)||hitFr(w.f));
     sec("Mots",ws,w=>{
       const d=el("div","word");
-      d.innerHTML=`<div class="l"><div class="k">${(S.script==="kana"||!w.j)?jp(w.k):rubyPair(w.j,w.k.split("・")[0])} ${sub(w)?`<em>${esc(sub(w))}</em>`:""}</div>
+      d.innerHTML=`<div class="l"><div class="k">${motCliquable(w.j,w.k.split("・")[0])} ${sub(w)?`<em>${esc(sub(w))}</em>`:""}</div>
         <div class="f">${esc(w.f)} <span class="tag">${CATS[w.c]||w.c}</span> <span class="tag">L${w.l}</span></div></div>
         <div class="r"><button class="ico">🔊</button></div>`;
       d.querySelector(".ico").onclick=()=>say(w.j||w.k);
