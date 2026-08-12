@@ -162,6 +162,14 @@ button.stat{font:inherit;width:100%}
 .ptitre{font-size:0.8125rem;font-weight:600;color:var(--ai);margin-bottom:4px}
 .pcorps{font-size:0.875rem;line-height:1.65;color:var(--tx)}
 .pcorps .jpx{font-family:var(--disp);font-size:0.9688rem}
+.nivrow{display:flex;align-items:center;gap:13px;width:100%;padding:13px 4px;
+  border-bottom:1px solid var(--line);text-align:left;background:none}
+.nivrow:last-child{border-bottom:0}
+.nivrow.on{background:color-mix(in srgb,var(--ai) 10%,transparent);border-radius:var(--r-sm)}
+.nivrow.on .nj,.nivrow.on .ngo{color:var(--ai)}
+.nivrow .nt b{display:block;font-size:0.9375rem;font-weight:600}
+.nivrow .nt span{display:block;font-size:0.7812rem;color:var(--mut);margin-top:2px;line-height:1.4}
+.dojohome{border-color:color-mix(in srgb,var(--ai) 45%,var(--line))}
 .chgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:6px;margin-top:8px}
 .chbtn{position:relative;border:1px solid var(--line);background:var(--surf2);border-radius:var(--r-sm);
   padding:9px 2px 13px;font-family:var(--disp);font-size:0.9375rem;color:var(--tx);transition:all .15s}
@@ -670,9 +678,14 @@ async function switchUser(id){
   try{ history.replaceState({michi:0},"",location.href);
        history.pushState({michi:0},"",location.href); }catch(e){}
 }
-async function createUser(name){
+async function createUser(name,niveau){
   const id="u"+Date.now().toString(36);
   USERS.push({id:id,n:name||"Élève"}); await saveUsers(); await switchUser(id);
+  /* le mode grand débutant doit être choisi, pas découvert par hasard */
+  if(niveau==="debut"){ S.kana=1; S.ch=1; }
+  else if(niveau==="kana"){ S.kana=0; S.ch=1; }
+  else if(niveau==="deja"){ S.kana=0; }
+  S.guide=0; save(); render();
 }
 /* le jour change selon le fuseau choisi, pas selon UTC */
 function today(d){
@@ -1525,14 +1538,43 @@ VIEWS.users=m=>{
     dz.appendChild(rb); m.appendChild(dz);
   }
 };
+let bienNom="", bienNiv=null;
 VIEWS.welcome=m=>{
   m.appendChild(el("h1",null,'<span class="jpx" style="font-size:2.125rem">ようこそ</span>'));
-  m.appendChild(el("p",null,'<span style="font-size:0.875rem;color:var(--mut)">Créez un profil pour enregistrer votre chapitre, vos favoris et votre historique de révision.</span>'));
+  m.appendChild(el("p",null,'<span style="font-size:0.875rem;color:var(--mut)">Créez un profil pour enregistrer votre progression.</span>'));
   const c=el("div","card");
-  const inp=el("input","search"); inp.placeholder="Votre prénom"; c.appendChild(inp);
-  const b=el("button","btn p w","Commencer");
-  b.onclick=()=>createUser(inp.value.trim()||"Élève");
-  c.appendChild(b); m.appendChild(c);
+  const inp=el("input","search"); inp.placeholder="Votre prénom"; inp.value=bienNom;
+  inp.oninput=e=>{bienNom=e.target.value;};
+  c.appendChild(inp);
+  m.appendChild(c);
+
+  const c2=el("div","card");
+  c2.appendChild(el("div","sec","Où en êtes-vous ?"));
+  const l=el("div");
+  [["debut","仮","Je débute vraiment","Je ne lis pas encore les kana — l'application commencera par les hiragana."],
+   ["kana","字","Je lis les kana","Hiragana et katakana acquis, je commence le vocabulaire."],
+   ["deja","進","J'ai déjà étudié","Vous choisirez votre chapitre de départ juste après."]
+  ].forEach(([k,j,t,d])=>{
+    const b=el("button","nivrow"+(bienNiv===k?" on":""));
+    b.innerHTML=`<span class="nj jpx">${j}</span>
+      <span class="nt"><b>${t}</b><span>${d}</span></span>
+      <span class="ngo">${bienNiv===k?"✓":""}</span>`;
+    b.onclick=()=>{bienNiv=k;render();};
+    l.appendChild(b);
+  });
+  c2.appendChild(l);
+  m.appendChild(c2);
+
+  const cc=el("div","ctrl");
+  const b2=el("button","btn p w","Commencer");
+  b2.disabled=!bienNiv;
+  b2.onclick=()=>{
+    const n=bienNom.trim()||"Élève", niv=bienNiv;
+    bienNom=""; bienNiv=null;
+    createUser(n,niv);
+  };
+  cc.appendChild(b2); m.appendChild(cc);
+  if(!bienNiv) m.appendChild(el("div","note","Choisissez une réponse : elle détermine par quoi l'application commence. Vous pourrez en changer à tout moment dans votre profil."));
 };
 
 /* ================= accueil ================= */
@@ -1583,6 +1625,27 @@ VIEWS.home=m=>{
     act.appendChild(b2);
   }
   m.appendChild(hero);
+
+  /* ---- grand débutant : le dojo passe devant tout le reste ---- */
+  if(S.kana){
+    const st=kStage(), sc=kStageScore();
+    const dj=el("div","card dojohome");
+    dj.innerHTML=`<div class="l" style="display:flex;gap:14px;align-items:center">
+        <span class="jpx" style="font-size:1.875rem;color:var(--ai);min-width:54px;text-align:center">道場</span>
+        <div style="flex:1;min-width:0">
+          <span class="eyebrow">Étape ${st} sur ${KPATH.length} · ${kUnlocked().length} kana ouverts</span>
+          <b style="display:block;font-size:1rem">${esc(KPATH[st-1].t)}</b>
+          <span style="font-size:0.7812rem;color:var(--mut)">S'exercer sans enjeu avant de tenter les nœuds.</span>
+        </div></div>
+      <div class="hero-bar" style="margin-top:10px"><i style="width:${sc.pc}%"></i></div>`;
+    const cd=el("div","ctrl"); cd.style.marginTop="12px";
+    const d1=el("button","btn p","Aller au dojo");
+    d1.onclick=()=>{ dojoNouveau(); go("dojo"); };
+    const d2=el("button","btn","Le tableau des kana");
+    d2.onclick=()=>go("kana");
+    cd.appendChild(d1); cd.appendChild(d2); dj.appendChild(cd);
+    m.appendChild(dj);
+  }
 
   /* ---- chapitre terminé : on propose la suite ---- */
   const chNoeuds=D.arbre.filter(n=>n.ch&&n.ch[0]===S.ch&&n.ch[1]===S.ch);
@@ -2201,7 +2264,7 @@ function dojoChoix(m){
   }
   m.appendChild(el("div","note","Aucune erreur n'est retenue contre vous. Ce qui résiste revient dans le paquet, voilà tout."));
 }
-let dojoOpts=null, dojoOptsFor=-1, dojoRep=null;
+let dojoOpts=null, dojoOptsFor=-1, dojoRep=null, dojoModele=false;
 
 /* --- tracer : la grille et le modèle, autant de fois qu'on veut --- */
 function dojoTrace(m){
@@ -2214,17 +2277,37 @@ function dojoTrace(m){
     <div class="qtext">${esc(x.r)}</div>
     <div class="qsub">${trs.length} trait${trs.length>1?"s":""}</div>`;
   m.appendChild(box);
-  m.appendChild(el("div",null,padHTML({c:car,p:trs,s:trs.length},false)));
+  if(!trs.length){
+    m.appendChild(el("div","empty","<b>—</b>Le tracé de ce caractère n'est pas disponible."));
+    const c0=el("div","ctrl");
+    const s0=el("button","btn p","Suivant"); s0.onclick=()=>{ dojoI++; render(); };
+    c0.appendChild(s0); m.appendChild(c0); return;
+  }
+  const kf={c:car,p:trs,s:trs.length};
+  m.appendChild(el("div",null,padHTML(kf,dojoModele)));
   const pad=initPad(m);
+  const gd=$("#gd",m);
   const cc=el("div","ctrl");
   const clr=el("button","btn","Effacer"); clr.onclick=pad.clear;
-  const rev=el("button","btn","Voir le modèle");
-  rev.onclick=()=>{ const g=$("#gd",m); if(g) g.classList.toggle("show"); };
+  /* le modèle se montre et se cache : c'est l'opacité qui commande, pas une classe */
+  const rev=el("button","btn"+(dojoModele?" p":""),dojoModele?"Masquer le modèle":"Voir le modèle");
+  rev.onclick=()=>{
+    dojoModele=!dojoModele;
+    if(gd) gd.style.opacity=dojoModele?1:0;
+    rev.textContent=dojoModele?"Masquer le modèle":"Voir le modèle";
+    rev.className="btn"+(dojoModele?" p":"");
+  };
+  const anim=el("button","btn","Animer");
+  anim.onclick=()=>{
+    if(gd) gd.style.opacity=0.25;
+    const pl=makePlayer(m,kf);
+    if(pl&&pl.play) pl.play();
+  };
   const nx=el("button","btn p","Suivant");
   nx.onclick=()=>{ dojoI++; render(); };
-  cc.appendChild(clr); cc.appendChild(rev); cc.appendChild(nx);
+  cc.appendChild(clr); cc.appendChild(anim); cc.appendChild(rev); cc.appendChild(nx);
   m.appendChild(cc);
-  m.appendChild(el("div","note","Tracez, effacez, recommencez. Rien n'est évalué ici."));
+  m.appendChild(el("div","note","Tracez avec le doigt, effacez, recommencez. « Animer » montre l'ordre des traits. Rien n'est évalué ici."));
 }
 
 /* --- tableau : la vue d'ensemble, pour se repérer --- */
@@ -5628,6 +5711,12 @@ VIEWS.shugyo=m=>{
       rb.style.marginTop="10px";
       rb.onclick=()=>startSession("due");
       c.appendChild(rb);
+    }
+    if(S.kana){
+      const bd=el("button","btn w","道場  S'exercer aux kana, sans enjeu");
+      bd.style.marginTop="10px";
+      bd.onclick=()=>{ dojoNouveau(); go("dojo"); };
+      c.appendChild(bd);
     }
     const bc=el("button","btn w","稽古  Cibler des chapitres précis");
     bc.style.marginTop="10px";
