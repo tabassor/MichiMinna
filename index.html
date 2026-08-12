@@ -162,6 +162,14 @@ button.stat{font:inherit;width:100%}
 .ptitre{font-size:0.8125rem;font-weight:600;color:var(--ai);margin-bottom:4px}
 .pcorps{font-size:0.875rem;line-height:1.65;color:var(--tx)}
 .pcorps .jpx{font-family:var(--disp);font-size:0.9688rem}
+.chgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:6px;margin-top:8px}
+.chbtn{position:relative;border:1px solid var(--line);background:var(--surf2);border-radius:var(--r-sm);
+  padding:9px 2px 13px;font-family:var(--disp);font-size:0.9375rem;color:var(--tx);transition:all .15s}
+.chbtn u{position:absolute;left:0;right:0;bottom:2px;text-decoration:none;font-size:0.5312rem;
+  color:var(--dim);font-family:var(--ui)}
+.chbtn.on{border-color:var(--ai);background:color-mix(in srgb,var(--ai) 18%,var(--surf2));color:var(--ai)}
+.chbtn.futur{opacity:.55}
+.chbtn:active{transform:scale(.94)}
 .dojocarte{text-align:center;padding:28px 18px;cursor:pointer;min-height:180px;
   display:flex;flex-direction:column;justify-content:center;gap:14px}
 .dj-face{font-family:var(--disp);font-size:4.75rem;line-height:1;color:var(--tx)}
@@ -2012,6 +2020,77 @@ function fMatch(q,...fields){
 
 
 
+
+
+
+/* ================= entraînement ciblé : choisir ses chapitres ================= */
+VIEWS.cible=m=>{
+  head(m,"稽古","S'exercer sur les chapitres de votre choix");
+  S.cible=S.cible||[]; S.cibleType=S.cibleType||[];
+
+  const c1=el("div","card");
+  c1.appendChild(el("div","sec","Chapitres"));
+  const g=el("div","chgrid");
+  for(let l=1;l<=50;l++){
+    const n=poolComplet().filter(q=>q.l===l).length;
+    const b=el("button","chbtn"+(S.cible.includes(l)?" on":"")+(l>S.ch?" futur":""));
+    b.innerHTML=l+(n?'<u>'+n+'</u>':"");
+    b.title="Chapitre "+l+" — "+n+" questions";
+    b.onclick=()=>{
+      const i=S.cible.indexOf(l);
+      if(i<0) S.cible.push(l); else S.cible.splice(i,1);
+      save(); render();
+    };
+    g.appendChild(b);
+  }
+  c1.appendChild(g);
+  const cc=el("div","ctrl"); cc.style.marginTop="10px";
+  const bt=el("button","btn","Jusqu'à mon chapitre");
+  bt.onclick=()=>{ S.cible=[]; for(let l=1;l<=S.ch;l++) S.cible.push(l); save(); render(); };
+  const br=el("button","btn","Les cinq derniers");
+  br.onclick=()=>{ S.cible=[]; for(let l=Math.max(1,S.ch-4);l<=S.ch;l++) S.cible.push(l); save(); render(); };
+  const bz=el("button","btn","Aucun");
+  bz.onclick=()=>{ S.cible=[]; save(); render(); };
+  cc.appendChild(bt); cc.appendChild(br); cc.appendChild(bz);
+  c1.appendChild(cc);
+  m.appendChild(c1);
+
+  const c2=el("div","card");
+  c2.appendChild(el("div","sec","Ce que l'on travaille"));
+  const f=el("div","filters");
+  [["","Tout"],["voc","Vocabulaire"],["conj","Conjugaison"],["adj","Adjectifs"],
+   ["kan","Sens des kanji"],["kanr","Lectures"],["rad","Radicaux"],
+   ["part","Particules"],["adv","Adverbes"],["cnt","Compteurs"],
+   ["expr","Expressions"],["gram","Grammaire"],["dic","Dictée"]].forEach(([k,lab])=>{
+    const on = k? S.cibleType.includes(k) : !S.cibleType.length;
+    const b=el("button","chip"+(on?" on":""),lab);
+    b.onclick=()=>{
+      if(!k) S.cibleType=[];
+      else{ const i=S.cibleType.indexOf(k); if(i<0) S.cibleType.push(k); else S.cibleType.splice(i,1); }
+      save(); render();
+    };
+    f.appendChild(b);
+  });
+  c2.appendChild(f);
+  m.appendChild(c2);
+
+  const ch=new Set(S.cible), ty=new Set(S.cibleType);
+  let dispo=poolComplet().filter(q=>ch.has(q.l));
+  if(ty.size) dispo=dispo.filter(q=>ty.has(q.type));
+  const c3=el("div","card");
+  c3.innerHTML=`<h3>${dispo.length} question${dispo.length>1?"s":""}</h3>
+    <div style="font-size:0.8438rem;color:var(--mut);margin-top:4px">${
+      S.cible.length? S.cible.length+" chapitre"+(S.cible.length>1?"s":"")+" sélectionné"+(S.cible.length>1?"s":"")
+                    : "Choisissez au moins un chapitre."}</div>`;
+  const cc3=el("div","ctrl"); cc3.style.marginTop="12px";
+  const go1=el("button","btn p","Commencer");
+  go1.disabled=!dispo.length;
+  go1.onclick=()=>startSession("cible");
+  cc3.appendChild(go1); c3.appendChild(cc3);
+  m.appendChild(c3);
+
+  m.appendChild(el("div","note","Cette séance ne suit pas les échéances de révision : elle tire librement dans ce que vous avez choisi. Vos réponses comptent malgré tout pour la mémorisation à long terme."));
+};
 
 /* ================= 道場 — s'exercer aux kana sans enjeu ================= */
 let dojoEcr="h", dojoFam="base", dojoPortee="ouverts", dojoMode="cartes", dojoSrs=0;
@@ -5484,6 +5563,17 @@ function startSession(mode){
       go("shugyo",null,false); return;
     }
   }
+  if(mode==="cible"){
+    /* on ne tire que dans les chapitres choisis, et l'on ignore les échéances :
+       c'est un entraînement, pas une révision. */
+    const ch=new Set(S.cible||[]);
+    const ty=new Set(S.cibleType||[]);
+    let p2=poolComplet().filter(q=>ch.has(q.l));
+    if(ty.size) p2=p2.filter(q=>ty.has(q.type));
+    if(!p2.length){ alert("Aucune question pour cette sélection."); return; }
+    sess={qs:shuffle(p2).slice(0,SIZE),i:0,res:[],mode:"cible",ans:[],shown:{},typed:{}};
+    go("shugyo",null,false); return;
+  }
   if(mode&&mode.indexOf("jlpt")===0){
     const niv=+mode.slice(4);
     const jp2=jlptPool(niv);
@@ -5539,6 +5629,10 @@ VIEWS.shugyo=m=>{
       rb.onclick=()=>startSession("due");
       c.appendChild(rb);
     }
+    const bc=el("button","btn w","稽古  Cibler des chapitres précis");
+    bc.style.marginTop="10px";
+    bc.onclick=()=>go("cible");
+    c.appendChild(bc);
     const g=el("div","opts");
     [["mix","Séance mixte — tout est possible"]].concat(S.kana?[["kana","Hiragana et katakana"]]:[]).concat([["conj","Conjugaison des verbes"],["adj","Formes des adjectifs"],
      ["part","Particules"],["adv","Adverbes et connecteurs"],["voc","Vocabulaire"],
