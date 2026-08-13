@@ -2156,11 +2156,33 @@ VIEWS.cible=m=>{
 };
 
 /* ================= 道場 — s'exercer aux kana sans enjeu ================= */
-let dojoEcr="h", dojoFam="base", dojoPortee="ouverts", dojoMode="cartes", dojoSrs=0;
+let dojoEcr="h", dojoFam="base", dojoPortee="ouverts", dojoMode="cartes", dojoSrs=0, dojoCible=null;
 let dojoLot=null, dojoI=0, dojoVu=false, dojoBilan={su:0,pas:0};
 
+/* les nœuds du seuil, avec les kana que chacun demande */
+function dojoNoeuds(){
+  return D.arbre.filter(n=>n.rang===0&&n.c&&(n.c.kana||n.c.trace)).map(n=>{
+    let l=[];
+    if(n.c.kana){
+      const rows=new Set();
+      for(let i=n.c.kana[0];i<=n.c.kana[1];i++)
+        (KPATH[i-1]&&KPATH[i-1].rows||[]).forEach(r=>rows.add(r));
+      l=D.kana.filter(x=>rows.has(x.row));
+    }else if(n.c.trace){
+      const r2=new Set(n.c.trace);
+      l=D.kana.filter(x=>r2.has(x.r));
+    }
+    return {n:n,kana:l};
+  }).filter(x=>x.kana.length);
+}
 function dojoKana(){
-  let l=(dojoPortee==="ouverts"&&S.kana)?kUnlocked():D.kana.slice();
+  let l;
+  if(dojoPortee==="noeud"){
+    const cible=dojoNoeuds().find(x=>x.n.id===dojoCible);
+    l=cible?cible.kana.slice():D.kana.slice();
+  }else{
+    l=(dojoPortee==="ouverts"&&S.kana)?kUnlocked():D.kana.slice();
+  }
   if(dojoFam!=="tout") l=l.filter(x=>x.g===dojoFam);
   return l;
 }
@@ -2182,13 +2204,40 @@ VIEWS.dojo=m=>{
     b.onclick=()=>{dojoFam=v;dojoNouveau();render();}; r2.appendChild(b);
   });
   m.appendChild(r2);
-  if(S.kana){
-    const r3=el("div","filters");
-    [["ouverts","ceux que j'ai vus"],["tout","tous"]].forEach(([v,lab])=>{
-      const b=el("button","chip"+(dojoPortee===v?" on":""),lab);
-      b.onclick=()=>{dojoPortee=v;dojoNouveau();render();}; r3.appendChild(b);
+  const r3=el("div","filters");
+  [["ouverts","ceux que j'ai vus"],["noeud","préparer un nœud"],["tout","tous"]].forEach(([v,lab])=>{
+    if(v==="ouverts"&&!S.kana) return;
+    const b=el("button","chip"+(dojoPortee===v?" on":""),lab);
+    b.onclick=()=>{
+      dojoPortee=v;
+      if(v==="noeud"&&!dojoCible){
+        /* par défaut, le premier nœud du seuil qui reste à faire */
+        const l=dojoNoeuds();
+        const suiv=l.find(x=>!estFait(x.n.id))||l[0];
+        dojoCible=suiv?suiv.n.id:null;
+      }
+      dojoNouveau(); render();
+    };
+    r3.appendChild(b);
+  });
+  m.appendChild(r3);
+
+  if(dojoPortee==="noeud"){
+    const c0=el("div","card");
+    c0.appendChild(el("div","sec","Quel nœud préparez-vous ?"));
+    const g0=el("div");
+    dojoNoeuds().forEach(x=>{
+      const fait=estFait(x.n.id), op=ouvert(x.n);
+      const b=el("button","nivrow"+(dojoCible===x.n.id?" on":""));
+      b.innerHTML=`<span class="nj jpx">${esc(EL[x.n.el].j)}</span>
+        <span class="nt"><b>${esc(x.n.t)}</b><span>${x.kana.length} kana · ${esc(x.n.s)}</span></span>
+        <span class="ngo">${fait?"✓":(op?"◆":"鍵")}</span>`;
+      b.onclick=()=>{ dojoCible=x.n.id; dojoNouveau(); render(); };
+      g0.appendChild(b);
     });
-    m.appendChild(r3);
+    c0.appendChild(g0);
+    m.appendChild(c0);
+    m.appendChild(el("div","note","Vous pouvez préparer un nœud avant de l'avoir déverrouillé : ici, rien n'est compté."));
   }
   const r4=el("div","filters");
   [["cartes","Cartes"],["choix","Reconnaître"],["trace","Tracer"],["table","Tableau"]].forEach(([v,lab])=>{
@@ -3403,34 +3452,47 @@ function poolNoeud(n){
     return shuffle(r).slice(0,28);
   }
   if(c.gram){
-    /* On interroge les structures elles-mêmes : sens, forme, reconnaissance en contexte.
-       L'ancienne version retombait sur les particules de la leçon, si peu nombreuses
-       que tous les nœuds d'un rang finissaient par poser les mêmes questions. */
+    /* La voie de la Terre fait construire, pas seulement reconnaître.
+       Trois exercices, du plus concret au plus abstrait :
+       — recomposer la phrase d'exemple à partir du français ;
+       — retrouver l'élément manquant dans une phrase trouée ;
+       — nommer la structure, une seule fois par point. */
     const tousPts=[];
     D.lessons.forEach(L2=>(L2.g||[]).forEach((g,gi)=>tousPts.push({l:L2.n,i:gi,g:g})));
     const out2=[];
     c.gram.forEach(([ln,gi])=>{
       const L2=D.lessons.find(x=>x.n===ln); if(!L2) return;
       const g=(L2.g||[])[gi]; if(!g) return;
-      const [pat,expl,exJ,exF,tr]=g;
+      const pat=g[0], exJ=g[2], exF=g[3], tr=g[4];
+      if(exJ&&exF){
+        const bl=blocsDe(exJ);
+        if(bl.length>=3&&bl.length<=7){
+          out2.push({type:"batir",key:"gb:"+ln+":"+gi,l:ln,head:"Composer · chapitre "+ln,
+            q:exF,sub:pat,a:bl.join(""),blocs:bl,o:[]});
+        }
+        const seg=segment(String(exJ).replace(/[。\s]+$/,""));
+        const mots=seg.map(x=>x[0]).filter(t=>/[\u3040-\u30ff\u4e00-\u9fff]/.test(t));
+        if(mots.length>=3){
+          const cible=mots[Math.floor(mots.length/2)];
+          const trou=String(exJ).replace(cible,"＿＿");
+          if(trou!==exJ){
+            const leurres=tousPts.filter(x=>x.l<=ln)
+              .flatMap(x=>segment(String(x.g[2]||"")).map(y=>y[0]))
+              .filter(t=>t&&t!==cible&&t.length<=5&&/[\u3040-\u30ff\u4e00-\u9fff]/.test(t));
+            out2.push({type:"trou",key:"gt:"+ln+":"+gi,l:ln,head:"Compléter · chapitre "+ln,
+              q:trou,sub:esc(exF),a:cible,o:opts(cible,leurres)});
+          }
+        }
+      }
       if(tr){
         out2.push({type:"gram",key:"gs:"+ln+":"+gi,l:ln,head:"Structure · chapitre "+ln,
           q:pat,sub:"Que dit cette structure ?",a:tr,
           o:opts(tr,tousPts.map(x=>x.g[4]).filter(Boolean))});
-        out2.push({type:"gram",key:"gf:"+ln+":"+gi,l:ln,head:"Structure · chapitre "+ln,
-          q:tr,sub:"Quelle structure exprime cela ?",a:pat,
-          o:opts(pat,tousPts.map(x=>x.g[0]).filter(Boolean))});
-      }
-      if(exJ&&exF){
-        out2.push({type:"gram",key:"ge:"+ln+":"+gi,l:ln,head:"En contexte · chapitre "+ln,
-          q:exJ,sub:esc(exF),a:pat,
-          o:opts(pat,tousPts.map(x=>x.g[0]).filter(Boolean))});
       }
     });
-    /* on complète avec les particules du même chapitre, qui relèvent bien de la voie */
     const ids=new Set(c.gram.map(g=>g[0]));
     tous.filter(q=>ids.has(q.l)&&q.type==="part").forEach(q=>out2.push(q));
-    return out2.filter(q=>!q.o||q.o.length>=2);
+    return out2.filter(q=>!q.o||!q.o.length||q.o.length>=2);
   }
   if(c.kanji){
     /* on compose les questions sur place : les kanji des niveaux supérieurs
@@ -5744,6 +5806,7 @@ VIEWS.shugyo=m=>{
   sess.qs.forEach((_,i)=>pr.appendChild(el("i",i<sess.res.length?(sess.res[i]?"d":"x"):(i===sess.i?"c":""))));
   m.appendChild(pr);
   if(q.type==="draw"){ drawChallenge(m,q); return; }
+  if(q.type==="batir"){ batirChallenge(m,q); return; }
   const chosen=sess.ans[sess.i], done=chosen!==undefined;
   const canType = q.type==="dic" || (typable(q) &&
     (S.input==="saisie" || S.input==="auto" || (S.input==="mixte" && sess.i%2===0)));
@@ -5909,6 +5972,65 @@ function answer(q,ok){
   if(ok===null) return;                 /* question passée (dictée sans son) */
   grade(q.key,ok);
   S.xp=(S.xp||0)+(ok?10:2); S.done=(S.done||0)+1; sess.res[sess.i]=ok; noteJour(ok); save();
+}
+/* composer une phrase à partir de blocs mêlés */
+function batirChallenge(m,q){
+  sess.pose=sess.pose||{}; sess.dispo=sess.dispo||{};
+  const k=sess.i;
+  if(!sess.dispo[k]){ sess.dispo[k]=shuffle((q.blocs||[]).slice()); sess.pose[k]=[]; }
+  const done=sess.res[k]!=null;
+  const box=el("div","qbox");
+  box.innerHTML=`<div class="qhead">${esc(q.head)} · ${sess.i+1}/${sess.qs.length}</div>
+    <div class="qtext" style="font-size:1.05rem;font-family:var(--ui)">${esc(q.q)}</div>
+    <div class="qsub">${esc(q.sub||"Remettez les blocs dans l'ordre.")}</div>`;
+  m.appendChild(box);
+
+  const zone=el("div","card");
+  const ligne=el("div","phline");
+  if(!sess.pose[k].length) ligne.innerHTML='<span class="phvide">Touchez les blocs ci-dessous</span>';
+  sess.pose[k].forEach((t,i2)=>{
+    const b=el("button","phbloc pose"); b.innerHTML=jp(t);
+    if(!done) b.onclick=()=>{ sess.dispo[k].push(sess.pose[k].splice(i2,1)[0]); render(); };
+    ligne.appendChild(b);
+  });
+  zone.appendChild(ligne);
+  const bank=el("div","phbank");
+  sess.dispo[k].forEach((t,i2)=>{
+    const b=el("button","phbloc"); b.innerHTML=jp(t);
+    if(!done) b.onclick=()=>{ sess.pose[k].push(sess.dispo[k].splice(i2,1)[0]); render(); };
+    bank.appendChild(b);
+  });
+  zone.appendChild(bank);
+
+  const cc=el("div","ctrl"); cc.style.marginTop="12px";
+  if(!done){
+    const ok=el("button","btn p","Vérifier");
+    ok.disabled=!!sess.dispo[k].length;
+    ok.onclick=()=>{
+      const prop=sess.pose[k].join(""), att=(q.blocs||[]).join("");
+      const juste = prop===att || matchKind(prop,[att])!==null;
+      answer(q,juste); render();
+    };
+    cc.appendChild(ok);
+    const sk=el("button","btn","Passer");
+    sk.onclick=()=>{ sess.res[sess.i]=false; grade(q.key,false); save(); render(); };
+    cc.appendChild(sk);
+  }
+  zone.appendChild(cc);
+  m.appendChild(zone);
+
+  if(done){
+    const r=el("div","card");
+    const juste=sess.res[k]===true;
+    r.style.borderColor=juste?"var(--take)":"var(--shu)";
+    r.innerHTML=`<div class="sec">${juste?"Juste":"La phrase attendue"}</div>
+      <div class="qtext" style="color:var(--${juste?"take":"shu"})">${jpw(q.a)}</div>`;
+    const c2=el("div","ctrl"); c2.style.marginTop="10px";
+    const nx=el("button","btn p w","Suivante");
+    nx.onclick=()=>{ sess.i++; render(); };
+    c2.appendChild(nx); r.appendChild(c2);
+    m.appendChild(r);
+  }
 }
 function drawChallenge(m,q){
   /* le tracé vaut aussi pour les kana : on fabrique une fiche équivalente */
