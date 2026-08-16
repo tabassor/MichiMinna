@@ -183,6 +183,12 @@ button.stat{font:inherit;width:100%}
 .dj-face{font-family:var(--disp);font-size:4.75rem;line-height:1;color:var(--tx)}
 .dj-dos{font-size:1.25rem;color:var(--ai);min-height:26px;font-family:var(--disp)}
 .dojocpt{text-align:center;font-size:0.75rem;color:var(--dim);margin-top:10px}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;margin-top:10px}
+.pcell{display:flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:var(--r-sm);padding:4px 6px}
+.pcell span{font-size:0.6875rem;color:var(--mut);min-width:22px}
+.pcell input{width:100%;min-width:0;background:none;border:0;color:var(--tx);font-family:var(--disp);
+  font-size:0.875rem;padding:0;text-align:right}
+.pcell input:focus{outline:none;color:var(--ai)}
 .advnote{font-size:0.7812rem;color:var(--mut);line-height:1.55;margin-top:8px;
   border-left:2px solid color-mix(in srgb,var(--ai) 50%,transparent);padding-left:10px}
 .advnote .kj{color:var(--ai)}
@@ -225,6 +231,8 @@ button.stat{font:inherit;width:100%}
   border-radius:var(--r-sm);padding:7px 11px;transition:transform .12s ease,border-color .2s}
 .phbloc:active{transform:scale(.95)}
 .phbloc.pose{border-color:var(--ai);background:color-mix(in srgb,var(--ai) 12%,var(--surf2))}
+.phbloc.leurre{display:inline-block;padding:2px 7px;font-size:0.8125rem;opacity:.6;
+  border-style:dashed;margin:2px 2px 0 0}
 .lect p{font-family:var(--disp);font-size:1.0625rem;line-height:2.05;margin:0 0 10px}
 .lect p:empty{margin:0 0 6px}
 .accbox{margin-top:12px;flex:0 0 100%;width:100%}
@@ -681,7 +689,8 @@ async function switchUser(id){
   UID=id; await saveUsers();
   const raw=await sGet("michi:u:"+id);
   S=Object.assign(NEW(), raw?JSON.parse(raw):{});
-  tickDay(); sess=null; stack=[]; go(S.guide?"home":"guide",null,false);
+  tickDay(); sess=null; stack=[]; chargeManuels().then(()=>{ if(MANUELS.length) render(); });
+  go(S.guide?"home":"guide",null,false);
   try{ history.replaceState({michi:0},"",location.href);
        history.pushState({michi:0},"",location.href); }catch(e){}
 }
@@ -1365,6 +1374,12 @@ VIEWS.users=m=>{
   row("Furigana", S.furi?"Activés":"Désactivés", ()=>{S.furi=S.furi?0:1;save();render();});
   const TZ=["auto","Europe/Paris","Europe/Brussels","Europe/Zurich","America/Montreal","Asia/Tokyo","Indian/Reunion","Pacific/Noumea"];
   const tzName=t=>t==="auto"?("Automatique — "+(Intl.DateTimeFormat().resolvedOptions().timeZone||"système")):t.split("/")[1].replace("_"," ");
+  row("Blocs pièges", S.leurres===0?"Aucun":"Oui",
+      ()=>{ S.leurres=(S.leurres===0)?1:0; save(); render(); });
+  row("Construction de phrases",
+      S.compo==="saisie"?"Saisie libre":(S.compo==="fin"?"Blocs fins":"Blocs"),
+      ()=>{ const o=["blocs","fin","saisie"];
+            S.compo=o[(o.indexOf(S.compo||"blocs")+1)%o.length]; save(); render(); });
   row("Revoir la présentation","3 écrans",()=>{ guideEtape=0; go("guide"); });
   row("Fuseau horaire", tzName(S.tz||"auto"),
       ()=>{ const i=TZ.indexOf(S.tz||"auto"); S.tz=TZ[(i+1)%TZ.length]; tickDay(); save(); render(); });
@@ -1792,7 +1807,8 @@ VIEWS.home=m=>{
     ["fiches","要点","Fiches de grammaire",D.fiches.filter(f=>f.l<=S.ch).length+" points"],
     ["pieges","落とし穴","Pièges, oral et culture",Object.keys(D.pieges||{}).length+" fiches hors manuel"],
     ["culture","文化","Contexte culturel",Math.min(S.ch,50)+" notes"],
-    ["audio","音声","Audio du manuel","Vos fichiers, hors ligne"]]);
+    ["audio","音声","Audio du manuel","Vos fichiers, hors ligne"],
+    ["manuel","本冊","Votre manuel","Le PDF que vous possédez"]]);
   groupe("S'entraîner",[
     ["arbre","道","Le chemin","Rang "+(tstate().rang+1)+" sur "+D.rangs.length],
     ["minna","練習","Exercices",D.minna.filter(x=>x.l<=S.ch).length+" séries et plus"],
@@ -1955,6 +1971,8 @@ VIEWS.lecon=m=>{
   });
   m.appendChild(e);
   m.appendChild(el("div","note",`<b>À surveiller —</b> ${esc(L.note)}`));
+  const bm=boutonManuel(L.n);
+  if(bm){ const cm=el("div","ctrl"); cm.style.margin="0 0 14px"; cm.appendChild(bm); m.appendChild(cm); }
   inventaireLecon(m,L.n);
   const cu=D.culture[String(L.n)];
   if(cu){
@@ -2614,18 +2632,114 @@ VIEWS.guide=m=>{
 /* ================= construire une phrase ================= */
 /* On part des phrases déjà traduites de l'application : les blocs sont mélangés,
    l'apprenant les remet dans l'ordre. Plusieurs ordres restent acceptables. */
-function blocsDe(phrase){
-  const segs=segment(String(phrase).replace(/[。\s]+$/,""));
-  const out=[]; let cur="";
+/* Morphèmes qui ne peuvent pas ouvrir un bloc : ils s'accrochent à ce qui précède. */
+const DEPEND=/^(さん|ちゃん|くん|君|様|さま|なさい|んです|んだ|んで|りし|りま|ても|では|でも|ては|ながら|たり|ので|のに|から|けど|けれど|まで|より|しか|だけ|ほど|くらい|ぐらい|など|とか|ずつ|ばかり|そう|らしい|よう|みたい|ため|こと|もの|とき|あと|まえ|ちゅう|ごろ|ずに|なく|なけれ|たら|れば|ましょ|ません|ました|ます|です|でし|だっ|じゃ|ない|なら|られ|させ|たい|ちゃ|とい|って|ので|わけ|はず|つもり|ようと)/;
+const PART1="はがをにへでともやかねよねぞわのしてた";
+
+/* Découpe une phrase en blocs jouables : un bloc = un mot plein et ce qui s'y accroche.
+   Aucun bloc ne peut commencer par un morceau dépendant. */
+function blocsDe(phrase, fin){
+  const segs=segment(String(phrase).replace(/[。\s]+$/,"")).filter(([t])=>!PUNCT.test(t));
+  const brut=[];
   segs.forEach(([t,info])=>{
-    const part = info && (info.c==="particule"||info.c==="copule"||info.c==="auxiliaire");
-    if(part && cur){ cur+=t; out.push(cur); cur=""; }
-    else if(PUNCT.test(t)){ if(cur){out.push(cur);cur="";} }
-    else { if(cur&&cur.length>=2){ out.push(cur); cur=t; } else cur+=t; }
+    const dep = (info && (info.c==="particule"||info.c==="copule"||info.c==="auxiliaire"))
+             || DEPEND.test(t)
+             || (t.length===1 && PART1.indexOf(t)>=0);
+    if(dep && brut.length) brut[brut.length-1]+=t;
+    else brut.push(t);
   });
-  if(cur) out.push(cur);
-  return out.filter(x=>x.trim());
+  /* on ne laisse jamais un bloc d'un seul kana isolé, ni un nom propre coupé :
+     サントス doit rester entier, マイク・ミラー aussi. */
+  const KATA=/^[\u30a0-\u30ff\u30fc・]+$/;
+  const LAT=/^[A-Za-z\uff21-\uff3a\uff41-\uff5a0-9\uff10-\uff19]+$/;
+  /* un montant reste entier : 千円, 1億円, 三十分 */
+  const NUMB=/^[0-9\uff10-\uff19一二三四五六七八九十百千万億兆]+$/;
+  const UNIT=/^[円年月日時分秒人枚本冊台個回歳階番度倍週個]/;
+  const KJ=/[\u4e00-\u9fff]/;
+  const out=[];
+  brut.forEach(t=>{
+    const prec=out.length?out[out.length-1]:null;
+    const colle=()=>{ out[out.length-1]+=t; };
+    if(!out.length){ out.push(t); return; }
+    if(t.length===1 && /[\u3040-\u309f]/.test(t)) return colle();
+    if(KATA.test(t) && KATA.test(prec)) return colle();
+    if(LAT.test(t) && LAT.test(prec)) return colle();
+    if(LAT.test(prec) && /^[A-Za-z\uff21-\uff3a]/.test(t)) return colle();
+    if(/^[・]/.test(t)) return colle();
+    if(NUMB.test(prec) && (NUMB.test(t)||UNIT.test(t))) return colle();
+    /* お荷物, ご案内 : le préfixe honorifique ouvre le bloc suivant */
+    if(/^[おご]$/.test(prec)) return colle();
+    out.push(t);
+  });
+  /* Un kanji resté seul est un radical orphelin : on le recolle du bon côté.
+     混 + んで forme un verbe ; 一時 + 間 non — le premier va vers l'avant, le second vers l'arrière. */
+  for(let i2=0;i2<out.length;i2++){
+    if(out[i2].length!==1||!KJ.test(out[i2])) continue;
+    const suiv=out[i2+1];
+    /* le bon côté est celui qui reforme un mot que le segmenteur reconnaît d'un seul tenant */
+    if(suiv && segment(out[i2]+suiv).length===1){ out.splice(i2,2,out[i2]+suiv); i2--; }
+    else if(i2>0){ out.splice(i2-1,2,out[i2-1]+out[i2]); i2--; }
+    else if(suiv){ out.splice(i2,2,out[i2]+suiv); i2--; }
+  }
+  /* si l'on veut moins de blocs, on fusionne les plus courts deux à deux */
+  if(fin && out.length>fin){
+    while(out.length>fin){
+      let k=0, min=1e9;
+      for(let i2=0;i2<out.length-1;i2++){
+        const l2=out[i2].length+out[i2+1].length;
+        if(l2<min){ min=l2; k=i2; }
+      }
+      out.splice(k,2,out[k]+out[k+1]);
+    }
+  }
+  if(S.compo==="fin"){
+    /* mode exigeant : la particule finale de chaque bloc devient un bloc à part */
+    const L2=buildLex(), f2=[];
+    out.forEach(t=>{
+      const m2=t.match(/^(.+?)([はがをにへでとも])$/);
+      /* on ne détache que si ce qui reste est un mot connu : とても garde son も */
+      if(m2&&m2[1].length>=2&&(L2.has(m2[1])||L2.has(kataToHira(m2[1])))&&!L2.has(t)){
+        f2.push(m2[1]); f2.push(m2[2]);
+      }else f2.push(t);
+    });
+    return f2.filter(x=>x.trim()&&/[\u3040-\u30ff\u4e00-\u9fffA-Za-z0-9]/.test(x));
+  }
+  return out.filter(x=>x.trim()&&/[\u3040-\u30ff\u4e00-\u9fffA-Za-z0-9]/.test(x));
 }
+
+/* Blocs pièges : il ne suffit plus d'ordonner, il faut choisir.
+   Les leurres sont plausibles — particules concurrentes, autres formes du même
+   verbe, blocs venus de phrases voisines — mais aucun ne peut composer la phrase. */
+const PART_LEURRE=["は","が","を","に","へ","で","と","も","から","まで","より","や"];
+function leurresPour(blocs,l,n){
+  const att=blocs.join(""), pris=new Set(blocs);
+  const cand=[];
+  const ajoute=t=>{
+    if(!t||pris.has(t)) return;
+    if(att.indexOf(t)>=0) return;      /* un morceau de la phrase n'est pas un piège */
+    pris.add(t); cand.push(t);
+  };
+  /* 1. une particule que la phrase n'emploie pas */
+  shuffle(PART_LEURRE.slice()).forEach(ajoute);
+  /* 2. d'autres formes du verbe final : même racine, temps ou politesse différents */
+  const fin=blocs[blocs.length-1]||"";
+  /* uniquement sur un vrai verbe en ます : にぎやかです ne donne pas « にぎやかません » */
+  const m=fin.match(/^(.+?)(ます|ました|ません|ませんでした)$/);
+  if(m&&m[1]&&!/です$|でした$|じゃ$/.test(m[1]))
+    ["ます","ました","ません","ませんでした"].forEach(x=>ajoute(m[1]+x));
+  /* 3. des blocs tirés d'autres phrases du même chapitre */
+  const L2=D.lessons.find(x=>x.n===l);
+  if(L2){
+    const autres=[];
+    (L2.g||[]).forEach(g=>{ if(g[2]) autres.push(g[2]); });
+    (L2.ex||[]).forEach(e=>{ if(e[0]) autres.push(e[0]); });
+    shuffle(autres).forEach(ph=>blocsDe(ph).forEach(ajoute));
+  }
+  return shuffle(cand).slice(0,n);
+}
+/* combien de pièges : proportionné à la longueur, jamais écrasant */
+const nbLeurres=b=>S.leurres===0?0:Math.max(2,Math.min(4,Math.round(b.length/1.8)));
+
 function poolPhrases(lmax){
   const out=[];
   D.lessons.filter(L=>L.n<=lmax).forEach(L=>{
@@ -2882,6 +2996,9 @@ function buildLex(){
   words(50).forEach(w=>{
     const base={f:w.f,c:CATS[w.c]||"",l:w.l,k:w.k,j:w.j};
     put(w.k,base); put(w.j,base);
+    /* « いい・よい » recouvre deux mots : chacun doit être trouvable seul */
+    if(String(w.k).indexOf("・")>=0) w.k.split("・").forEach(v=>put(v,base));
+    if(String(w.j).indexOf("・")>=0) w.j.split("・").forEach(v=>put(v,base));
     const t=conjTable(w,true)||adjTable(w,true);
     if(t) t.forEach(r=>{
       String(r.val).split(" ／ ").forEach(v=>{
@@ -2921,6 +3038,26 @@ function buildLex(){
 }
 let PREF=null;
 /* mot inconnu : on retrouve son radical et on signale qu'il est conjugué */
+/* Les adjectifs en い conjugués : おもしろくない, 楽しかった, 高くて…
+   Sans cela, le segmenteur les casse en morceaux (おも + しろ + く + ない). */
+const ADJSUF=["くありません","くなかったです","くないです","くなかった","くなくて",
+              "かったです","くない","かった","くては","くても","ければ","くなる","くなり",
+              "くて","くos","さ","そう"];
+function parAdjectif(str,i){
+  const L=buildLex();
+  for(let n=Math.min(14,str.length-i);n>=3;n--){
+    const seg=str.substr(i,n);
+    for(const suf of ADJSUF){
+      if(!seg.endsWith(suf)) continue;
+      const rad=seg.slice(0,-suf.length);
+      if(rad.length<1) continue;
+      const base=rad+"い";
+      const info=L.get(base)||L.get(kataToHira(base));
+      if(info&&(info.c==="adj. い"||info.c==="ai"||/adj/.test(info.c||""))) return [seg,info];
+    }
+  }
+  return null;
+}
 function parRadical(str,i){
   if(!PREF) return null;
   let j=i; while(j<str.length&&isKanji(str[j])) j++;
@@ -3005,6 +3142,7 @@ function segment(str){
     if(PUNCT.test(str[i])){ out.push([str[i],null]); i++; continue; }
     let hit=null;
     const FIN="はがをにへでともの";      /* particules qu'un mot ne doit pas engloutir */
+
     for(let n=Math.min(12,str.length-i);n>=1;n--){
       const seg=str.substr(i,n);
       /* on ne détache la particule finale que si le reste est un mot plein :
@@ -3019,6 +3157,26 @@ function segment(str){
       const alt=kataToHira(seg), alt2=toKata(seg);
       if(L.has(alt)){ hit=[seg,L.get(alt)]; break; }
       if(L.has(alt2)){ hit=[seg,L.get(alt2)]; break; }
+    }
+    /* 町はとても : はと existe (鳩), mais は appartient au mot précédent.
+       On ne défait que les mots courts et rares qui commencent par une particule
+       après un mot plein — にぎやか, plus long et courant, n'est pas concerné. */
+    if(hit && hit[0].length<=3 && "はがをにへもや".indexOf(hit[0][0])>=0 && out.length){
+      const prec=out[out.length-1][1];
+      /* sans catégorie connue (entrée JMdict), on considère le mot comme plein */
+      const plein = !(prec && prec.c && ["particule","copule","auxiliaire"].indexOf(prec.c)>=0);
+      if(plein && L.has(hit[0][0])){
+        /* on tranche par ce qui suit : si un mot d'au moins deux mores commence
+           juste après la particule, c'est que la particule est bien isolée. */
+        let suite=0;
+        for(let n2=Math.min(10,str.length-i-1);n2>=2;n2--){
+          const s2=str.substr(i+1,n2);
+          if(L.has(s2)||L.has(kataToHira(s2))){ suite=n2; break; }
+        }
+        /* un adjectif conjugué compte aussi comme mot qui suit */
+        if(!suite){ const a2=parAdjectif(str,i+1); if(a2) suite=a2[0].length; }
+        if(suite) hit=[hit[0][0],L.get(hit[0][0])];
+      }
     }
     /* un nombre et son compteur forment un seul mot : 六時, 三つ, 五枚 */
     if(NUM.test(str[i])){
@@ -3046,6 +3204,10 @@ function segment(str){
         hit=[kt, e||{f:"",c:"",l:0,lex:1}];
       }
     }
+    /* un adjectif conjugué l'emporte sur un mot plus court trouvé par hasard :
+       おもしろくない ne doit pas se casser en おも + しろ + く + ない */
+    const adj=parAdjectif(str,i);
+    if(adj&&(!hit||adj[0].length>hit[0].length)) hit=adj;
     if(!hit) hit=parRadical(str,i);
     if(hit){ out.push(hit); i+=hit[0].length; }
     else {
@@ -4615,7 +4777,9 @@ VIEWS.culture=m=>{
   const q=FQ.culture||"";
   let n=0;
   D.lessons.forEach(L=>{
-    inventaireLecon(m,L.n);
+    const bm=boutonManuel(L.n);
+  if(bm){ const cm=el("div","ctrl"); cm.style.margin="0 0 14px"; cm.appendChild(bm); m.appendChild(cm); }
+  inventaireLecon(m,L.n);
   const cu=D.culture[String(L.n)];
     if(!cu||L.n>S.ch) return;
     if(!fMatch(q,cu.t,cu.b,"第"+L.n+"課 L"+L.n)) return;
@@ -5463,6 +5627,137 @@ VIEWS.exo=m=>{
 };
 
 
+
+/* ================= votre exemplaire du manuel, en local ================= */
+/* Le fichier reste sur l'appareil : rien n'est envoyé ni partagé.
+   L'index des pages n'est qu'un repère, saisi une fois. */
+function mdb(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open("michi-manuel",1);
+    r.onupgradeneeded=()=>{ if(!r.result.objectStoreNames.contains("t")) r.result.createObjectStore("t",{keyPath:"id"}); };
+    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
+  });
+}
+async function mPut(rec){ const db=await mdb();
+  return new Promise((res,rej)=>{const t=db.transaction("t","readwrite");t.objectStore("t").put(rec);
+    t.oncomplete=()=>res();t.onerror=()=>rej(t.error);}); }
+async function mAll(){ try{ const db=await mdb();
+  return await new Promise((res,rej)=>{const q=db.transaction("t").objectStore("t").getAll();
+    q.onsuccess=()=>res(q.result||[]);q.onerror=()=>rej(q.error);}); }catch(e){ return []; } }
+async function mDel(id){ const db=await mdb();
+  return new Promise(res=>{const t=db.transaction("t","readwrite");t.objectStore("t").delete(id);t.oncomplete=()=>res();}); }
+
+let MANUELS=null, murl={};
+async function chargeManuels(){ MANUELS=await mAll(); return MANUELS; }
+/* le volume qui couvre une leçon donnée */
+function manuelDe(l){
+  return (MANUELS||[]).find(v=>l>=(v.lmin||1)&&l<=(v.lmax||50));
+}
+function pageDe(l){
+  const ix=(S.pages||{})[l];
+  return (ix&&ix>0)?ix:null;
+}
+/* ouvre le volume à la page voulue, dans un onglet */
+function ouvrirManuel(l){
+  const v=manuelDe(l);
+  if(!v){ toast("Aucun manuel importé pour cette leçon"); return; }
+  if(!murl[v.id]) murl[v.id]=URL.createObjectURL(v.f);
+  const pg=pageDe(l);
+  window.open(murl[v.id]+(pg?"#page="+pg:""),"_blank","noopener");
+}
+/* un bouton réutilisable, affiché seulement si un manuel couvre la leçon */
+function boutonManuel(l){
+  if(!manuelDe(l)) return null;
+  const pg=pageDe(l);
+  const b=el("button","btn","本 "+(pg?"Ouvrir p. "+pg:"Ouvrir le manuel"));
+  b.onclick=e=>{ e.stopPropagation(); ouvrirManuel(l); };
+  return b;
+}
+
+VIEWS.manuel=m=>{
+  head(m,"本冊","Votre exemplaire, sur cet appareil");
+  if(MANUELS===null){ chargeManuels().then(render);
+    m.appendChild(el("div","empty","<b>…</b>Lecture en cours.")); return; }
+
+  const av=el("div","card");
+  av.innerHTML=`<div style="font-size:0.8438rem;color:var(--mut);line-height:1.6">
+    Importez le PDF du manuel que vous possédez. Il reste sur cet appareil :
+    il n'est ni envoyé, ni partagé, ni inclus dans vos sauvegardes.
+    Chaque leçon affichera ensuite un bouton qui l'ouvre à la bonne page.</div>`;
+  m.appendChild(av);
+
+  /* --- les volumes importés --- */
+  const c=el("div","card");
+  c.appendChild(el("div","sec","Volumes"));
+  if(!MANUELS.length) c.appendChild(el("div","empty","<b>—</b>Aucun volume importé."));
+  MANUELS.forEach(v=>{
+    const d=el("div","word");
+    d.innerHTML=`<div class="l"><div class="k" style="font-size:0.9375rem">${esc(v.nom)}</div>
+      <div class="f">leçons ${v.lmin} à ${v.lmax} · ${Math.round((v.f.size||0)/1048576)} Mo</div></div>
+      <div class="r"><button class="ico">✕</button></div>`;
+    d.querySelector(".ico").onclick=async e=>{
+      e.stopPropagation();
+      if(!confirm("Retirer « "+v.nom+" » de cet appareil ?")) return;
+      await mDel(v.id); MANUELS=null; render();
+    };
+    d.onclick=()=>ouvrirManuel(v.lmin);
+    c.appendChild(d);
+  });
+
+  const inp=document.createElement("input");
+  inp.type="file"; inp.accept="application/pdf"; inp.style.display="none";
+  inp.onchange=async()=>{
+    const f=inp.files[0]; if(!f) return;
+    const lmin=+prompt("Première leçon couverte par ce fichier ?","1")||1;
+    const lmax=+prompt("Dernière leçon couverte ?",String(Math.min(50,lmin+24)))||50;
+    await mPut({id:"m"+Date.now().toString(36),nom:f.name,f:f,lmin:lmin,lmax:lmax});
+    MANUELS=null; render(); toast("Volume importé");
+  };
+  const bi=el("button","btn p w","Importer un PDF");
+  bi.onclick=()=>inp.click();
+  c.appendChild(inp); c.appendChild(bi);
+  m.appendChild(c);
+
+  if(!MANUELS.length) return;
+
+  /* --- l'index des pages --- */
+  S.pages=S.pages||{};
+  const ix=el("div","card");
+  ix.appendChild(el("div","sec","À quelle page commence chaque leçon ?"));
+  ix.appendChild(el("div","note","Ouvrez le PDF, relevez le numéro de page affiché par votre lecteur, et saisissez-le. Une seule fois."));
+  const g=el("div","pgrid");
+  for(let l=1;l<=50;l++){
+    if(!manuelDe(l)) continue;
+    const w=el("label","pcell");
+    const i2=document.createElement("input");
+    i2.type="number"; i2.min="1"; i2.inputMode="numeric";
+    i2.value=(S.pages[l]||""); i2.placeholder="—";
+    i2.onchange=()=>{ const v2=+i2.value;
+      if(v2>0) S.pages[l]=v2; else delete S.pages[l];
+      save(); };
+    w.innerHTML=`<span>L${l}</span>`;
+    w.appendChild(i2);
+    g.appendChild(w);
+  }
+  ix.appendChild(g);
+
+  const cc=el("div","ctrl"); cc.style.marginTop="12px";
+  const bp=el("button","btn","Remplir par pas régulier");
+  bp.onclick=()=>{
+    const p1=+prompt("Page de la leçon 1 ?","")||0;
+    if(!p1) return;
+    const pas=+prompt("Combien de pages par leçon, en moyenne ?","8")||8;
+    for(let l=1;l<=50;l++) if(manuelDe(l)) S.pages[l]=p1+(l-1)*pas;
+    save(); render();
+    toast("Index prérempli — ajustez au besoin");
+  };
+  const bz=el("button","btn","Tout effacer");
+  bz.onclick=()=>{ if(confirm("Effacer tout l'index des pages ?")){ S.pages={}; save(); render(); } };
+  cc.appendChild(bp); cc.appendChild(bz);
+  ix.appendChild(cc);
+  m.appendChild(ix);
+};
+
 /* ================= audio des leçons ================= */
 const A3A = n => n<=25 ? "https://www.3anet.co.jp/np/en/resrcs/230020/"
                        : "https://www.3anet.co.jp/np/en/resrcs/240020/";
@@ -5551,6 +5846,8 @@ VIEWS.audio=m=>{
 
   const box=el("div","card");
   box.appendChild(el("h3",null,"Leçon "+audLes));
+  const bm2=boutonManuel(audLes);
+  if(bm2){ const c2=el("div","ctrl"); c2.style.marginBottom="10px"; c2.appendChild(bm2); box.appendChild(c2); }
   const inp=document.createElement("input");
   inp.type="file"; inp.accept="audio/*"; inp.multiple=true; inp.style.display="none";
   const btn=el("button","btn p w","Importer des fichiers audio pour cette leçon");
@@ -6075,9 +6372,15 @@ function answer(q,ok){
 }
 /* composer une phrase à partir de blocs mêlés */
 function batirChallenge(m,q){
+  if(S.compo==="saisie"){ batirSaisie(m,q); return; }
   sess.pose=sess.pose||{}; sess.dispo=sess.dispo||{};
   const k=sess.i;
-  if(!sess.dispo[k]){ sess.dispo[k]=shuffle((q.blocs||[]).slice()); sess.pose[k]=[]; }
+  if(!sess.dispo[k]){
+    const vrais=(q.blocs||[]).slice();
+    const faux=leurresPour(vrais,q.l,nbLeurres(vrais));
+    sess.faux=sess.faux||{}; sess.faux[k]=faux;
+    sess.dispo[k]=shuffle(vrais.concat(faux)); sess.pose[k]=[];
+  }
   const done=sess.res[k]!=null;
   const box=el("div","qbox");
   box.innerHTML=`<div class="qhead">${esc(q.head)} · ${sess.i+1}/${sess.qs.length}</div>
@@ -6105,7 +6408,7 @@ function batirChallenge(m,q){
   const cc=el("div","ctrl"); cc.style.marginTop="12px";
   if(!done){
     const ok=el("button","btn p","Vérifier");
-    ok.disabled=!!sess.dispo[k].length;
+    ok.disabled=!sess.pose[k].length;
     ok.onclick=()=>{
       const prop=sess.pose[k].join(""), att=(q.blocs||[]).join("");
       const juste = prop===att || matchKind(prop,[att])!==null;
@@ -6123,14 +6426,63 @@ function batirChallenge(m,q){
     const r=el("div","card");
     const juste=sess.res[k]===true;
     r.style.borderColor=juste?"var(--take)":"var(--shu)";
+    const fx=(sess.faux&&sess.faux[k])||[];
     r.innerHTML=`<div class="sec">${juste?"Juste":"La phrase attendue"}</div>
-      <div class="qtext" style="color:var(--${juste?"take":"shu"})">${jpw(q.a)}</div>`;
+      <div class="qtext" style="color:var(--${juste?"take":"shu"})">${jpw(q.a)}</div>
+      ${fx.length?`<div class="note" style="margin-top:8px">Blocs inutiles : ${
+        fx.map(x=>'<span class="phbloc leurre">'+jp(x)+'</span>').join(" ")}</div>`:""}`;
     const c2=el("div","ctrl"); c2.style.marginTop="10px";
     const nx=el("button","btn p w","Suivante");
     nx.onclick=()=>{ sess.i++; render(); };
     c2.appendChild(nx); r.appendChild(c2);
     m.appendChild(r);
   }
+}
+/* traduire et écrire la phrase entière, sans blocs */
+function batirSaisie(m,q){
+  const k=sess.i, done=sess.res[k]!=null;
+  const box=el("div","qbox");
+  box.innerHTML=`<div class="qhead">${esc(q.head)} · ${sess.i+1}/${sess.qs.length}</div>
+    <div class="qtext" style="font-size:1.05rem;font-family:var(--ui)">${esc(q.q)}</div>
+    <div class="qsub">${esc(q.sub||"Écrivez la phrase en japonais.")}</div>`;
+  m.appendChild(box);
+  const c=el("div","card");
+  const inp=document.createElement("input");
+  inp.className="search"; inp.placeholder="日本語で…";
+  inp.value=(sess.typed&&sess.typed[k])||"";
+  inp.autocapitalize="off"; inp.autocomplete="off"; inp.spellcheck=false;
+  if(done) inp.disabled=true;
+  c.appendChild(inp);
+  const cc=el("div","ctrl"); cc.style.marginTop="10px";
+  if(!done){
+    const ok=el("button","btn p","Vérifier");
+    const juge=()=>{
+      sess.typed=sess.typed||{}; sess.typed[k]=inp.value;
+      const juste=matchKind(inp.value,[q.a])!==null;
+      answer(q,juste); render();
+    };
+    ok.onclick=juge;
+    inp.onkeydown=e=>{ if(e.key==="Enter") juge(); };
+    const sk=el("button","btn","Passer");
+    sk.onclick=()=>{ sess.res[k]=false; grade(q.key,false); save(); render(); };
+    cc.appendChild(ok); cc.appendChild(sk);
+  }
+  c.appendChild(cc); m.appendChild(c);
+  if(done){
+    const juste=sess.res[k]===true;
+    const r=el("div","card");
+    r.style.borderColor=juste?"var(--take)":"var(--shu)";
+    const fx=(sess.faux&&sess.faux[k])||[];
+    r.innerHTML=`<div class="sec">${juste?"Juste":"La phrase attendue"}</div>
+      <div class="qtext" style="color:var(--${juste?"take":"shu"})">${jpw(q.a)}</div>
+      ${fx.length?`<div class="note" style="margin-top:8px">Blocs inutiles : ${
+        fx.map(x=>'<span class="phbloc leurre">'+jp(x)+'</span>').join(" ")}</div>`:""}`;
+    const c2=el("div","ctrl"); c2.style.marginTop="10px";
+    const nx=el("button","btn p w","Suivante");
+    nx.onclick=()=>{ sess.i++; render(); };
+    c2.appendChild(nx); r.appendChild(c2); m.appendChild(r);
+  }
+  setTimeout(()=>{ if(!done) inp.focus(); },60);
 }
 function drawChallenge(m,q){
   /* le tracé vaut aussi pour les kana : on fabrique une fiche équivalente */
