@@ -509,11 +509,15 @@ main.nav-fwd>*{animation-name:slideIn}
 .ech u{position:absolute;left:0;bottom:0;top:0;background:color-mix(in srgb,var(--ai) 30%,transparent);
   text-decoration:none;transition:width .6s cubic-bezier(.22,.9,.28,1)}
 .fragline{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
-.fchip{position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:4px;font-size:0.75rem;
-  color:var(--mut);border:1px solid color-mix(in srgb,var(--c) 40%,transparent);border-radius:999px;padding:2px 9px}
+.fragline{display:flex;gap:5px;margin-top:12px;flex-wrap:nowrap}
+.fchip{position:relative;overflow:hidden;flex:1 1 0;min-width:0;
+  display:inline-flex;align-items:center;justify-content:center;gap:2px;
+  font-size:clamp(8.5px,2.6vw,11px);
+  color:var(--mut);border:1px solid color-mix(in srgb,var(--c) 40%,transparent);
+  border-radius:999px;padding:3px 3px;white-space:nowrap}
 .fchip i,.fchip span,.fchip u{position:relative;z-index:1}
 .fchip i{font-family:var(--disp);font-style:normal;color:var(--c);font-size:0.8125rem}
-.fchip u{text-decoration:none;color:var(--dim)}
+.fchip u{text-decoration:none;color:var(--dim);font-size:.82em}
 .fbar{position:absolute;left:0;top:0;bottom:0;z-index:0;background:color-mix(in srgb,var(--c) 22%,transparent);
   transition:width .6s cubic-bezier(.22,.9,.28,1)}
 
@@ -1729,7 +1733,10 @@ VIEWS.home=m=>{
     const sp=el("span","fchip");
     sp.style.setProperty("--c",e.c);
     sp.title=e.n+" — "+o+" sur "+b2;
-    sp.innerHTML=`<b class="fbar" style="width:${pcf}%"></b><i class="jpx">${esc(e.j)}</i><span>${o}</span>${b2?'<u>/'+b2+'</u>':""}`;
+    /* cinq jauges sur une ligne : le pourcentage suffit, le détail est dans l'infobulle
+       et la barre de fond figure la proportion. */
+    sp.innerHTML=`<b class="fbar" style="width:${pcf}%"></b><i class="jpx">${esc(e.j)}</i>`+
+      `<span>${b2?pcf+"%":o}</span>`;
     fl.appendChild(sp);
   });
   pv.onclick=e=>{ if(!e.target.closest(".pvgo")) go("arbre"); };
@@ -1765,20 +1772,7 @@ VIEWS.home=m=>{
     k.onclick=()=>go("kana"); m.appendChild(k);
   }
 
-  /* ---- le chemin ---- */
-  const T=tstate(), R=RANG(T.rang);
-  const ch=el("div","card");
-  ch.style.cursor="pointer";
-  ch.innerHTML=`<div style="display:flex;gap:14px;align-items:center">
-    <div class="rk-mark" style="width:56px;height:56px"><b class="jpx" style="font-size:1.25rem">${esc(RG.j)}</b></div>
-    <div style="flex:1;min-width:0">
-      <span class="eyebrow">Votre rang</span>
-      <div style="font-family:var(--tit);font-size:1.25rem;line-height:1.2">${esc(RG.n)}</div>
-      <div style="font-size:0.7812rem;color:var(--mut)">${progRang(T.rang)} % du rang · ${
-        D.elements.map(e=>esc(e.j)+" "+(T.frag[e.id]||0)).join("  ")}</div>
-    </div><span class="ngo" style="color:var(--dim);font-size:1.1875rem">›</span></div>`;
-  ch.onclick=()=>go("arbre");
-  m.appendChild(ch);
+  /* le rang est déjà présenté plus haut : pas de seconde carte */
 
   /* ---- les rubriques, en tuiles ---- */
   const t=el("div","tiles");
