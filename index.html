@@ -6083,9 +6083,27 @@ function buildPool(){
       sub:"Quel est son radical ?",hint:k.f,a:k.rad,o:optsRanked(k.rad,(k.cp||[]),pool)});
   });
   D.compteurs.filter(c=>c.l<=S.ch).forEach(c=>{
-    const base=c.c.replace(/^～/,"").split(" ")[0].split("／")[0];
-    out.push({type:"cnt",key:"n:"+c.c,l:c.l,head:"Compteur",q:c.u,sub:"Quel compteur employer ?",
-      a:c.c,alt:[base,"～"+base],o:opts(c.c,D.compteurs.map(x=>x.c))});
+    /* 匹 et 頭 sont deux compteurs distincts, non deux graphies du même :
+       une entrée qui en réunit plusieurs donne autant de questions séparées,
+       chacune avec son propre énoncé. On ne sépare pas sur ・, qui note des variantes. */
+    const parts=String(c.c).split(/／|\s*\/\s*/).map(x=>x.trim()).filter(Boolean);
+    const tous=D.compteurs.flatMap(x=>String(x.c).split(/／|\s*\/\s*/).map(y=>y.trim())).filter(Boolean);
+    parts.forEach((p2,i2)=>{
+      const base=p2.replace(/^～/,"").split(" ")[0];
+      /* l'énoncé doit désigner ce compteur-là : on cherche sa précision dans le libellé */
+      let q2=c.u;
+      if(parts.length>1){
+        const nu=base.replace(/\s*[（(].*$/,"");
+        /* si le libellé énumère lui-même les cas, on l'apparie ; sinon on précise */
+        const lib=String(c.u).split(/\s*\/\s*|／/).map(x=>x.trim()).filter(Boolean);
+        q2 = (lib.length===parts.length)
+           ? lib[i2].replace(/[。.]$/,"")
+           : String(c.u).replace(/[。.]$/,"")+" — "+nu;
+      }
+      out.push({type:"cnt",key:"n:"+c.c+(parts.length>1?":"+i2:""),l:c.l,head:"Compteur",
+        q:q2,sub:"Quel compteur employer ?",
+        a:p2,alt:[base,"～"+base],o:opts(p2,tous)});
+    });
   });
   const vu=new Set();
   let res=out.filter(x=>{
