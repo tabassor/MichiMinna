@@ -1104,6 +1104,26 @@ function blocks(t){
   const parts=s2.split(/[、,\u3000\s]+/).filter(Boolean);
   return parts.length>1?parts.slice().sort():null;
 }
+/* Lecture en kana d'une phrase entière : « 駅まで三十分かかります » devient
+   « えきまでさんじゅっぷんかかります ». Sans cela, une réponse saisie tout en
+   hiragana était refusée dès que la phrase comptait plus d'un mot. */
+function lecturePhrase(t){
+  const str=String(t);
+  if(!/[\u4e00-\u9fff]/.test(str)) return str;
+  /* suffixes dont la lecture dépend du mot qui précède : アメリカ人 = ～じん */
+  const SUF={"人":"じん","語":"ご","国":"こく","円":"えん","年":"ねん","月":"がつ","日":"にち"};
+  try{
+    return segment(str).map(([tok,info],i,tab)=>{
+      if(!/[\u4e00-\u9fff]/.test(tok)) return tok;
+      const lu = D.rd[tok] ||
+        (info&&info.k&&!/[\u4e00-\u9fff]/.test(info.k)?info.k.split("・")[0]:null) ||
+        (D.rs&&D.rs[tok]);
+      /* un kanji suffixe collé à un mot étranger garde sa lecture sino-japonaise */
+      if(tok.length===1&&SUF[tok]&&i>0&&!/[\u4e00-\u9fff]/.test(tab[i-1][0]||"")) return SUF[tok];
+      return lu||tok;
+    }).join("");
+  }catch(e){ return str; }
+}
 function matchKind(user,answers,strict){
   if(!user||!user.trim()) return null;
   const cands=[user];
@@ -1125,6 +1145,18 @@ function matchKind(user,answers,strict){
   for(const a of A){
     for(const av of variants(a)) if(CV.indexOf(norm(av))>=0) return "lecture";
     for(const av of variants(a)) if(numNorm(norm(av))&&CV.some(x=>numNorm(x)===numNorm(norm(av)))) return "lecture";
+  }
+  /* phrase entière saisie en kana : on compare les lectures reconstituées */
+  if(!strict){
+    for(const c of cands){
+      const lc=norm(lecturePhrase(c));
+      for(const a of A){
+        const la=norm(lecturePhrase(a));
+        /* さんじっぷん et さんじゅっぷん sont deux lectures reçues du même mot */
+        const eq=x=>String(x).replace(/じゅっ/g,"じっ").replace(/ぷん/g,"ふん").replace(/っ/g,"");
+        if(lc&&la&&(lc===la||numNorm(lc)===numNorm(la)||eq(lc)===eq(la))) return "lecture";
+      }
+    }
   }
   /* groupes intervertis : même contenu, ordre différent */
   for(const c of cands){
