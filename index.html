@@ -13,7 +13,7 @@
 <meta name="description" content="Compagnon de révision Minna no Nihongo : vocabulaire, kanji, grammaire, entraînement espacé.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192-v2.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192-v3.png">
 <title>みち — compagnon d'étude du japonais</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -198,6 +198,33 @@ button.stat{font:inherit;width:100%}
   font-size:0.8438rem;color:var(--tx);line-height:1.5}
 .sheetmots span{display:block;font-size:0.6562rem;letter-spacing:.12em;text-transform:uppercase;
   color:var(--dim);margin-bottom:3px}
+
+#splash{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;background:var(--bg);
+  animation:spSortie .5s ease 1.45s forwards}
+#splash svg{overflow:visible}
+.sp-ring{fill:none;stroke:var(--ai);stroke-width:7;stroke-linecap:round;
+  /* le trait s'ouvre en haut, comme un 円相 que l'on n'a pas refermé */
+  stroke-dasharray:420 465;stroke-dashoffset:420;
+  transform:rotate(-104deg);transform-origin:100px 100px;
+  animation:spTrace .85s cubic-bezier(.32,.72,.26,1) forwards}
+.sp-mi{font-family:var(--disp);font-size:4.625rem;fill:var(--ai);text-anchor:middle;
+  dominant-baseline:central;opacity:0;
+  animation:spSceau .5s cubic-bezier(.3,1.5,.4,1) .42s forwards}
+.sp-nom{font-family:var(--disp);font-size:1.4375rem;color:var(--tx);letter-spacing:.14em;
+  margin-top:16px;opacity:0;animation:spMonte .5s ease .58s forwards}
+.sp-sous{font-family:var(--ui);font-size:0.6562rem;letter-spacing:.19em;text-transform:uppercase;
+  color:var(--dim);opacity:0;animation:spMonte .5s ease .68s forwards}
+@keyframes spTrace{to{stroke-dashoffset:0}}
+@keyframes spSceau{from{opacity:0;transform:scale(.55) rotate(-8deg)}
+  to{opacity:1;transform:none}}
+@keyframes spMonte{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+@keyframes spSortie{to{opacity:0;visibility:hidden}}
+@media (prefers-reduced-motion:reduce){
+  #splash{animation:spSortie .3s ease .35s forwards}
+  .sp-ring,.sp-mi,.sp-nom,.sp-sous{animation:none;opacity:1;stroke-dashoffset:0}
+}
+
 .advnote{font-size:0.7812rem;color:var(--mut);line-height:1.55;margin-top:8px;
   border-left:2px solid color-mix(in srgb,var(--ai) 50%,transparent);padding-left:10px}
 .advnote .kj{color:var(--ai)}
@@ -653,6 +680,16 @@ html[data-skin="retro"] .opt.no{box-shadow:0 0 12px color-mix(in srgb,var(--shu)
 </style>
 </head>
 <body>
+
+<!-- écran d'ouverture : le cercle se trace, le み s'y pose -->
+<div id="splash" aria-hidden="true">
+  <svg viewBox="0 0 200 200" width="168" height="168">
+    <circle class="sp-ring" cx="100" cy="100" r="74"/>
+    <text class="sp-mi" x="100" y="100">み</text>
+  </svg>
+  <div class="sp-nom">みち</div>
+  <div class="sp-sous">compagnon d'étude du japonais</div>
+</div>
 <div id="app">
   <header>
     <button class="ava" id="avaBtn" aria-label="Profil">・</button>
@@ -698,6 +735,8 @@ async function switchUser(id){
   UID=id; await saveUsers();
   const raw=await sGet("michi:u:"+id);
   S=Object.assign(NEW(), raw?JSON.parse(raw):{});
+  const sp=document.getElementById("splash");
+  if(sp) setTimeout(()=>sp.remove(),2050);
   tickDay(); sess=null; stack=[]; chargeManuels().then(()=>{ if(MANUELS.length) render(); });
   go(S.guide?"home":"guide",null,false);
   try{ history.replaceState({michi:0},"",location.href);
@@ -1891,6 +1930,14 @@ function bonjour(){
 /* ================= leçons ================= */
 VIEWS.lecons=m=>{
   head(m,"課","Le cours de chaque chapitre, resserré");
+  /* on amène directement le chapitre en cours sous les yeux, sauf si l'on
+     revient d'une leçon : la position de lecture précédente prime alors. */
+  if(!FQ.lecons && !posVue["lecons|null"]){
+    setTimeout(()=>{
+      const c2=document.getElementById("lecActuel");
+      if(c2) c2.scrollIntoView({block:"center",behavior:"auto"});
+    },40);
+  }
   filterBar(m,"lecons","Chercher un point de grammaire, un thème…",()=>render());
   const q=FQ.lecons||"";
   const ls=D.lessons.filter(L=>fMatch(q,"第"+L.n+"課 L"+L.n,L.jp,L.fr,L.kaiwa,L.jpfr,L.kwfr,
@@ -1901,6 +1948,7 @@ VIEWS.lecons=m=>{
   ls.forEach(L=>{
     const lock=L.n>S.ch;
     const c=el("div","card"+(lock?" lock":""));
+    if(L.n===S.ch) c.id="lecActuel";
     c.innerHTML=`<h3>第${L.n}課 <span class="tag">${esc(L.fr)}</span>${lock?' <span class="tag">verrouillé</span>':''}</h3>
       <div class="jpx" style="font-size:0.9375rem;color:var(--mut)">${lock?"—":jpn(L.jp)}</div>
       ${(!lock&&L.jpfr&&S.tr==="visible")?`<div class="gtr" style="font-size:0.7812rem">${esc(L.jpfr)}</div>`:""}`;
@@ -3308,7 +3356,7 @@ function sentenceSheet(jpText,fr,glose){
     const comp=kanjis.length?`<span class="cread">${kanjis.map(c=>esc(c)+" "+esc((KIDX[c].f||"").split(",")[0])).join(" · ")}</span>`:"";
     return `<div class="crow" data-w="${esc(t)}">
       <span class="cch jpx" style="font-size:1.1875rem;min-width:auto;padding-right:4px">${jp(t)}</span>
-      <span class="cdesc"><b>${esc(i.f||"—")}</b>${i.c?` <span class="tag">${esc(i.c)}</span>`:""}${
+      <span class="cdesc"><b>${esc(sensForme(i)||i.f||"—")}</b>${i.c?` <span class="tag">${esc(i.c)}</span>`:""}${
         i.form?` <span class="tag" style="border-color:var(--ai);color:var(--ai)">${esc(i.form)}</span>`:""}${
         i.l>0?` <span class="tag" style="border-color:var(--take);color:var(--take)">L${i.l}</span>`:""}
         ${comp}</span><span class="cgo">›</span></div>`;
@@ -5545,6 +5593,38 @@ function trDe(a){
   const t=trIndex().get(norm(String(a).replace(/[。、\s]/g,"")));
   return t||"";
 }
+/* Le sens d'une forme conjuguée n'est pas celui du mot de base :
+   « 古くないです » ne veut pas dire « vieux » mais « pas vieux ». */
+const NEG=/négat|nég\./i;
+const PASSE=/passé/i;
+function sensForme(info){
+  if(!info||!info.f) return "";
+  const f=info.f.split(",")[0].trim();
+  const fo=info.form||"";
+  if(!fo) return f;
+  const verbe=/^verbe/.test(info.c||"");
+  const el=/^[aeiouâêîôûéèh]/i.test(f);          /* élision : « d'aller » */
+  if(verbe){
+    if(NEG.test(fo)&&PASSE.test(fo)) return "n'a pas "+f;
+    if(NEG.test(fo)) return "ne pas "+f;
+    if(PASSE.test(fo)) return f+" (passé)";
+    if(/envie de/.test(fo)) return "avoir envie "+(el?"d'":"de ")+f;
+    if(/potentiel/.test(fo)) return "pouvoir "+f;
+    if(/prohibitif/.test(fo)) return "ne pas "+f;
+    if(/impératif/.test(fo)) return f+" (ordre)";
+    if(/volitif/.test(fo)) return "allons "+f;
+    if(/passif/.test(fo)) return "être "+f;
+    if(/causatif/.test(fo)) return "faire "+f;
+    return f;
+  }
+  /* adjectifs et noms : l'accord se fait au masculin, la nuance est portée par le verbe être */
+  if(NEG.test(fo)&&PASSE.test(fo)) return "n'était pas "+f;
+  if(NEG.test(fo)) return "n'est pas "+f;
+  if(PASSE.test(fo)) return "était "+f;
+  if(/trop/.test(fo)) return "trop "+f;
+  if(/devient/.test(fo)) return "devenir "+f;
+  return f;
+}
 function exoHint(x,q,a){
   /* d'abord la vraie traduction, si nous l'avons */
   const vrai=trDe(a);
@@ -5552,11 +5632,11 @@ function exoHint(x,q,a){
   const L=buildLex();
   const clean=t=>String(t).replace(/[。、（）()]/g,"").trim();
   const w=L.get(clean(a))||L.get(clean(q));
-  if(w&&w.f&&!w.lex) return w.f;
+  if(w&&w.f&&!w.lex) return sensForme(w);
   /* phrase : on assemble le sens des mots pleins */
   const segs=segment(clean(a)).filter(([t,i])=>i&&i.f&&!i.lex&&i.c&&
     ["nom","pronom","verbe I","verbe II","verbe III","adj. い","adj. な","adverbe","nombre","compteur"].indexOf(i.c)>=0);
-  if(segs.length>=2) return segs.map(([t,i])=>i.f.split(",")[0]).join(" · ");
+  if(segs.length>=2) return segs.map(([t,i])=>sensForme(i)).join(" · ");
   return "";
 }
 function exoState(key){ return S.exos&&S.exos[key]; }
