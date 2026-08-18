@@ -225,6 +225,20 @@ button.stat{font:inherit;width:100%}
   .sp-ring,.sp-mi,.sp-nom,.sp-sous{animation:none;opacity:1;stroke-dashoffset:0}
 }
 
+.antbloc{margin-top:14px}
+.antlien{display:flex;align-items:baseline;gap:10px;width:100%;text-align:left;
+  background:var(--surf2);border:1px solid var(--line);border-radius:var(--r-sm);
+  padding:8px 11px;margin-bottom:6px}
+.antlien:active{border-color:var(--ai)}
+.antlien .j{font-family:var(--disp);font-size:1.0625rem;color:var(--tx)}
+.antlien .f{font-size:0.7812rem;color:var(--mut)}
+.jlptline{display:flex;align-items:center;gap:9px;margin-top:10px;font-size:0.7812rem;color:var(--mut)}
+.tag.jlpt{border-color:color-mix(in srgb,var(--ai) 55%,transparent);color:var(--ai);font-weight:600}
+.kcell{position:relative}
+.kjl{position:absolute;top:3px;left:5px;font-style:normal;font-size:0.5312rem;
+  color:var(--dim);font-family:var(--ui);letter-spacing:.02em}
+.kcell.n5 .kjl,.kcell.n4 .kjl{color:color-mix(in srgb,var(--take) 75%,transparent)}
+.kcell.n1 .kjl,.kcell.n2 .kjl{color:color-mix(in srgb,var(--shu) 70%,transparent)}
 .advnote{font-size:0.7812rem;color:var(--mut);line-height:1.55;margin-top:8px;
   border-left:2px solid color-mix(in srgb,var(--ai) 50%,transparent);padding-left:10px}
 .advnote .kj{color:var(--ai)}
@@ -1984,7 +1998,8 @@ function inventaireLecon(m,n){
     c.appendChild(el("div","sec","Kanji du chapitre · "+kj.length));
     const g=el("div","kgrid");
     kj.forEach(k=>{
-      const b=el("button","kcell",k.c+"<u>"+esc((k.f||"").split(",")[0].slice(0,8))+"</u>");
+      const b=el("button","kcell"+(k.jl?" n"+k.jl:""),
+        k.c+(k.jl?'<i class="kjl">N'+k.jl+"</i>":"")+"<u>"+esc((k.f||"").split(",")[0].slice(0,8))+"</u>");
       b.onclick=()=>go("trace",k.c); g.appendChild(b);
     });
     c.appendChild(g); m.appendChild(c);
@@ -3388,6 +3403,24 @@ function trBtn(jpText,fr,glose){
 }
 
 /* les compteurs ont leur propre fiche : un toucher y mène directement */
+/* le contraire d'un mot, s'il en a un : on cherche dans les deux sens */
+function antonymesDe(mot){
+  const cl=x=>String(x).replace(/^[～~]/,"").split("・")[0];
+  /* on accepte aussi bien 暑い que あつい : on ramène d'abord à la lecture */
+  const w0=words(50).find(y=>y.j===mot||y.k===mot||cl(y.k)===cl(mot));
+  const c=cl(w0?w0.k:mot);
+  const out=[];
+  (D.ant||[]).forEach(([a,b,f])=>{
+    const nu=(f&&f.indexOf("—")>0)?f.split("—")[1].trim():"";
+    if(cl(a)===c) out.push({mot:b,nuance:nu});
+    else if(cl(b)===c) out.push({mot:a,nuance:nu});
+  });
+  /* on ajoute la graphie en kanji quand elle existe */
+  return out.map(x=>{
+    const w=words(50).find(y=>y.k===x.mot||y.k.split("・")[0]===x.mot||y.j===x.mot);
+    return {mot:x.mot, j:(w&&w.j)||"", f:(w&&w.f)||"", nuance:x.nuance};
+  }).filter(x=>x.f);
+}
 function estCompteur(t){
   /* les fiches portent la lecture entre parenthèses : « ～枚 (まい) » */
   const nu=x=>String(x).replace(/^[～~]/,"").replace(/\s*[（(].*$/,"").trim();
@@ -3425,6 +3458,7 @@ function wordSheet(t){
       ${info.jm?'<span class="tag">hors manuel</span>':""}</div>`
      :'<div class="sheetfr" style="color:var(--mut)">Mot non répertorié — voyez le dictionnaire étendu.</div>'}
     <div id="shAcc"></div>
+    <div id="shAnt"></div>
     ${comp?`<div class="sec" style="margin:14px 0 4px">Composition — touchez un kanji pour son tracé</div><div class="comp">${comp}</div>`:""}
     <button class="btn w" id="shDico" style="margin-top:14px">Chercher dans le dictionnaire étendu</button>
   </div>`;
@@ -3436,6 +3470,19 @@ function wordSheet(t){
   $("#shDico",back).onclick=()=>{ close(); jq=t; go("jmdict"); };
   const wA=words(50).find(x=>x.k===t||x.j===t)||(info&&info.k?{k:info.k,j:info.j}:null);
   if(wA){ const ab=accentBloc(wA); if(ab) $("#shAcc",back).replaceWith(ab); }
+  const ants=antonymesDe(wA?(wA.k||t):t);
+  if(ants.length){
+    const zone=el("div","antbloc");
+    zone.innerHTML=`<div class="sec" style="margin:0 0 6px">Contraire${ants.length>1?"s":""}</div>`;
+    ants.forEach(a=>{
+      const b2=el("button","antlien");
+      b2.innerHTML=`<span class="j">${a.j?rubyPair(a.j,a.mot):jp(a.mot)}</span>
+        <span class="f">${esc(a.f)}${a.nuance?' <span class="tag">'+esc(a.nuance)+"</span>":""}</span>`;
+      b2.onclick=()=>{ close(); wordSheet(a.j||a.mot); };
+      zone.appendChild(b2);
+    });
+    const cible=$("#shAnt",back); if(cible) cible.replaceWith(zone);
+  }
   back.querySelectorAll(".cgo").forEach(g=>g.onclick=()=>{ close(); go("trace",g.dataset.k); });
 }
 
@@ -4838,7 +4885,8 @@ VIEWS.rad=m=>{
     const g=el("div","kgrid");
     arr.forEach(c=>{
       const k=KIDX[c];
-      const btn=el("button","kcell"+((k&&k.l&&k.l<=S.ch)?"":" lk"),c+(k&&k.l?`<u>L${k.l}</u>`:"<u>+</u>"));
+      const btn=el("button","kcell"+((k&&k.l&&k.l<=S.ch)?"":" lk")+((k&&k.jl)?" n"+k.jl:""),
+        c+((k&&k.jl)?`<i class="kjl">N${k.jl}</i>`:"")+(k&&k.l?`<u>L${k.l}</u>`:"<u>+</u>"));
       btn.onclick=()=>go("trace",c); g.appendChild(btn);
     });
     m.appendChild(g);
@@ -4932,7 +4980,8 @@ VIEWS.search=m=>{
       n+=ks.length;
       box.appendChild(el("div","sec","Kanji · "+ks.length));
       const g=el("div","kgrid");
-      ks.slice(0,60).forEach(k=>{const b=el("button","kcell"+(k.l>S.ch?" lk":""),`${k.c}<u>${k.l>S.ch?"L"+k.l:k.s}</u>`);
+      ks.slice(0,60).forEach(k=>{const b=el("button","kcell"+(k.l>S.ch?" lk":"")+(k.jl?" n"+k.jl:""),
+        `${k.c}${k.jl?'<i class="kjl">N'+k.jl+"</i>":""}<u>${k.l>S.ch?"L"+k.l:k.s}</u>`);
         b.onclick=()=>go("trace",k.c); g.appendChild(b);});
       box.appendChild(g);
     }
@@ -5227,7 +5276,8 @@ VIEWS.kanji=m=>{
       box.appendChild(el("div","sec",res.length+" résultat"+(res.length>1?"s":"")));
       const g=el("div","kgrid");
       res.slice(0,120).forEach(k=>{
-        const b=el("button","kcell"+(k.l>S.ch?" lk":""),`${k.c}<u>${k.l>S.ch?"L"+k.l:k.s}</u>`);
+        const b=el("button","kcell"+(k.l>S.ch?" lk":"")+(k.jl?" n"+k.jl:""),
+          `${k.c}${k.jl?'<i class="kjl">N'+k.jl+"</i>":""}<u>${k.l>S.ch?"L"+k.l:k.s}</u>`);
         b.onclick=()=>go("trace",k.c); g.appendChild(b);
       });
       box.appendChild(g);
@@ -5237,7 +5287,8 @@ VIEWS.kanji=m=>{
     D.kanji.forEach(k=>{
       if(!k.l||k.l>S.ch) return;
       if(k.l!==cur){cur=k.l;box.appendChild(el("div","sec","Leçon "+k.l));g=el("div","kgrid");box.appendChild(g);}
-      const b=el("button","kcell",`${k.c}<u>${k.s}</u>`);
+      const b=el("button","kcell"+(k.jl?" n"+k.jl:""),
+        `${k.c}${k.jl?'<i class="kjl">N'+k.jl+"</i>":""}<u>${k.s}</u>`);
       b.onclick=()=>go("trace",k.c); g.appendChild(b);
     });
     const prog=D.kanji.filter(k=>k.l>0).length, sup=D.kanji.length-prog;
@@ -5312,6 +5363,13 @@ VIEWS.trace=m=>{
   const info=el("div","card");
   info.appendChild(el("h3",null,"Lectures"));
   const rd=el("div","reads");
+  /* le niveau JLPT du kanji, une information utile à chaque consultation */
+  if(k.jl){
+    const jt=el("div","jlptline");
+    jt.innerHTML=`<span class="tag jlpt">JLPT N${k.jl}</span>`+
+      `<span>${esc(NIVDESC[k.jl]||"")}</span>`;
+    info.appendChild(jt);
+  }
   const rare=k.rare||[];
   const marq=w=>rare.indexOf(w)>=0?' <span class="tag rarelec">peu employée</span>':"";
   rd.innerHTML=`<span>ON 音</span><b>${k.on.length?esc(k.on.slice(0,5).join("・")):"—"}${marq("on")}</b>
@@ -6552,6 +6610,8 @@ function requeue(q){
 /* Le sens en français ne se cache que là où il aide vraiment : la conjugaison
    d'un verbe dont on doit aussi retenir le sens. Ailleurs, le sous-titre porte
    la consigne — « Quel compteur employer ? » — et doit rester visible. */
+const NIVDESC={5:"premiers kanji, niveau débutant",4:"kanji de la vie courante",
+  3:"niveau intermédiaire",2:"niveau avancé",1:"niveau supérieur"};
 const SENS_CACHE=["conj","adj"];
 const TYPABLE=["conj","adj","part","voc","adv","kanr","cnt","dic","ant"];
 function typable(q){
