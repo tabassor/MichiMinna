@@ -3729,13 +3729,17 @@ function seuilRang(r){ return RANG(r).seuil||4; }
    d'un autre rang et faire diverger « ce qui manque » du nombre de nœuds restants. */
 function fragAcquis(r){
   const a={};
-  D.arbre.filter(n=>n.rang<=r&&estFait(n.id)).forEach(n=>{ a[n.el]=(a[n.el]||0)+gainNoeud(n); });
+  D.arbre.filter(n=>n.rang===r&&estFait(n.id)).forEach(n=>{ a[n.el]=(a[n.el]||0)+gainNoeud(n); });
   D.elements.forEach(e=>{ if(a[e.id]==null) a[e.id]=0; });
   return a;
 }
+/* Le seuil porte sur le rang lui-même, non sur tout le parcours depuis le début :
+   la jauge, le nombre de nœuds restants et l'épreuve décrivent ainsi le même
+   ensemble, et ne peuvent plus se contredire. Un rang antérieur laissé inachevé
+   — après un changement de chapitre, par exemple — ne pèse plus sur le rang courant. */
 function besoinRang(r){
   const b={};
-  D.arbre.filter(n=>n.rang<=r).forEach(n=>{ b[n.el]=(b[n.el]||0)+gainNoeud(n); });
+  D.arbre.filter(n=>n.rang===r).forEach(n=>{ b[n.el]=(b[n.el]||0)+gainNoeud(n); });
   D.elements.forEach(e=>{ if(b[e.id]==null) b[e.id]=0; });
   return b;
 }
