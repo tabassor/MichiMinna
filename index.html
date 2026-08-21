@@ -4083,8 +4083,8 @@ VIEWS.arbre=m=>{
   const estMaitre=!!R.maitre;
   tb.innerHTML=`<h3>${estMaitre?"Épreuve de maître · N"+R.maitre:"Test de rang"}</h3>
     <div style="font-size:0.8438rem;color:var(--mut)">${
-      pret?(RA.maitre
-        ? "<b>Trente questions</b> tirées de tout le rang, <b>90 %</b> pour la franchir. C'est elle qui ouvre le niveau JLPT N"+RA.jlpt+"."
+      pret?(R.maitre
+        ? "<b>Trente questions</b> tirées de tout le rang, <b>90 %</b> pour la franchir. C'est elle qui ouvre le niveau JLPT N"+R.jlpt+"."
         : "Vingt questions tirées de tout le rang. 85 % pour passer.")
         :(reste?reste+" nœud"+(reste>1?"s":"")+" à terminer"+(manque.length?", et ":".")
               :"")+(manque.length?"il vous manque "+manque.map(x=>x.faut-x.ont+" "+x.e.j).join(", ")+".":"")}</div>`;
