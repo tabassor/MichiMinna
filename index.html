@@ -1837,7 +1837,7 @@ VIEWS.home=m=>{
   pv.querySelector(".l").insertAdjacentElement("afterend",ech);
   const fl=$(".fragline",pv);
   D.elements.forEach(e=>{
-    const b2=besoinRang(TS.rang)[e.id]||0, o=TS.frag[e.id]||0;
+    const b2=besoinRang(TS.rang)[e.id]||0, o=Math.min(TS.frag[e.id]||0, b2||Infinity);
     const pcf=b2?Math.min(100,Math.round(o/b2*100)):100;
     const sp=el("span","fchip");
     sp.style.setProperty("--c",e.c);
@@ -2634,7 +2634,7 @@ VIEWS.progres=m=>{
   c3.appendChild(el("div","sec","L'équilibre des cinq voies"));
   const eq=el("div","eqlist");
   D.elements.forEach(e=>{
-    const o=T.frag[e.id]||0, b=bes[e.id]||1, pc=Math.min(100,Math.round(o/b*100));
+    const b=bes[e.id]||1, o=Math.min(T.frag[e.id]||0,b), pc=Math.min(100,Math.round(o/b*100));
     const r=el("div","eqrow");
     r.style.setProperty("--c",e.c);
     r.innerHTML=`<span class="eqj jpx">${esc(e.j)}</span>
@@ -4052,7 +4052,10 @@ VIEWS.arbre=m=>{
   const fr=el("div","frags");
   const bes=besoinRang(T.rang);
   D.elements.forEach(e=>{
-    const need=bes[e.id]||0, ont=T.frag[e.id]||0;
+    const need=bes[e.id]||0;
+    /* un rang repris plus tard peut avoir accumulé plus que son seuil :
+       on n'affiche pas de fraction supérieure à 1, qui n'aurait pas de sens. */
+    const ont=Math.min(T.frag[e.id]||0, need||Infinity);
     const pc=need?Math.min(100,Math.round(ont/need*100)):100;
     const d=el("div","frag");
     d.innerHTML=`<div class="fr-ring" style="--c:${e.c};--p:${pc};${need?"":"opacity:.4"}"><b class="jpx">${esc(e.j)}</b></div>
@@ -4286,10 +4289,14 @@ VIEWS.parcours=m=>{
     const etat = R.id<T.rang?"passe" : (R.id===T.rang?"ici":"avenir");
     const c=el("div","rangrow "+etat);
 
-    const parEl={};
-    ns.forEach(n=>{ parEl[n.el]=(parEl[n.el]||0)+gainNoeud(n); });
+    /* Le seuil d'une épreuve est cumulatif : il englobe les rangs précédents.
+       Afficher ici ce que le rang rapporte à lui seul laissait croire à un écart
+       entre les fragments annoncés et ceux que l'épreuve réclame. */
+    const parEl=besoinRang(R.id);
+    const acquis=T.frag||{};
     const jauges=D.elements.filter(e=>parEl[e.id]).map(e=>
-      `<span class="minifrag" style="--c:${e.c}"><i class="jpx">${esc(e.j)}</i>${parEl[e.id]}</span>`).join("");
+      `<span class="minifrag" style="--c:${e.c}"><i class="jpx">${esc(e.j)}</i>${
+        (R.id<=T.rang?Math.min(acquis[e.id]||0,parEl[e.id])+"/":"")}${parEl[e.id]}</span>`).join("");
 
     const ch=ns.filter(n=>n.ch).map(n=>n.ch[0]);
     const plage=ch.length?("ch. "+Math.min(...ch)+" à "+Math.max(...ch)):null;
