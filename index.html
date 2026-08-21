@@ -1837,7 +1837,7 @@ VIEWS.home=m=>{
   pv.querySelector(".l").insertAdjacentElement("afterend",ech);
   const fl=$(".fragline",pv);
   D.elements.forEach(e=>{
-    const b2=besoinRang(TS.rang)[e.id]||0, o=Math.min(TS.frag[e.id]||0, b2||Infinity);
+    const b2=besoinRang(TS.rang)[e.id]||0, o=fragAcquis(TS.rang)[e.id]||0;
     const pcf=b2?Math.min(100,Math.round(o/b2*100)):100;
     const sp=el("span","fchip");
     sp.style.setProperty("--c",e.c);
@@ -2629,12 +2629,12 @@ VIEWS.progres=m=>{
   }
 
   /* équilibre entre les cinq voies */
-  const T=tstate(), bes=besoinRang(T.rang);
+  const T=tstate(), bes=besoinRang(T.rang), acq=fragAcquis(T.rang);
   const c3=el("div","card");
   c3.appendChild(el("div","sec","L'équilibre des cinq voies"));
   const eq=el("div","eqlist");
   D.elements.forEach(e=>{
-    const b=bes[e.id]||1, o=Math.min(T.frag[e.id]||0,b), pc=Math.min(100,Math.round(o/b*100));
+    const b=bes[e.id]||1, o=acq[e.id]||0, pc=Math.min(100,Math.round(o/b*100));
     const r=el("div","eqrow");
     r.style.setProperty("--c",e.c);
     r.innerHTML=`<span class="eqj jpx">${esc(e.j)}</span>
@@ -2644,7 +2644,7 @@ VIEWS.progres=m=>{
   });
   c3.appendChild(eq);
   const faible=D.elements.slice().sort((a,b2)=>
-    ((T.frag[a.id]||0)/(bes[a.id]||1))-((T.frag[b2.id]||0)/(bes[b2.id]||1)))[0];
+    ((acq[a.id]||0)/(bes[a.id]||1))-((acq[b2.id]||0)/(bes[b2.id]||1)))[0];
   c3.appendChild(el("div","note","La voie la plus en retard est <b>"+esc(faible.j+" "+faible.n)+"</b> — "+esc(faible.d.toLowerCase())+". L'épreuve de rang exige les cinq."));
   m.appendChild(c3);
 
@@ -3724,6 +3724,15 @@ function seuilRang(r){ return RANG(r).seuil||4; }
 /* Les fragments s'accumulent d'un rang à l'autre : le seuil est donc cumulatif,
    et vaut la totalité de ce que tous les rangs jusqu'ici peuvent donner.
    Les jauges se remplissent ainsi exactement au rythme des nœuds acquis. */
+/* Fragments réellement acquis pour un rang : on les recalcule depuis les nœuds
+   validés plutôt que de se fier à un compteur cumulé, qui peut inclure des nœuds
+   d'un autre rang et faire diverger « ce qui manque » du nombre de nœuds restants. */
+function fragAcquis(r){
+  const a={};
+  D.arbre.filter(n=>n.rang<=r&&estFait(n.id)).forEach(n=>{ a[n.el]=(a[n.el]||0)+gainNoeud(n); });
+  D.elements.forEach(e=>{ if(a[e.id]==null) a[e.id]=0; });
+  return a;
+}
 function besoinRang(r){
   const b={};
   D.arbre.filter(n=>n.rang<=r).forEach(n=>{ b[n.el]=(b[n.el]||0)+gainNoeud(n); });
@@ -3731,9 +3740,9 @@ function besoinRang(r){
   return b;
 }
 function fragManquants(r){
-  const T=tstate(), b=besoinRang(r);
+  const b=besoinRang(r), a=fragAcquis(r);
   return D.elements.filter(e=>b[e.id])
-    .map(e=>({e:e,ont:T.frag[e.id]||0,faut:b[e.id]}))
+    .map(e=>({e:e,ont:a[e.id]||0,faut:b[e.id]}))
     .filter(x=>x.ont<x.faut);
 }
 function testPret(r){ return !fragManquants(r).length; }
@@ -4050,12 +4059,10 @@ VIEWS.arbre=m=>{
 
   /* les cinq éléments et leurs fragments */
   const fr=el("div","frags");
-  const bes=besoinRang(T.rang);
+  const bes=besoinRang(T.rang), acq=fragAcquis(T.rang);
   D.elements.forEach(e=>{
     const need=bes[e.id]||0;
-    /* un rang repris plus tard peut avoir accumulé plus que son seuil :
-       on n'affiche pas de fraction supérieure à 1, qui n'aurait pas de sens. */
-    const ont=Math.min(T.frag[e.id]||0, need||Infinity);
+    const ont=acq[e.id]||0;
     const pc=need?Math.min(100,Math.round(ont/need*100)):100;
     const d=el("div","frag");
     d.innerHTML=`<div class="fr-ring" style="--c:${e.c};--p:${pc};${need?"":"opacity:.4"}"><b class="jpx">${esc(e.j)}</b></div>
@@ -4293,7 +4300,7 @@ VIEWS.parcours=m=>{
        Afficher ici ce que le rang rapporte à lui seul laissait croire à un écart
        entre les fragments annoncés et ceux que l'épreuve réclame. */
     const parEl=besoinRang(R.id);
-    const acquis=T.frag||{};
+    const acquis=fragAcquis(R.id);
     const jauges=D.elements.filter(e=>parEl[e.id]).map(e=>
       `<span class="minifrag" style="--c:${e.c}"><i class="jpx">${esc(e.j)}</i>${
         (R.id<=T.rang?Math.min(acquis[e.id]||0,parEl[e.id])+"/":"")}${parEl[e.id]}</span>`).join("");
