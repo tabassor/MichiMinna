@@ -1981,7 +1981,7 @@ function inventaireLecon(m,n){
 
   if(mots.length){
     const c=el("div","card");
-    c.appendChild(el("div","sec","Vocabulaire du chapitre · "+mots.length));
+    c.appendChild(el("div","sec","Vocabulaire · "+mots.length+" mot"+(mots.length>1?"s":"")));
     const g=el("div");
     mots.forEach(w=>{
       const d=el("div","word");
@@ -1995,7 +1995,7 @@ function inventaireLecon(m,n){
   }
   if(kj.length){
     const c=el("div","card");
-    c.appendChild(el("div","sec","Kanji du chapitre · "+kj.length));
+    c.appendChild(el("div","sec","Kanji · "+kj.length+" caractère"+(kj.length>1?"s":"")));
     const g=el("div","kgrid");
     kj.forEach(k=>{
       const b=el("button","kcell"+(k.jl?" n"+k.jl:""),
@@ -2004,21 +2004,22 @@ function inventaireLecon(m,n){
     });
     c.appendChild(g); m.appendChild(c);
   }
-  const petit=(titre,items,rendu)=>{
+  const petit=(titre,items,rendu,unite)=>{
     if(!items.length) return;
     const c=el("div","card");
-    c.appendChild(el("div","sec",titre+" · "+items.length));
+    const n2=items.length;
+    c.appendChild(el("div","sec",titre+" · "+n2+" "+(unite||"entrée")+(n2>1?"s":"")));
     const g=el("div"); items.forEach(x=>g.appendChild(rendu(x)));
     c.appendChild(g); m.appendChild(c);
   };
   petit("Particules introduites",parts,p=>el("div","ex",
-    `<div class="j">${jpw(p.p)}</div><div class="f">${esc(p.r)}</div>`));
+    `<div class="j">${jpw(p.p)}</div><div class="f">${esc(p.r)}</div>`),"particule");
   petit("Compteurs",cnts,c=>el("div","ex",
-    `<div class="j">${jpw(c.c)}</div><div class="f">${esc(c.u)}</div>`));
+    `<div class="j">${jpw(c.c)}</div><div class="f">${esc(c.u)}</div>`),"compteur");
   petit("Adverbes",advs,a=>el("div","ex",
-    `<div class="j">${motCliquable(a.j,a.k)}</div><div class="f">${esc(a.f)}</div>`));
+    `<div class="j">${motCliquable(a.j,a.k)}</div><div class="f">${esc(a.f)}</div>`),"adverbe");
   petit("Familles d'expressions",exprs,e=>el("div","ex",
-    `<div class="j">${esc(e.g)}</div><div class="f">${e.it.length} formules</div>`));
+    `<div class="j">${esc(e.g)}</div><div class="f">${e.it.length} formules</div>`),"famille");
 }
 VIEWS.lecon=m=>{
   const L=D.lessons.find(x=>x.n===+param)||D.lessons[0];
