@@ -2313,7 +2313,25 @@ VIEWS.cible=m=>{
 /* Une consigne en français, un temps pour répondre, la correction en japonais,
    puis deux temps de répétition. L'apprenant prononce donc la réponse trois fois :
    de mémoire, après le modèle, puis une dernière fois pour l'ancrer. */
-let oraSess=null, oraTimer=null, oraRec=null, oraEtat="arret";
+let oraSess=null, oraTimer=null, oraRec=null, oraEtat="arret", oraJeton=0, oraVeille=null;
+/* Le nom de chaque forme, dit en toutes lettres : la voix française bute sur
+   les kana, et « se lever — ません » se prononçait de façon inintelligible. */
+const NOM_FORME={
+  "ませんでした":"au passé négatif poli","ません":"à la forme négative polie",
+  "ました":"au passé poli","ます":"à la forme polie",
+  "たい":"avec l'envie de le faire","ています":"en train de se faire",
+  "なかった":"au passé négatif neutre","ない":"à la forme neutre négative",
+  "辞書":"à la forme du dictionnaire","たら":"à la forme conditionnelle en tara",
+  "た":"au passé neutre","可能":"au potentiel","意向":"au volitif",
+  "命令":"à l'impératif","禁止":"au prohibitif","ば":"au conditionnel en ba",
+  "使役受身":"au causatif-passif","使役":"au causatif","受身":"au passif",
+  "présent":"au présent","négatif":"au négatif","passé négatif":"au passé négatif",
+  "passé":"au passé","adverbe":"en adverbe","devient":"à la forme du devenir",
+  "trop":"à la forme de l'excès"
+};
+/* rien de japonais ne doit passer par la voix française */
+const enFrancais=t=>String(t).replace(/[\u3040-\u30ff\u4e00-\u9fff々〜～「」『』]/g,"")
+  .replace(/\s{2,}/g," ").replace(/[,\s—-]+$/,"").trim();
 
 function oraDit(t,lang,cb){
   try{
@@ -2389,8 +2407,9 @@ function oraLot(){
       return cle ? OK[cle]<=maxCh : false;
     }).forEach(r=>{
       const v=String(r.val).split(" ／ ")[0];
-      out.push({genre:"conj",fr:(w.f.split(",")[0])+" — "+r.lab.replace(/ —.*$/,""),
-        ja:v,lu:v,l:w.l});
+      const nom=NOM_FORME[Object.keys(NOM_FORME).find(k=>String(r.lab).indexOf(k)>=0)];
+      if(!nom) return;
+      out.push({genre:"conj",fr:(w.f.split(",")[0])+", "+nom,ja:v,lu:v,l:w.l});
     });
   });
   /* 3. des phrases entières, celles dont nous avons la traduction */
@@ -2415,11 +2434,34 @@ function oraLot(){
 }
 
 function oraStop(){
+  oraJeton++;                       /* invalide tout ce qui était en attente */
   clearTimeout(oraTimer); oraTimer=null;
+  oraLibereVeille();
   try{ speechSynthesis.cancel(); }catch(e){}
   try{ if(oraRec) oraRec.abort(); }catch(e){}
   oraEtat="arret";
 }
+
+/* ---- garder l'écran allumé pendant la séance ---- */
+async function oraTientEveille(){
+  try{
+    if(!("wakeLock" in navigator)) return;
+    oraVeille=await navigator.wakeLock.request("screen");
+    oraVeille.addEventListener("release",()=>{ oraVeille=null; });
+  }catch(e){ oraVeille=null; }
+}
+function oraLibereVeille(){
+  try{ if(oraVeille){ oraVeille.release(); oraVeille=null; } }catch(e){}
+}
+/* Au retour de veille, les minuteurs en attente se déclenchaient tous d'un coup :
+   on met donc la séance en pause dès que la page passe en arrière-plan. */
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){
+    if(oraEtat==="marche"){ oraStop(); oraEtat="pause"; }
+  }else if(oraEtat==="pause"&&view==="oral"){
+    render();
+  }
+});
 
 /* la reconnaissance vocale, quand le navigateur la propose */
 function oraEcoute(attendu,cb){
@@ -2514,7 +2556,8 @@ VIEWS.oral=m=>{
   m.appendChild(box);
 
   const cc=el("div","ctrl");
-  const bGo=el("button","btn p", oraEtat==="arret"?"Commencer":"Arrêter");
+  const bGo=el("button","btn p",
+    oraEtat==="marche"?"Arrêter":(oraEtat==="pause"?"Reprendre":"Commencer"));
   const bSkip=el("button","btn","Passer");
   cc.appendChild(bGo); cc.appendChild(bSkip);
   m.appendChild(cc);
@@ -2523,11 +2566,12 @@ VIEWS.oral=m=>{
 
   const montre=(html)=>{ zone.innerHTML=html; };
 
-  const etape=()=>{
+  const etape=(jeton)=>{
+    if(jeton!==oraJeton||oraEtat!=="marche") return;
     if(!oraSess||!oraSess.lot.length) return;
     const it=oraSess.lot[oraSess.i%oraSess.lot.length];
     const genres=S.oraGenres||["mot","conj","phrase"];
-    if(genres.indexOf(it.genre)<0){ oraSess.i++; etape(); return; }
+    if(genres.indexOf(it.genre)<0){ oraSess.i++; etape(jeton); return; }
 
     const badge={mot:"Traduisez",conj:"Conjuguez",phrase:"Traduisez la phrase"}[it.genre];
     montre(`<div class="ora-eb">${esc(badge)}${it.l?" · leçon "+it.l:""}</div>
@@ -2537,11 +2581,13 @@ VIEWS.oral=m=>{
       <div class="ora-cpt">${oraSess.faits} prononcé${oraSess.faits>1?"s":""} · ${oraSess.lot.length} au total</div>`);
 
     /* 1. la consigne en français */
-    oraDit((it.genre==="conj"?"Conjuguez : ":"")+it.fr,"fr-FR",()=>{
+    const consigne=enFrancais((it.genre==="conj"?"Conjuguez : ":"")+it.fr);
+    oraDit(consigne||"Traduisez","fr-FR",()=>{
       /* 2. le temps de répondre, micro ouvert si demandé */
       let dit=null;
       oraRec=oraEcoute(it.ja,alts=>{ dit=alts; });
       oraTimer=setTimeout(()=>{
+        if(jeton!==oraJeton) return;
         try{ if(oraRec) oraRec.stop(); }catch(e){}
         const verdict=oraJuste(dit,it);
         const msg=$("#oramsg",zone);
@@ -2551,18 +2597,22 @@ VIEWS.oral=m=>{
         const ja=$("#oraja",zone); if(ja) ja.innerHTML=jpw(it.ja);
         /* 3. la correction, puis deux répétitions */
         oraDit(it.ja,"ja-JP",()=>{
+          if(jeton!==oraJeton) return;
           const m2=$("#oramsg",zone); if(m2) m2.textContent="répétez";
           oraTimer=setTimeout(()=>{
+            if(jeton!==oraJeton) return;
             oraDit(it.ja,"ja-JP",()=>{
+              if(jeton!==oraJeton) return;
               const m3=$("#oramsg",zone); if(m3) m3.textContent="encore une fois";
               oraTimer=setTimeout(()=>{
+                if(jeton!==oraJeton) return;
                 oraSess.i++; oraSess.faits++;
                 /* le travail oral compte dans le journal ; il n'est porté au crédit
                    des bonnes réponses que si l'écoute a validé la prononciation. */
                 noteJour(verdict===true);
                 if(verdict===true&&it.key) grade(it.key,true);
                 save();
-                if(oraEtat==="marche") etape();
+                if(oraEtat==="marche") etape(jeton);
               }, oraPause(it.lu,1.1));
             });
           }, oraPause(it.lu,1.15));
@@ -2573,6 +2623,10 @@ VIEWS.oral=m=>{
 
   bGo.onclick=()=>{
     if(oraEtat==="marche"){ oraStop(); render(); return; }
+    if(oraEtat==="pause"&&oraSess){
+      oraEtat="marche"; oraJeton++; oraTientEveille();
+      bGo.textContent="Arrêter"; etape(oraJeton); return;
+    }
     const brut=oraLot().filter(x=>(S.oraGenres||["mot","conj","phrase"]).indexOf(x.genre)>=0);
     if(!brut.length){ toast("Aucun contenu pour cette sélection"); return; }
     /* un tirage uniforme servirait surtout des mots, les plus nombreux :
@@ -2592,17 +2646,19 @@ VIEWS.oral=m=>{
     }
     shuffle(lot);
     oraSess={lot:lot,i:0,faits:0};
-    oraEtat="marche";
+    oraEtat="marche"; oraJeton++;
+    oraTientEveille();
     bGo.textContent="Arrêter";
-    etape();
+    etape(oraJeton);
   };
   bSkip.onclick=()=>{
     if(!oraSess) return;
     clearTimeout(oraTimer); try{speechSynthesis.cancel();}catch(e){}
-    oraSess.i++; if(oraEtat==="marche") etape();
+    oraSess.i++; oraJeton++; if(oraEtat==="marche") etape(oraJeton);
   };
 
-  if(oraEtat==="arret") montre('<div class="ora-msg">Touchez « Commencer ». Les consignes sont dites en français, les réponses en japonais.</div>');
+  if(oraEtat==="pause") montre('<div class="ora-msg">Séance suspendue — l\'écran s\'est éteint. Touchez « Reprendre ».</div>');
+  else if(oraEtat==="arret") montre('<div class="ora-msg">Touchez « Commencer ». Les consignes sont dites en français, les réponses en japonais.</div>');
 };
 
 /* ================= 道場 — s'exercer aux kana sans enjeu ================= */
