@@ -845,7 +845,28 @@ const el=(t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!=
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const rnd=a=>a[Math.floor(Math.random()*a.length)];
 function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
-function say(t){ try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(String(t).replace(/[（(].*?[)）]/g,""));u.lang="ja-JP";u.rate=.85;speechSynthesis.speak(u);}catch(e){} }
+/* Un mot isolé écrit en kanji laisse la voix deviner : 日 se dit « nichi » ou
+   « hi » selon le contexte, qu'elle n'a pas. Quand nous connaissons la lecture,
+   nous la lui donnons. Les phrases, elles, gardent leurs kanji : la voix s'en
+   sert pour découper et accentuer correctement. */
+function voixDe(t){
+  const str=String(t).replace(/[（(].*?[)）]/g,"").trim();
+  if(!/[\u4e00-\u9fff]/.test(str)) return str;
+  if(str.length>6||/[。、！？\s]/.test(str)) return str;   /* une phrase : on n'y touche pas */
+  const lu=(D.rd&&D.rd[str])||(D.rs&&D.rs[str]);
+  if(lu&&!/[\u4e00-\u9fff]/.test(lu)) return lu;
+  const w=words(50).find(x=>x.j===str);
+  if(w&&w.k) return w.k.split("・")[0].replace(/^[～~]/,"");
+  /* le lexique complet, dictionnaire étendu compris */
+  try{
+    const e=buildLex().get(str);
+    if(e&&e.k&&!/[\u4e00-\u9fff]/.test(e.k)) return e.k.split("・")[0].replace(/^[～~]/,"");
+  }catch(err){}
+  /* en dernier recours, la lecture reconstituée mot à mot */
+  const rec=lecturePhrase(str);
+  return (rec&&!/[\u4e00-\u9fff]/.test(rec))?rec:str;
+}
+function say(t){ try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(voixDe(t));u.lang="ja-JP";u.rate=.85;speechSynthesis.speak(u);}catch(e){} }
 const isKanji=c=>/[\u4e00-\u9fff\u3005]/.test(c);
 const VERSION="1.0";
 const KIDX={}; D.kanji.forEach(k=>KIDX[k.c]=k);
@@ -2336,7 +2357,8 @@ const enFrancais=t=>String(t).replace(/[\u3040-\u30ff\u4e00-\u9fff々〜～「�
 function oraDit(t,lang,cb){
   try{
     speechSynthesis.cancel();
-    const u=new SpeechSynthesisUtterance(String(t).replace(/[（(].*?[)）]/g,""));
+    const u=new SpeechSynthesisUtterance(
+      lang==="ja-JP" ? voixDe(t) : String(t).replace(/[（(].*?[)）]/g,""));
     u.lang=lang; u.rate=(lang==="ja-JP")?(S.oraVit||0.85):1;
     u.onend=()=>{ if(cb) cb(); };
     u.onerror=()=>{ if(cb) cb(); };
