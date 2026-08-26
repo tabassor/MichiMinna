@@ -2503,6 +2503,17 @@ function oraStop(){
   oraEtat="arret";
 }
 
+/* Suspendre sans perdre le fil : l'item reste affiché, la séance reprend
+   là où elle s'est arrêtée. Utile pour prendre le temps de lire la correction. */
+function oraSuspend(){
+  oraJeton++;
+  clearTimeout(oraTimer); oraTimer=null;
+  try{ speechSynthesis.cancel(); }catch(e){}
+  try{ if(oraRec) oraRec.abort(); }catch(e){}
+  oraLibereVeille();
+  oraEtat="pause";
+}
+
 /* ---- garder l'écran allumé pendant la séance ---- */
 async function oraTientEveille(){
   try{
@@ -2618,9 +2629,14 @@ VIEWS.oral=m=>{
 
   const cc=el("div","ctrl");
   const bGo=el("button","btn p",
-    oraEtat==="marche"?"Arrêter":(oraEtat==="pause"?"Reprendre":"Commencer"));
+    oraEtat==="marche"?"Pause":(oraEtat==="pause"?"Reprendre":"Commencer"));
   const bSkip=el("button","btn","Passer");
   cc.appendChild(bGo); cc.appendChild(bSkip);
+  if(oraEtat!=="arret"){
+    const bFin=el("button","btn","Arrêter");
+    bFin.onclick=()=>{ oraStop(); oraSess=null; render(); };
+    cc.appendChild(bFin);
+  }
   m.appendChild(cc);
 
   m.appendChild(el("div","note","Trois temps : vous répondez de mémoire, vous écoutez la correction, vous la répétez deux fois. Gardez le téléphone à portée de voix et parlez à voix haute — c'est l'articulation qui compte, non la performance."));
@@ -2684,10 +2700,10 @@ VIEWS.oral=m=>{
   };
 
   bGo.onclick=()=>{
-    if(oraEtat==="marche"){ oraStop(); render(); return; }
+    if(oraEtat==="marche"){ oraSuspend(); render(); return; }
     if(oraEtat==="pause"&&oraSess){
       oraEtat="marche"; oraJeton++; oraTientEveille();
-      bGo.textContent="Arrêter"; etape(oraJeton); return;
+      bGo.textContent="Pause"; etape(oraJeton); return;
     }
     const brut=oraLot().filter(x=>(S.oraGenres||["mot","conj","phrase"]).indexOf(x.genre)>=0);
     if(!brut.length){ toast("Aucun contenu pour cette sélection"); return; }
@@ -2710,16 +2726,26 @@ VIEWS.oral=m=>{
     oraSess={lot:lot,i:0,faits:0};
     oraEtat="marche"; oraJeton++;
     oraTientEveille();
-    bGo.textContent="Arrêter";
+    bGo.textContent="Pause";
     etape(oraJeton);
   };
+  bSkip.disabled=!oraSess;
   bSkip.onclick=()=>{
     if(!oraSess) return;
+    if(oraEtat==="pause"){ oraSess.i++; render(); return; }
     clearTimeout(oraTimer); try{speechSynthesis.cancel();}catch(e){}
     oraSess.i++; oraJeton++; if(oraEtat==="marche") etape(oraJeton);
   };
 
-  if(oraEtat==="pause") montre('<div class="ora-msg">Séance suspendue — l\'écran s\'est éteint. Touchez « Reprendre ».</div>');
+  if(oraEtat==="pause"&&oraSess){
+    const it=oraSess.lot[oraSess.i%oraSess.lot.length];
+    montre(`<div class="ora-eb">en pause</div>
+      <div class="ora-fr">${esc(it.fr)}</div>
+      <div class="ora-ja">${jpw(it.ja)}</div>
+      <div class="ora-msg">Prenez le temps qu'il faut. « Reprendre » redit la consigne.</div>
+      <div class="ora-cpt">${oraSess.faits} prononcé${oraSess.faits>1?"s":""} · ${oraSess.lot.length} au total</div>`);
+  }
+  else if(oraEtat==="pause") montre('<div class="ora-msg">Séance suspendue. Touchez « Reprendre ».</div>');
   else if(oraEtat==="arret") montre('<div class="ora-msg">Touchez « Commencer ». Les consignes sont dites en français, les réponses en japonais.</div>');
 };
 
