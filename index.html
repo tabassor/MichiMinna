@@ -2497,7 +2497,7 @@ function oraLot(){
 function oraStop(){
   oraJeton++;                       /* invalide tout ce qui était en attente */
   clearTimeout(oraTimer); oraTimer=null;
-  oraLibereVeille();
+  oraLibereVeille(); oraFermeRoute();
   try{ speechSynthesis.cancel(); }catch(e){}
   try{ if(oraRec) oraRec.abort(); }catch(e){}
   oraEtat="arret";
@@ -2510,8 +2510,48 @@ function oraSuspend(){
   clearTimeout(oraTimer); oraTimer=null;
   try{ speechSynthesis.cancel(); }catch(e){}
   try{ if(oraRec) oraRec.abort(); }catch(e){}
-  oraLibereVeille();
+  oraLibereVeille(); oraFermeRoute();
   oraEtat="pause";
+}
+
+
+/* ---- routage audio : sortir par les enceintes de la voiture ----
+   La synthèse vocale d'Android emprunte parfois un canal que l'autoradio ignore,
+   alors que la lecture d'un fichier passe bien. En maintenant un flux média
+   silencieux pendant la séance, et en déclarant une session média, on demande
+   au système de traiter l'application comme un lecteur : le son suit alors la
+   même route que la musique. */
+let oraFlux=null;
+function oraOuvreRoute(){
+  try{
+    if(!oraFlux){
+      oraFlux=new Audio(
+        "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=");
+      oraFlux.loop=true; oraFlux.volume=0.001; oraFlux.preload="auto";
+    }
+    const pr=oraFlux.play();
+    if(pr&&pr.catch) pr.catch(()=>{});
+    if("mediaSession" in navigator){
+      navigator.mediaSession.metadata=new MediaMetadata({
+        title:"音読 — répétition à voix haute", artist:"みち", album:"Compagnon d'étude du japonais"});
+      navigator.mediaSession.playbackState="playing";
+      try{
+        navigator.mediaSession.setActionHandler("pause",()=>{ oraSuspend(); render(); });
+        navigator.mediaSession.setActionHandler("play",()=>{
+          const b=[...document.querySelectorAll(".btn")].find(x=>x.textContent==="Reprendre");
+          if(b) b.click();
+        });
+        navigator.mediaSession.setActionHandler("nexttrack",()=>{
+          const b=[...document.querySelectorAll(".btn")].find(x=>x.textContent==="Passer");
+          if(b) b.click();
+        });
+      }catch(e){}
+    }
+  }catch(e){}
+}
+function oraFermeRoute(){
+  try{ if(oraFlux) oraFlux.pause(); }catch(e){}
+  try{ if("mediaSession" in navigator) navigator.mediaSession.playbackState="paused"; }catch(e){}
 }
 
 /* ---- garder l'écran allumé pendant la séance ---- */
@@ -2639,6 +2679,7 @@ VIEWS.oral=m=>{
   }
   m.appendChild(cc);
 
+  m.appendChild(el("div","note","En voiture : lancez la séance <b>après</b> avoir connecté le téléphone, et le son suivra la route de la musique. Si l'autoradio reste muet, lancez d'abord un morceau puis revenez ici."));
   m.appendChild(el("div","note","Trois temps : vous répondez de mémoire, vous écoutez la correction, vous la répétez deux fois. Gardez le téléphone à portée de voix et parlez à voix haute — c'est l'articulation qui compte, non la performance."));
 
   const montre=(html)=>{ zone.innerHTML=html; };
@@ -2702,7 +2743,7 @@ VIEWS.oral=m=>{
   bGo.onclick=()=>{
     if(oraEtat==="marche"){ oraSuspend(); render(); return; }
     if(oraEtat==="pause"&&oraSess){
-      oraEtat="marche"; oraJeton++; oraTientEveille();
+      oraEtat="marche"; oraJeton++; oraTientEveille(); oraOuvreRoute();
       bGo.textContent="Pause"; etape(oraJeton); return;
     }
     const brut=oraLot().filter(x=>(S.oraGenres||["mot","conj","phrase"]).indexOf(x.genre)>=0);
@@ -2725,7 +2766,7 @@ VIEWS.oral=m=>{
     shuffle(lot);
     oraSess={lot:lot,i:0,faits:0};
     oraEtat="marche"; oraJeton++;
-    oraTientEveille();
+    oraTientEveille(); oraOuvreRoute();
     bGo.textContent="Pause";
     etape(oraJeton);
   };
