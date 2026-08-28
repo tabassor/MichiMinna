@@ -2510,7 +2510,11 @@ function oraSuspend(){
   clearTimeout(oraTimer); oraTimer=null;
   try{ speechSynthesis.cancel(); }catch(e){}
   try{ if(oraRec) oraRec.abort(); }catch(e){}
-  oraLibereVeille(); oraFermeRoute();
+  oraLibereVeille();
+  /* On garde le flux média ouvert : l'autoradio abandonne la liaison après
+     quelques secondes de silence, et le son ne revenait plus à la reprise.
+     Seul l'arrêt complet referme le canal. */
+  try{ if("mediaSession" in navigator) navigator.mediaSession.playbackState="paused"; }catch(e){}
   oraEtat="pause";
 }
 
@@ -2528,6 +2532,13 @@ function oraOuvreRoute(){
       oraFlux=new Audio(
         "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=");
       oraFlux.loop=true; oraFlux.volume=0.001; oraFlux.preload="auto";
+    }
+    if(!oraFlux.__veille){
+      oraFlux.__veille=1;
+      /* certains systèmes coupent le flux d'eux-mêmes : on le relance */
+      oraFlux.addEventListener("pause",()=>{
+        if(oraEtat!=="arret"){ try{ oraFlux.play().catch(()=>{}); }catch(e){} }
+      });
     }
     const pr=oraFlux.play();
     if(pr&&pr.catch) pr.catch(()=>{});
@@ -2744,7 +2755,12 @@ VIEWS.oral=m=>{
     if(oraEtat==="marche"){ oraSuspend(); render(); return; }
     if(oraEtat==="pause"&&oraSess){
       oraEtat="marche"; oraJeton++; oraTientEveille(); oraOuvreRoute();
-      bGo.textContent="Pause"; etape(oraJeton); return;
+      bGo.textContent="Pause";
+      /* un court délai avant de reparler : le temps que la liaison se rétablisse
+         si l'autoradio l'avait relâchée pendant la pause */
+      const j=oraJeton;
+      oraTimer=setTimeout(()=>{ if(j===oraJeton) etape(j); },450);
+      return;
     }
     const brut=oraLot().filter(x=>(S.oraGenres||["mot","conj","phrase"]).indexOf(x.genre)>=0);
     if(!brut.length){ toast("Aucun contenu pour cette sélection"); return; }
