@@ -239,6 +239,13 @@ button.stat{font:inherit;width:100%}
 .ora-ja{font-family:var(--disp);font-size:1.5rem;color:var(--ai);min-height:34px}
 .ora-msg{font-size:0.7812rem;color:var(--mut);margin-top:8px}
 .ora-cpt{font-size:0.6562rem;color:var(--dim);margin-top:10px;letter-spacing:.06em}
+.dlbox{background:var(--surf2);border:1px solid var(--line);border-radius:var(--r-sm);
+  padding:12px 14px;margin-top:10px}
+.dl-t{font-size:0.875rem;font-weight:600;color:var(--tx)}
+.dl-d{font-size:0.7812rem;color:var(--mut);line-height:1.55;margin-top:6px}
+.dl-bar{height:6px;border-radius:999px;background:var(--line);overflow:hidden;margin-top:9px}
+.dl-bar i{display:block;height:100%;background:var(--ai);border-radius:999px;
+  transition:width .25s ease}
 .jlptline{display:flex;align-items:center;gap:9px;margin-top:10px;font-size:0.7812rem;color:var(--mut)}
 .tag.jlpt{border-color:color-mix(in srgb,var(--ai) 55%,transparent);color:var(--ai);font-weight:600}
 .kcell{position:relative}
@@ -6671,53 +6678,74 @@ VIEWS.audio=m=>{
   /* L'éditeur propose aussi l'archive complète en un seul téléchargement :
      c'est le plus simple, et l'import ci-dessous répartit les pistes tout seul. */
   const dl=el("div","ctrl"); dl.style.marginTop="8px";
-  const etat=el("div","note"); etat.style.display="none";
+  const etat=el("div","dlbox"); etat.style.display="none";
+  /* Un état visible à chaque instant : sans cela, on ne sait pas si le
+     téléchargement a commencé, où il en est, ni ce qu'il reste à faire. */
+  const montreEtat=(titre,detail,pc)=>{
+    etat.style.display="";
+    etat.innerHTML=`<div class="dl-t">${titre}</div>`+
+      (pc!=null?`<div class="dl-bar"><i style="width:${Math.max(2,Math.round(pc))}%"></i></div>`:"")+
+      (detail?`<div class="dl-d">${detail}</div>`:"");
+    return etat;
+  };
   [["Installer les leçons 1 à 25 · 92 Mo","0-0001-01-230020",25],
    ["Installer les leçons 26 à 50 · 100 Mo","0-0001-01-240020",50]].forEach(([lab,ref,jusqua])=>{
     const url="https://www.3anet.co.jp/np/en/secure/"+ref+"/"+ref+"-0.zip";
     const bz=el("button","btn"+(S.ch<=jusqua&&S.ch>jusqua-25?" p":""),lab);
     bz.onclick=async()=>{
-      /* On tente d'abord de tout faire d'un geste : récupérer l'archive et
-         l'ouvrir sur place. Le serveur de l'éditeur n'autorise pas forcément
-         cette lecture directe ; dans ce cas on bascule sur le téléchargement
-         ordinaire, et l'archive se réimporte ensuite en un toucher. */
-      etat.style.display=""; etat.textContent="Téléchargement…";
+      dl.querySelectorAll("button").forEach(x=>x.disabled=true);
+      montreEtat("Connexion au site de l'éditeur…","",0);
+      let r=null;
       try{
-        const r=await fetch(url,{mode:"cors"});
-        if(!r.ok) throw new Error("réponse "+r.status);
+        const minuteur=new Promise((_,rej)=>setTimeout(()=>rej(new Error("délai dépassé")),12000));
+        r=await Promise.race([fetch(url,{mode:"cors"}),minuteur]);
+        if(!r||!r.ok) throw new Error("réponse "+(r?r.status:"vide"));
+      }catch(e){
+        /* Le serveur de l'éditeur n'autorise pas la lecture directe : le
+           navigateur prend le relais, mais lui seul connaît l'avancement.
+           On l'annonce clairement plutôt que de laisser un écran muet. */
+        dl.querySelectorAll("button").forEach(x=>x.disabled=false);
+        montreEtat("Téléchargement confié à votre navigateur",
+          "L'éditeur ne permet pas le téléchargement depuis l'application. "+
+          "L'avancement s'affiche dans la barre de notifications de votre téléphone "+
+          "— comptez quelques minutes selon la connexion.<br><br>"+
+          "<b>Quand il est terminé</b>, touchez le bouton ci-dessous et choisissez le "+
+          "fichier qui vient d'arriver : son nom se termine par <b>.zip</b>.");
+        const bi=el("button","btn p w","Ouvrir l'archive téléchargée");
+        bi.style.marginTop="12px";
+        bi.onclick=()=>inp.click();
+        etat.appendChild(bi);
+        window.open(url,"_blank","noopener");
+        return;
+      }
+      /* le serveur accepte : on suit la descente octet par octet */
+      try{
         const tot=+(r.headers.get("content-length")||0);
-        const lu=[]; let n=0;
+        const morceaux=[]; let n=0, t0=Date.now();
         const rd=r.body.getReader();
         for(;;){
           const {done,value}=await rd.read();
           if(done) break;
-          lu.push(value); n+=value.length;
-          etat.textContent="Téléchargement… "+Math.round(n/1048576)+" Mo"+(tot?" sur "+Math.round(tot/1048576):"");
+          morceaux.push(value); n+=value.length;
+          const mo=n/1048576, sec=Math.max(0.4,(Date.now()-t0)/1000), vit=mo/sec;
+          const poids=x=>x>=1?x.toFixed(x<10?1:0)+" Mo":Math.round(x*1024)+" Ko";
+          const reste=(tot&&vit>0.01)?Math.max(0,(tot/1048576-mo)/vit):0;
+          const bits=[poids(mo)+(tot?" sur "+poids(tot/1048576):"")];
+          if(vit>=0.05) bits.push(vit.toFixed(1)+" Mo/s");
+          if(reste>=2) bits.push("encore "+(reste>90?Math.round(reste/60)+" min":Math.round(reste)+" s"));
+          montreEtat("Téléchargement en cours",bits.join(" · "),tot?n/tot*100:null);
         }
-        const f=new File(lu,"audio.zip",{type:"application/zip"});
-        etat.textContent="Ouverture de l'archive…";
-        const pistes=await litArchive(f,k=>{ etat.textContent="Ouverture… "+k+" pistes"; });
+        montreEtat("Ouverture de l'archive…","",100);
+        const f=new File(morceaux,"audio.zip",{type:"application/zip"});
+        const pistes=await litArchive(f,k=>montreEtat("Ouverture de l'archive…",k+" pistes extraites",100));
         const g=guessLessons(pistes,audLes);
         audPending={files:pistes,map:g.map,how:g.how};
-        etat.style.display="none";
+        montreEtat("Prêt",pistes.length+" pistes trouvées.",100);
         render();
       }catch(e){
-        /* Le serveur de l'éditeur refuse la lecture directe : on laisse le
-           navigateur télécharger, puis on offre le bouton qui reprend le
-           fichier — sans quoi l'utilisateur reste avec une archive et rien
-           pour l'ouvrir. */
-        etat.innerHTML='<b>Le téléchargement se poursuit dans votre navigateur.</b><br>'+
-          "Quand il est terminé, touchez le bouton ci-dessous et choisissez le fichier "+
-          "qui vient d'arriver — son nom se termine par <b>.zip</b>. L'application "+
-          "l'ouvrira et rangera chaque piste dans sa leçon.";
-        if(!etat.__bouton){
-          etat.__bouton=1;
-          const bi=el("button","btn p w","J'ai téléchargé l'archive — l'ouvrir");
-          bi.style.marginTop="10px";
-          bi.onclick=()=>inp.click();
-          etat.appendChild(bi);
-        }
-        window.open(url,"_blank","noopener");
+        dl.querySelectorAll("button").forEach(x=>x.disabled=false);
+        montreEtat("Téléchargement interrompu",
+          "La connexion s'est coupée avant la fin ("+esc(e.message)+"). Vous pouvez recommencer.");
       }
     };
     dl.appendChild(bz);
