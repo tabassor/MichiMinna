@@ -2362,6 +2362,251 @@ VIEWS.cible=m=>{
 
 
 
+
+/* ================= 手控え — votre matériel personnel =================
+   L'application lit ici un fichier que vous fournissez et le rend interrogeable.
+   Tout se passe sur l'appareil : le contenu n'est ni transmis, ni recopié dans
+   les données de l'application, ni inclus dans les sauvegardes exportées. Il
+   disparaît si vous le retirez. Ce que vous chargez ne regarde que vous. */
+function pdb(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open("michi-perso",1);
+    r.onupgradeneeded=()=>{ if(!r.result.objectStoreNames.contains("t")) r.result.createObjectStore("t",{keyPath:"id"}); };
+    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
+  });
+}
+async function pPut(rec){ const db=await pdb();
+  return new Promise((res,rej)=>{const t=db.transaction("t","readwrite");t.objectStore("t").put(rec);
+    t.oncomplete=()=>res();t.onerror=()=>rej(t.error);}); }
+async function pAll(){ try{ const db=await pdb();
+  return await new Promise((res,rej)=>{const q=db.transaction("t").objectStore("t").getAll();
+    q.onsuccess=()=>res(q.result||[]);q.onerror=()=>rej(q.error);}); }catch(e){ return []; } }
+async function pDel(id){ const db=await pdb();
+  return new Promise(res=>{const t=db.transaction("t","readwrite");t.objectStore("t").delete(id);t.oncomplete=()=>res();}); }
+
+/* Découpe un texte en items interrogeables. On reconnaît les repères habituels
+   d'un cahier d'exercices : le numéro de leçon, la numérotation des items, et
+   la flèche qui sépare l'énoncé de la réponse. */
+/* Deux fichiers séparés — les énoncés d'un côté, les réponses de l'autre —
+   se recoupent par leçon et par numéro d'item. C'est la forme habituelle d'un
+   cahier et de son corrigé. */
+function apparie(enonces,reponses){
+  const cle=x=>x.l+"|"+(x.n||0)+"|"+(x.s||"");
+  const idx=new Map();
+  reponses.forEach(r=>{ if(r.n) idx.set(cle(r),r.a||r.q); });
+  const out=[];
+  enonces.forEach(e=>{
+    if(e.a) { out.push(e); return; }          /* déjà complet */
+    const rep=idx.get(cle(e))||idx.get(e.l+"|"+(e.n||0)+"|");
+    if(rep) out.push(Object.assign({},e,{a:rep}));
+  });
+  return out;
+}
+function litExercices(txt){
+  const lignes=String(txt).replace(/\r/g,"").split("\n");
+  const out=[]; let lecon=0, section="";
+  const NUM=/^\s*(?:[（(]?\s*)?(\d{1,2})\s*[\.、）)]\s*/;
+  const FLECHE=/\s*(?:→|⇒|=>|➡|―>|->)\s*/;
+  let ecoute=false;
+  lignes.forEach(l=>{
+    const t=l.trim();
+    if(!t) return;
+    /* L'OCR abîme volontiers les en-têtes : « 第 1 2 課 », « 第l3課 », un O pour
+       un zéro. On répare les confusions les plus fréquentes avant de lire. */
+    const plein=x=>x.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xfee0));
+    /* on ne répare les lettres confondues qu'entre 第 et 課, jamais dans un mot */
+    const rep=plein(t).replace(/第([^課]{0,6})課/g,
+      (_,d)=>"第"+d.replace(/[lI|]/g,"1").replace(/[Oo]/g,"0")+"課");
+    let m=rep.match(/第\s*([0-9]\s*[0-9]?)\s*課/)
+         ||plein(t).match(/(?:le[çc]on|lesson|unit)\s*[:.\-]?\s*([0-9]{1,2})/i)
+         ||plein(t).match(/^\s*([0-9]{1,2})\s*課\s*$/);
+    if(m){
+      const n2=+String(m[1]).replace(/\s+/g,"");
+      if(n2>=1&&n2<=50){ lecon=n2; return; }
+    }
+    m=t.match(/(練習\s*[ＡＢＣABC]|問題|文型|例文|会話|聴解|聞いて|Ｂ\s*\d+|B\s*\d+)/);
+    if(m&&t.length<24){ section=m[1]; ecoute=/聴解|聞いて/.test(m[1]); return; }
+    const num=(t.match(NUM)||[])[1];
+    if(!FLECHE.test(t)){
+      /* une ligne numérotée sans flèche : soit un énoncé qui attend son
+         corrigé, soit une réponse du corrigé. On la garde telle quelle. */
+      if(!num) return;
+      const seul=t.replace(NUM,"").trim();
+      if(!seul||seul.length>90) return;
+      out.push({l:lecon||0, n:+num, q:seul, a:"", s:section, ecoute:ecoute});
+      return;
+    }
+    const parts=t.split(FLECHE);
+    if(parts.length<2) return;
+    let q=parts[0].replace(NUM,"").trim();
+    let a=parts.slice(1).join(" ").trim();
+    /* on écarte les lignes qui ne portent pas de japonais des deux côtés */
+    if(!/[\u3040-\u30ff\u4e00-\u9fff]/.test(a)) return;
+    if(!q||q.length>90||a.length>90) return;
+    const exemple=/^例|^れい/.test(q);
+    out.push({l:lecon||0, n:num?+num:0, q:q, a:a, s:section, ex:exemple, ecoute:ecoute});
+  });
+  return out;
+}
+
+let persoCache=null, persoPending=null, persoLec=0;
+
+VIEWS.perso=m=>{
+  head(m,"手控え","Vos propres exercices, sur cet appareil");
+
+  const av=el("div","card");
+  av.innerHTML=`<div style="font-size:0.875rem;color:var(--mut);line-height:1.6">
+    Chargez un fichier texte contenant vos exercices : l'application le lit
+    <b>sur votre appareil</b>, y repère les items et vous les pose un par un.
+    Rien n'est transmis ni ajouté aux données de l'application, et le contenu
+    n'entre pas dans vos sauvegardes exportées.</div>`;
+  m.appendChild(av);
+
+  const inp=document.createElement("input");
+  inp.type="file"; inp.accept=".txt,.md,.csv,text/plain"; inp.multiple=true; inp.style.display="none";
+  const box=el("div","card");
+  box.appendChild(el("div","sec","Charger"));
+  box.appendChild(el("div","note","Deux façons de faire. <b>Un seul fichier</b> : une ligne par item, l'énoncé et la réponse séparés par une flèche →. <b>Deux fichiers</b> : le cahier d'un côté, le corrigé de l'autre — choisissez-les ensemble, ils seront recoupés par leçon et par numéro d'item. Les mentions « 第12課 » fixent la leçon."));
+  const b1=el("button","btn p w","Choisir un fichier");
+  b1.onclick=()=>inp.click();
+  const b2=el("button","btn w","Coller un texte");
+  b2.style.marginTop="8px";
+  b2.onclick=()=>{
+    const t=prompt("Collez ici vos exercices :");
+    if(t) { persoPending=litExercices(t); render(); }
+  };
+  inp.onchange=async()=>{
+    const fs=[...inp.files]; if(!fs.length) return;
+    let tout=[];
+    for(const f of fs){
+      const txt=await f.text();
+      const lu=litExercices(txt);
+      /* un fichier dont presque aucune ligne n'a de réponse est un corrigé
+         ou un cahier : on les recoupe plutôt que de les empiler. */
+      tout.push({nom:f.name,items:lu});
+    }
+    const pleins=tout.filter(x=>x.items.some(i=>i.a));
+    const vides=tout.filter(x=>!x.items.some(i=>i.a));
+    let res=[];
+    if(pleins.length&&vides.length){
+      /* le fichier complet sert de corrigé aux énoncés nus */
+      const rep=pleins.flatMap(x=>x.items);
+      const en=vides.flatMap(x=>x.items);
+      res=apparie(en,rep).concat(rep.filter(r=>r.a));
+    }else if(tout.length===2&&!pleins.length){
+      res=apparie(tout[0].items,tout[1].items);
+    }else{
+      res=tout.flatMap(x=>x.items).filter(x=>x.a);
+    }
+    persoPending=res; render();
+  };
+  box.appendChild(b1); box.appendChild(b2); box.appendChild(inp);
+  m.appendChild(box);
+
+  /* ---- vérification avant enregistrement ---- */
+  if(persoPending){
+    const P=persoPending;
+    const c=el("div","card");
+    c.appendChild(el("h3",null,P.length+" item"+(P.length>1?"s":"")+" reconnu"+(P.length>1?"s":"")));
+    if(!P.length){
+      c.appendChild(el("div","note","Aucune ligne exploitable. Vérifiez que chaque item comporte une flèche → entre l'énoncé et la réponse."));
+    }else{
+      const sansL=P.filter(x=>!x.l).length;
+      if(sansL) c.appendChild(el("div","note",sansL+" item"+(sansL>1?"s":"")+" sans leçon repérée : ils seront rangés dans la leçon "+S.ch+"."));
+      const g=el("div");
+      P.slice(0,6).forEach(x=>{
+        const d=el("div","ex");
+        d.innerHTML=`<div class="j">${jpw(x.q)} <span style="color:var(--dim)">→</span> ${jpw(x.a)}</div>
+          <div class="f">leçon ${x.l||S.ch}${x.s?" · "+esc(x.s):""}</div>`;
+        g.appendChild(d);
+      });
+      if(P.length>6) g.appendChild(el("div","note","… et "+(P.length-6)+" autres."));
+      c.appendChild(g);
+    }
+    const cc=el("div","ctrl"); cc.style.marginTop="12px";
+    if(P.length){
+      const ok=el("button","btn p","Enregistrer sur cet appareil");
+      ok.onclick=async()=>{
+        for(let i=0;i<P.length;i++){
+          const x=P[i];
+          await pPut({id:"e"+Date.now().toString(36)+"-"+i, l:x.l||S.ch, q:x.q, a:x.a, s:x.s||"", ecoute:x.ecoute?1:0});
+        }
+        persoPending=null; persoCache=null; render();
+        toast(P.length+" items enregistrés");
+      };
+      cc.appendChild(ok);
+    }
+    const no=el("button","btn","Annuler");
+    no.onclick=()=>{ persoPending=null; render(); };
+    cc.appendChild(no); c.appendChild(cc);
+    m.appendChild(c);
+  }
+
+  /* ---- ce qui est déjà chargé ---- */
+  const list=el("div"); m.appendChild(list);
+  (async()=>{
+    if(!persoCache) persoCache=await pAll();
+    list.innerHTML="";
+    if(!persoCache.length){
+      list.appendChild(el("div","empty","<b>手</b>Rien de chargé pour l'instant."));
+      return;
+    }
+    const parL={};
+    persoCache.forEach(x=>{ (parL[x.l]=parL[x.l]||[]).push(x); });
+    const c=el("div","card");
+    c.appendChild(el("div","sec",persoCache.length+" items · "+Object.keys(parL).length+" leçons"));
+    const g=el("div","chgrid");
+    Object.keys(parL).map(Number).sort((a,b)=>a-b).forEach(l=>{
+      const b3=el("button","chbtn"+(persoLec===l?" on":""));
+      b3.innerHTML=l+"<u>"+parL[l].length+"</u>";
+      b3.onclick=()=>{ persoLec=(persoLec===l?0:l); render(); };
+      g.appendChild(b3);
+    });
+    c.appendChild(g);
+    list.appendChild(c);
+
+    if(persoLec&&parL[persoLec]){
+      const items=parL[persoLec];
+      const d=el("div","card");
+      d.appendChild(el("div","sec","Leçon "+persoLec+" · "+items.length+" items"));
+      const cc=el("div","ctrl"); cc.style.marginTop="10px";
+      const go=el("button","btn p","S'exercer sur cette leçon");
+      go.onclick=()=>{
+        const qs=shuffle(items.map((x,i)=>({
+          type:"perso",key:"P:"+x.id,l:x.l,head:"Mon matériel · leçon "+x.l,
+          q:x.q,sub:x.s||"Complétez d'après votre énoncé.",a:x.a,o:[],
+          ecoute:x.ecoute?x.l:0})));
+        sess={qs:qs.slice(0,SIZE),i:0,res:[],mode:"perso",ans:[],shown:{},typed:{}};
+        go2("shugyo");
+      };
+      const sup=el("button","btn","Retirer cette leçon");
+      sup.onclick=async()=>{
+        if(!confirm("Retirer les "+items.length+" items de la leçon "+persoLec+" ?")) return;
+        for(const x of items) await pDel(x.id);
+        persoCache=null; persoLec=0; render();
+      };
+      cc.appendChild(go); cc.appendChild(sup);
+      d.appendChild(cc);
+      items.slice(0,8).forEach(x=>{
+        const e=el("div","ex");
+        e.innerHTML=`<div class="j">${jpw(x.q)}</div><div class="f">${jpw(x.a)}</div>`;
+        d.appendChild(e);
+      });
+      if(items.length>8) d.appendChild(el("div","note","… et "+(items.length-8)+" autres."));
+      list.appendChild(d);
+    }
+    const tout=el("div","ctrl"); tout.style.marginTop="10px";
+    const bt=el("button","btn","Tout retirer de cet appareil");
+    bt.onclick=async()=>{
+      if(!confirm("Retirer les "+persoCache.length+" items chargés ?")) return;
+      for(const x of persoCache) await pDel(x.id);
+      persoCache=null; persoLec=0; render();
+    };
+    tout.appendChild(bt); list.appendChild(tout);
+  })();
+};
+const go2=v=>go(v);
+
 /* ================= 音読 — la répétition à voix haute ================= */
 /* Une consigne en français, un temps pour répondre, la correction en japonais,
    puis deux temps de répétition. L'apprenant prononce donc la réponse trois fois :
@@ -7197,6 +7442,10 @@ VIEWS.shugyo=m=>{
       bd.onclick=()=>{ dojoNouveau(); go("dojo"); };
       c.appendChild(bd);
     }
+    const bp=el("button","btn w","手控え  Mes propres exercices");
+    bp.style.marginTop="10px";
+    bp.onclick=()=>go("perso");
+    c.appendChild(bp);
     const bo=el("button","btn w","音読  Répéter à voix haute");
     bo.style.marginTop="10px";
     bo.onclick=()=>go("oral");
@@ -7256,6 +7505,31 @@ VIEWS.shugyo=m=>{
       bs.onclick=()=>{ sess.sub=sess.sub||{}; sess.sub[sess.i]=1; montreS(); };
       zc.appendChild(bs);
     }
+  }
+  /* Un exercice d'écoute : on donne accès aux pistes de la leçon, celles que
+     vous avez importées. L'application ne sait pas laquelle correspond à quel
+     item — vous choisissez, et vous pouvez réécouter autant qu'il faut. */
+  if(q.ecoute){
+    const zeco=el("div","card");
+    zeco.appendChild(el("div","sec","Écoutez la piste de la leçon "+q.ecoute));
+    (async()=>{
+      if(!audCache) audCache=await aAll();
+      const pistes=audCache.filter(t=>t.l===q.ecoute);
+      if(!pistes.length){
+        zeco.appendChild(el("div","note","Aucune piste importée pour cette leçon. Rendez-vous dans 音声 pour les installer."));
+        return;
+      }
+      pistes.forEach(t=>{
+        const li=el("div","word");
+        li.innerHTML=`<div class="l"><div class="k" style="font-size:0.85rem">${esc(t.name)}</div></div>`;
+        const au=document.createElement("audio");
+        au.controls=true; au.preload="none"; au.style.cssText="width:100%;margin-top:6px";
+        au.src=URL.createObjectURL(t.blob);
+        const w=el("div"); w.appendChild(li); w.appendChild(au);
+        zeco.appendChild(w);
+      });
+    })();
+    m.appendChild(zeco);
   }
   if(q.hint){
     const h=box.querySelector(".qhint");
@@ -7375,7 +7649,7 @@ function requeue(q){
 const NIVDESC={5:"premiers kanji, niveau débutant",4:"kanji de la vie courante",
   3:"niveau intermédiaire",2:"niveau avancé",1:"niveau supérieur"};
 const SENS_CACHE=["conj","adj"];
-const TYPABLE=["conj","adj","part","voc","adv","kanr","cnt","dic","ant"];
+const TYPABLE=["conj","adj","part","voc","adv","kanr","cnt","dic","ant","perso"];
 function typable(q){
   if(!TYPABLE.includes(q.type)) return false;      /* kan, rad, kana : toujours en choix multiple */
   /* les réponses à variantes (だれ・どなた, ～階) sont désormais toutes acceptées par expand() ;
