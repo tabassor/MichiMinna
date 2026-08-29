@@ -6658,10 +6658,11 @@ VIEWS.audio=m=>{
   src.appendChild(el("h3",null,"Où trouver les fichiers"));
   src.innerHTML+=`<div style="font-size:0.875rem;color:var(--mut);line-height:1.6">
     3A Corporation met l'audio du manuel à disposition gratuitement, sans inscription.
-    Téléchargez-le depuis leur site, puis importez ici les fichiers de la leçon voulue :
-    ils resteront sur votre appareil et fonctionneront hors ligne.</div>`;
+    Deux façons d'y accéder : <b>écouter en ligne</b> ouvre leur lecteur dans le
+    navigateur, leçon par leçon ; <b>installer</b> place l'audio sur votre appareil,
+    une fois pour toutes, et il fonctionnera ensuite sans connexion.</div>`;
   const lk=el("div","ctrl"); lk.style.marginTop="10px";
-  [["Tome I — leçons 1 à 25",25],["Tome II — leçons 26 à 50",50]].forEach(([lab,n])=>{
+  [["Écouter en ligne — leçons 1 à 25",25],["Écouter en ligne — leçons 26 à 50",50]].forEach(([lab,n])=>{
     const a=el("button","btn",lab);
     a.onclick=()=>window.open(A3A(n),"_blank","noopener");
     lk.appendChild(a);
@@ -6671,8 +6672,8 @@ VIEWS.audio=m=>{
      c'est le plus simple, et l'import ci-dessous répartit les pistes tout seul. */
   const dl=el("div","ctrl"); dl.style.marginTop="8px";
   const etat=el("div","note"); etat.style.display="none";
-  [["Tout le tome I — 87 pistes, 92 Mo","0-0001-01-230020",25],
-   ["Tout le tome II — 75 pistes, 100 Mo","0-0001-01-240020",50]].forEach(([lab,ref,jusqua])=>{
+  [["Installer les leçons 1 à 25 · 92 Mo","0-0001-01-230020",25],
+   ["Installer les leçons 26 à 50 · 100 Mo","0-0001-01-240020",50]].forEach(([lab,ref,jusqua])=>{
     const url="https://www.3anet.co.jp/np/en/secure/"+ref+"/"+ref+"-0.zip";
     const bz=el("button","btn"+(S.ch<=jusqua&&S.ch>jusqua-25?" p":""),lab);
     bz.onclick=async()=>{
@@ -6701,17 +6702,28 @@ VIEWS.audio=m=>{
         etat.style.display="none";
         render();
       }catch(e){
-        etat.innerHTML="Le site de l'éditeur ne permet pas la récupération directe. "+
-          "Le téléchargement s'ouvre dans votre navigateur : une fois terminé, "+
-          "touchez <b>Importer</b> ci-dessous et choisissez le fichier <b>.zip</b> — "+
-          "l'application fait le reste.";
+        /* Le serveur de l'éditeur refuse la lecture directe : on laisse le
+           navigateur télécharger, puis on offre le bouton qui reprend le
+           fichier — sans quoi l'utilisateur reste avec une archive et rien
+           pour l'ouvrir. */
+        etat.innerHTML='<b>Le téléchargement se poursuit dans votre navigateur.</b><br>'+
+          "Quand il est terminé, touchez le bouton ci-dessous et choisissez le fichier "+
+          "qui vient d'arriver — son nom se termine par <b>.zip</b>. L'application "+
+          "l'ouvrira et rangera chaque piste dans sa leçon.";
+        if(!etat.__bouton){
+          etat.__bouton=1;
+          const bi=el("button","btn p w","J'ai téléchargé l'archive — l'ouvrir");
+          bi.style.marginTop="10px";
+          bi.onclick=()=>inp.click();
+          etat.appendChild(bi);
+        }
         window.open(url,"_blank","noopener");
       }
     };
     dl.appendChild(bz);
   });
   src.appendChild(dl); src.appendChild(etat);
-  src.appendChild(el("div","note","Un seul geste : touchez le tome qui vous concerne. L'application télécharge l'archive, l'ouvre et range chaque piste dans sa leçon. Vous n'avez rien à décompresser."));
+  src.appendChild(el("div","note","<b>Installer</b> demande une connexion le temps du téléchargement, puis plus rien : l'application ouvre l'archive et range chaque piste dans sa leçon. Vous n'avez rien à décompresser."));
   m.appendChild(src);
 
   const f=el("div","filters");
@@ -6727,7 +6739,7 @@ VIEWS.audio=m=>{
   if(bm2){ const c2=el("div","ctrl"); c2.style.marginBottom="10px"; c2.appendChild(bm2); box.appendChild(c2); }
   const inp=document.createElement("input");
   inp.type="file"; inp.accept="audio/*,.zip,application/zip"; inp.multiple=true; inp.style.display="none";
-  const btn=el("button","btn p w","Importer des fichiers audio pour cette leçon");
+  const btn=el("button","btn p w","Importer — fichiers audio ou archive .zip");
   btn.onclick=()=>inp.click();
   inp.onchange=async()=>{
     let files=[...inp.files]; if(!files.length) return;
