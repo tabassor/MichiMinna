@@ -6603,6 +6603,53 @@ function guessLessons(files,fallback){
 }
 
 let audLes=0, audCache=null, audPending=null;
+
+/* ================= ouvrir une archive audio sans rien installer =================
+   Les navigateurs savent décompresser depuis quelques années : on lit donc
+   directement l'archive de l'éditeur, sans que l'utilisateur ait à la
+   décompresser lui-même. Rien n'est envoyé nulle part, tout se passe sur
+   l'appareil. */
+async function litArchive(file, avance){
+  const buf=await file.arrayBuffer();
+  const dv=new DataView(buf), u8=new Uint8Array(buf);
+  /* on cherche la fin du répertoire central, en partant de la fin */
+  let fin=-1;
+  for(let i=buf.byteLength-22;i>=Math.max(0,buf.byteLength-66000);i--){
+    if(dv.getUint32(i,true)===0x06054b50){ fin=i; break; }
+  }
+  if(fin<0) throw new Error("Ce fichier n'est pas une archive lisible.");
+  const nb=dv.getUint16(fin+10,true);
+  let p=dv.getUint32(fin+16,true);
+  const out=[];
+  for(let k=0;k<nb;k++){
+    if(dv.getUint32(p,true)!==0x02014b50) break;
+    const methode=dv.getUint16(p+10,true);
+    const taille=dv.getUint32(p+24,true);
+    const nLen=dv.getUint16(p+28,true), eLen=dv.getUint16(p+30,true), cLen=dv.getUint16(p+32,true);
+    const debut=dv.getUint32(p+42,true);
+    const nom=new TextDecoder("utf-8").decode(u8.subarray(p+46,p+46+nLen));
+    p+=46+nLen+eLen+cLen;
+    if(!/\.(mp3|m4a|aac|wav|ogg)$/i.test(nom)) continue;
+    /* l'en-tête local donne la position réelle des données */
+    const nL=dv.getUint16(debut+26,true), eL=dv.getUint16(debut+28,true);
+    const d0=debut+30+nL+eL;
+    const comp=dv.getUint32(debut+18,true)||taille;
+    const brut=u8.subarray(d0,d0+comp);
+    let donnees;
+    if(methode===0) donnees=brut;
+    else if(methode===8){
+      const fluxA=new Blob([brut]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+      donnees=new Uint8Array(await new Response(fluxA).arrayBuffer());
+    }else continue;
+    /* on garde le chemin : « L13/02.mp3 » dit la leçon, « 02.mp3 » ne dit rien */
+    const propre=nom.replace(/^\.?\//,"").replace(/\//g," ");
+    out.push(new File([donnees],propre,{type:"audio/mpeg"}));
+    if(avance) avance(out.length);
+  }
+  if(!out.length) throw new Error("Aucune piste audio dans cette archive.");
+  return out.sort((a,b)=>natCmp(a.name,b.name));
+}
+
 VIEWS.audio=m=>{
   head(m,"音声","L'audio officiel du manuel, sur votre appareil");
   if(!audLes) audLes=Math.min(S.ch,50);
@@ -6619,7 +6666,53 @@ VIEWS.audio=m=>{
     a.onclick=()=>window.open(A3A(n),"_blank","noopener");
     lk.appendChild(a);
   });
-  src.appendChild(lk); m.appendChild(src);
+  src.appendChild(lk);
+  /* L'éditeur propose aussi l'archive complète en un seul téléchargement :
+     c'est le plus simple, et l'import ci-dessous répartit les pistes tout seul. */
+  const dl=el("div","ctrl"); dl.style.marginTop="8px";
+  const etat=el("div","note"); etat.style.display="none";
+  [["Tout le tome I — 87 pistes, 92 Mo","0-0001-01-230020",25],
+   ["Tout le tome II — 75 pistes, 100 Mo","0-0001-01-240020",50]].forEach(([lab,ref,jusqua])=>{
+    const url="https://www.3anet.co.jp/np/en/secure/"+ref+"/"+ref+"-0.zip";
+    const bz=el("button","btn"+(S.ch<=jusqua&&S.ch>jusqua-25?" p":""),lab);
+    bz.onclick=async()=>{
+      /* On tente d'abord de tout faire d'un geste : récupérer l'archive et
+         l'ouvrir sur place. Le serveur de l'éditeur n'autorise pas forcément
+         cette lecture directe ; dans ce cas on bascule sur le téléchargement
+         ordinaire, et l'archive se réimporte ensuite en un toucher. */
+      etat.style.display=""; etat.textContent="Téléchargement…";
+      try{
+        const r=await fetch(url,{mode:"cors"});
+        if(!r.ok) throw new Error("réponse "+r.status);
+        const tot=+(r.headers.get("content-length")||0);
+        const lu=[]; let n=0;
+        const rd=r.body.getReader();
+        for(;;){
+          const {done,value}=await rd.read();
+          if(done) break;
+          lu.push(value); n+=value.length;
+          etat.textContent="Téléchargement… "+Math.round(n/1048576)+" Mo"+(tot?" sur "+Math.round(tot/1048576):"");
+        }
+        const f=new File(lu,"audio.zip",{type:"application/zip"});
+        etat.textContent="Ouverture de l'archive…";
+        const pistes=await litArchive(f,k=>{ etat.textContent="Ouverture… "+k+" pistes"; });
+        const g=guessLessons(pistes,audLes);
+        audPending={files:pistes,map:g.map,how:g.how};
+        etat.style.display="none";
+        render();
+      }catch(e){
+        etat.innerHTML="Le site de l'éditeur ne permet pas la récupération directe. "+
+          "Le téléchargement s'ouvre dans votre navigateur : une fois terminé, "+
+          "touchez <b>Importer</b> ci-dessous et choisissez le fichier <b>.zip</b> — "+
+          "l'application fait le reste.";
+        window.open(url,"_blank","noopener");
+      }
+    };
+    dl.appendChild(bz);
+  });
+  src.appendChild(dl); src.appendChild(etat);
+  src.appendChild(el("div","note","Un seul geste : touchez le tome qui vous concerne. L'application télécharge l'archive, l'ouvre et range chaque piste dans sa leçon. Vous n'avez rien à décompresser."));
+  m.appendChild(src);
 
   const f=el("div","filters");
   for(let l=1;l<=S.ch;l++){
@@ -6633,11 +6726,29 @@ VIEWS.audio=m=>{
   const bm2=boutonManuel(audLes);
   if(bm2){ const c2=el("div","ctrl"); c2.style.marginBottom="10px"; c2.appendChild(bm2); box.appendChild(c2); }
   const inp=document.createElement("input");
-  inp.type="file"; inp.accept="audio/*"; inp.multiple=true; inp.style.display="none";
+  inp.type="file"; inp.accept="audio/*,.zip,application/zip"; inp.multiple=true; inp.style.display="none";
   const btn=el("button","btn p w","Importer des fichiers audio pour cette leçon");
   btn.onclick=()=>inp.click();
-  inp.onchange=()=>{
-    const files=[...inp.files]; if(!files.length) return;
+  inp.onchange=async()=>{
+    let files=[...inp.files]; if(!files.length) return;
+    /* une archive est ouverte sur place : l'utilisateur n'a rien à décompresser */
+    const arch=files.filter(f=>/\.zip$/i.test(f.name));
+    if(arch.length){
+      const av=el("div","note"); av.textContent="Ouverture de l'archive…";
+      box.appendChild(av);
+      try{
+        let tout=[];
+        for(const a of arch){
+          const t=await litArchive(a,n=>{ av.textContent="Ouverture de l'archive… "+n+" pistes"; });
+          tout=tout.concat(t);
+        }
+        files=tout.concat(files.filter(f=>!/\.zip$/i.test(f.name)));
+      }catch(e){
+        av.textContent="Archive illisible : "+e.message;
+        return;
+      }
+      av.remove();
+    }
     const g=guessLessons(files,audLes);
     audPending={files:files.slice().sort((a,b)=>natCmp(a.name,b.name)),map:g.map,how:g.how};
     render();
