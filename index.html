@@ -246,6 +246,12 @@ button.stat{font:inherit;width:100%}
 .dl-bar{height:6px;border-radius:999px;background:var(--line);overflow:hidden;margin-top:9px}
 .dl-bar i{display:block;height:100%;background:var(--ai);border-radius:999px;
   transition:width .25s ease}
+.audlink{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:0.7812rem}
+.audlink span{color:var(--mut);min-width:74px}
+.audsel{flex:1;min-width:0;background:var(--surf2);color:var(--tx);border:1px solid var(--line);
+  border-radius:var(--r-sm);padding:6px 8px;font-family:var(--ui);font-size:0.7812rem}
+.modele{border-left:3px solid var(--ai);background:var(--surf2)}
+.modele .j{font-family:var(--disp);font-size:1rem;line-height:1.7}
 .jlptline{display:flex;align-items:center;gap:9px;margin-top:10px;font-size:0.7812rem;color:var(--mut)}
 .tag.jlpt{border-color:color-mix(in srgb,var(--ai) 55%,transparent);color:var(--ai);font-weight:600}
 .kcell{position:relative}
@@ -2451,13 +2457,25 @@ function litExercices(txt,depart){
   const REP=/^\s*(?:(\d{1,2})[.．])?([A-ZＡ-Ｚ]?[.．]?\d{0,2}(?:[.．]\d{1,2})*)\s*[)）.．、]?\s+/;
   const NUM=/^\s*(?:[（(]?\s*)?(\d{1,2})\s*[.、）)]\s*/;
 
-  const pousse=(q,a,n)=>{
+  const PREF_EX=/^\s*(?:例\s*\d*|れい|exemple|mod[èe]le)\s*[:：.．)）]?\s*/i;
+  const pousse=(q,a,n,serie)=>{
     q=String(q||"").trim(); a=String(a||"").trim();
     if(!q) return;
     if(a&&P_VIDE.test(a)) a="";
     if(!/[\u3040-\u30ff\u4e00-\u9fff]/.test(a||q)) return;
     if(q.length>140||a.length>140) return;
-    out.push({l:lecon||0,n:n||0,q:q,a:a,s:section,ecoute:ecoute});
+    /* « 例 » ouvre une série : ce n'est pas une question mais le modèle,
+       qui montre la transformation attendue. On l'écarte des questions
+       et on le range avec sa série pour l'y rattacher ensuite. */
+    const estEx=PREF_EX.test(q)||PREF_EX.test(a)||n===0;
+    q=q.replace(PREF_EX,"").trim();
+    a=a.replace(PREF_EX,"").trim();
+    /* la numérotation d'origine ne sert plus une fois le rang retenu */
+    const NUMDEB=/^\s*[（(]?\s*\d{1,2}\s*[)）.．、:：]\s*/;
+    q=q.replace(NUMDEB,"").trim();
+    a=a.replace(NUMDEB,"").trim();
+    if(!q) return;
+    out.push({l:lecon||0,n:n||0,g:serie||"",q:q,a:a,s:section,ecoute:ecoute,ex:estEx?1:0});
   };
 
   /* Disposition « Question … / Corrigé … », où les deux moitiés d'un item
@@ -2495,7 +2513,7 @@ function litExercices(txt,depart){
     if(mq&&(mq[3]||"").trim()){
       if(attente&&attente.a) pousse(attente.q,attente.a,attente.n);
       if(mq[1]){ const k=+mq[1]; if(k>=1&&k<=50) lecon=k; }
-      attente={q:mq[3].trim(),a:"",n:mq[2]?+mq[2]:0};
+      attente={q:mq[3].trim(),a:"",n:mq[2]?+mq[2]:0,g:mq[1]?String(mq[1]):""};
       return;
     }
     /* le mot « Corrigé » seul annonce la réponse sur la ligne suivante */
@@ -2503,19 +2521,21 @@ function litExercices(txt,depart){
     let mc=t.match(/^(?:corrig[ée]s?|r[ée]ponse|答え?|解答)?\s*[:：]\s*(.+)$/i);
     if(attente&&mc&&mc[1].trim()){
       attente.a=(attente.a?attente.a+" ":"")+mc[1].trim();
-      pousse(attente.q,attente.a,attente.n);
+      pousse(attente.q,attente.a,attente.n,attente.g);
       attente=null;
       return;
     }
     if(attente&&!attente.a&&/[\u3040-\u30ff\u4e00-\u9fff]/.test(t)&&t.length<140){
-      attente.a=t; pousse(attente.q,attente.a,attente.n); attente=null; return;
+      attente.a=t; pousse(attente.q,attente.a,attente.n,attente.g); attente=null; return;
     }
 
     /* disposition 1 : une flèche sépare l'énoncé de la réponse */
     if(FLECHE.test(t)){
       const p=t.split(FLECHE);
       const num=(t.match(NUM)||[])[1];
-      pousse(p[0].replace(NUM,"").replace(REP,""),p.slice(1).join(" "),num?+num:0);
+      const mr0=t.match(REP);
+      const ser0=mr0&&mr0[2]?String(mr0[2]).replace(/[.．]?\d{1,2}\s*$/,""):"";
+      pousse(p[0].replace(NUM,"").replace(REP,""),p.slice(1).join(" "),num?+num:0,ser0);
       return;
     }
 
@@ -2523,11 +2543,12 @@ function litExercices(txt,depart){
     const mr=t.match(REP);
     if(mr&&mr[2]){
       const rang=(mr[2].match(/(\d{1,2})\s*$/)||[])[1];
+      const serie=String(mr[2]).replace(/[.．]?\d{1,2}\s*$/,"");
       const reste=t.slice(mr[0].length).trim();
       /* le corrigé reprend souvent la numérotation : « 3) …… » */
       const coupe=reste.match(/^(.*?)\s(?:\d{1,2}\s*[)）]\s*)(.+)$/);
-      if(coupe) pousse(coupe[1],coupe[2],rang?+rang:0);
-      else pousse(reste,"",rang?+rang:0);
+      if(coupe) pousse(coupe[1],coupe[2],rang?+rang:0,serie);
+      else pousse(reste,"",rang?+rang:0,serie);
       return;
     }
 
@@ -2659,7 +2680,7 @@ VIEWS.perso=m=>{
         const t0=Date.now().toString(36);
         for(let i=0;i<P.length;i++){
           const x=P[i];
-          await pPut({id:"e"+t0+"-"+i,l:x.l||S.ch,q:x.q,a:x.a,s:x.s||"",ecoute:x.ecoute?1:0});
+          await pPut({id:"e"+t0+"-"+i,l:x.l||S.ch,q:x.q,a:x.a,s:x.s||"",g:x.g||"",ecoute:x.ecoute?1:0,ex:x.ex?1:0});
         }
         persoPending=null; persoMuets=[]; persoCache=null; render();
         toast(P.length+" items enregistrés");
@@ -2701,10 +2722,25 @@ VIEWS.perso=m=>{
       const cc=el("div","ctrl"); cc.style.marginTop="10px";
       const bJouer=el("button","btn p","S'exercer sur cette leçon");
       bJouer.onclick=()=>{
-        const qs=shuffle(items.map(x=>({
-          type:"perso",key:"P:"+x.id,l:x.l,head:"Mon matériel · leçon "+x.l,
-          q:x.q,sub:x.s||"Complétez d'après votre énoncé.",a:x.a,o:[],
-          ecoute:x.ecoute?x.l:0})));
+        /* Le modèle de chaque série accompagne ses questions : sans lui, on ne
+           peut pas deviner la transformation attendue. */
+        const modeles={}, parSection={};
+        items.filter(x=>x.ex&&x.a).forEach(x=>{
+          const k=(x.s||"")+"|"+(x.g||"");
+          if(!modeles[k]) modeles[k]=x;
+          if(!parSection[x.s||""]) parSection[x.s||""]=x;
+        });
+        const jouables=items.filter(x=>!x.ex&&x.a);
+        if(!jouables.length){ toast("Cette leçon ne contient que des modèles"); return; }
+        const qs=shuffle(jouables.map(x=>{
+          const md=modeles[(x.s||"")+"|"+(x.g||"")]||parSection[x.s||""]||null;
+          return {type:"perso",key:"P:"+x.id,l:x.l,
+            head:"Mon matériel · leçon "+x.l+(x.s?" · "+x.s:""),
+            q:x.q,sub:"Transformez comme le modèle.",a:x.a,o:[],
+            modele:md?{q:md.q,a:md.a}:null,
+            ecoute:(x.ecoute||(S.persoAudio||{})[x.l+"|"+(x.s||"")])?x.l:0,
+            piste:(S.persoAudio||{})[x.l+"|"+(x.s||"")]||""};
+        }));
         sess={qs:qs.slice(0,SIZE),i:0,res:[],mode:"perso",ans:[],shown:{},typed:{}};
         go("shugyo");
       };
@@ -2715,6 +2751,45 @@ VIEWS.perso=m=>{
         persoCache=null; persoLec=0; render();
       };
       cc.appendChild(bJouer); cc.appendChild(sup); d.appendChild(cc);
+
+      /* Lier une piste à chaque série : l'application ne peut pas deviner
+         laquelle correspond, mais elle peut retenir votre choix. */
+      const sections=[...new Set(items.map(x=>x.s||""))];
+      const zAudio=el("div"); d.appendChild(zAudio);
+      (async()=>{
+        if(!audCache) audCache=await aAll();
+        const pistes=audCache.filter(t=>t.l===persoLec)
+          .sort((a,b)=>natCmp(a.name,b.name));
+        zAudio.appendChild(el("div","sec","Audio de la leçon"));
+        if(!pistes.length){
+          zAudio.appendChild(el("div","note","Aucune piste installée pour cette leçon. Rendez-vous dans 音声 pour l'ajouter ; vous pourrez ensuite la lier à une série."));
+          return;
+        }
+        zAudio.appendChild(el("div","note","Choisissez la piste qui accompagne chaque série. Elle sera proposée pendant l'exercice."));
+        S.persoAudio=S.persoAudio||{};
+        sections.forEach(sec=>{
+          const cle=persoLec+"|"+sec;
+          const w=el("div","audlink");
+          w.innerHTML=`<span>${esc(sec||"sans section")}</span>`;
+          const sel=document.createElement("select");
+          sel.className="audsel";
+          const vide=document.createElement("option");
+          vide.value=""; vide.textContent="— aucune —";
+          sel.appendChild(vide);
+          pistes.forEach(t=>{
+            const o=document.createElement("option");
+            o.value=t.id; o.textContent=t.name;
+            if((S.persoAudio[cle]||"")===t.id) o.selected=true;
+            sel.appendChild(o);
+          });
+          sel.onchange=()=>{
+            if(sel.value) S.persoAudio[cle]=sel.value; else delete S.persoAudio[cle];
+            save(); toast(sel.value?"Piste liée à "+(sec||"la série"):"Lien retiré");
+          };
+          w.appendChild(sel);
+          zAudio.appendChild(w);
+        });
+      })();
       items.slice(0,8).forEach(x=>{
         const e=el("div","ex");
         e.innerHTML=`<div class="j">${jpw(x.q)}</div><div class="f">${jpw(x.a)}</div>`;
@@ -7633,16 +7708,24 @@ VIEWS.shugyo=m=>{
       zc.appendChild(bs);
     }
   }
-  /* Un item d'écoute : on donne accès aux pistes de la leçon, celles que vous
-     avez installées. L'application ignore laquelle correspond — vous choisissez. */
+  /* Le modèle de la série, posé au-dessus de la question. */
+  if(q.modele){
+    const mo=el("div","card modele");
+    mo.innerHTML=`<div class="sec">例 &nbsp;le modèle</div>
+      <div class="j">${jpw(q.modele.q)} <span style="color:var(--dim)">→</span></div>
+      <div class="j" style="color:var(--ai);margin-top:4px">${jpw(q.modele.a)}</div>`;
+    m.appendChild(mo);
+  }
+  /* La piste liée à cette série, ou à défaut celles de la leçon. */
   if(q.ecoute){
     const z=el("div","card");
-    z.appendChild(el("div","sec","Écoutez la leçon "+q.ecoute));
+    z.appendChild(el("div","sec","Écoute"));
     (async()=>{
       if(!audCache) audCache=await aAll();
-      const pistes=audCache.filter(t=>t.l===q.ecoute);
-      if(!pistes.length){ z.appendChild(el("div","note","Aucune piste importée pour cette leçon. Rendez-vous dans 音声.")); return; }
-      pistes.forEach(t=>{
+      let pistes=audCache.filter(t=>t.l===q.ecoute);
+      if(q.piste){ const p1=pistes.filter(t=>t.id===q.piste); if(p1.length) pistes=p1; }
+      if(!pistes.length){ z.appendChild(el("div","note","Aucune piste pour cette leçon. Installez l'audio dans 音声.")); return; }
+      pistes.slice(0,6).forEach(t=>{
         const w=el("div");
         w.innerHTML=`<div class="f" style="margin-top:6px">${esc(t.name)}</div>`;
         const au=document.createElement("audio");
