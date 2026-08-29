@@ -2363,11 +2363,13 @@ VIEWS.cible=m=>{
 
 
 
-/* ================= 手控え — votre matériel personnel =================
-   L'application lit ici un fichier que vous fournissez et le rend interrogeable.
-   Tout se passe sur l'appareil : le contenu n'est ni transmis, ni recopié dans
-   les données de l'application, ni inclus dans les sauvegardes exportées. Il
-   disparaît si vous le retirez. Ce que vous chargez ne regarde que vous. */
+
+/* ================= 手控え — vos propres fichiers d'exercices =================
+   L'application lit ici un fichier que vous lui donnez et le rend interrogeable.
+   Tout se passe sur l'appareil : rien n'est transmis, rien n'est recopié dans
+   les données de l'application, rien n'entre dans les sauvegardes exportées.
+   Ce que vous chargez ne regarde que vous, et disparaît si vous le retirez. */
+
 function pdb(){
   return new Promise((res,rej)=>{
     const r=indexedDB.open("michi-perso",1);
@@ -2384,31 +2386,9 @@ async function pAll(){ try{ const db=await pdb();
 async function pDel(id){ const db=await pdb();
   return new Promise(res=>{const t=db.transaction("t","readwrite");t.objectStore("t").delete(id);t.oncomplete=()=>res();}); }
 
-/* Découpe un texte en items interrogeables. On reconnaît les repères habituels
-   d'un cahier d'exercices : le numéro de leçon, la numérotation des items, et
-   la flèche qui sépare l'énoncé de la réponse. */
-/* Deux fichiers séparés — les énoncés d'un côté, les réponses de l'autre —
-   se recoupent par leçon et par numéro d'item. C'est la forme habituelle d'un
-   cahier et de son corrigé. */
-function apparie(enonces,reponses){
-  const cle=x=>x.l+"|"+(x.n||0)+"|"+(x.s||"");
-  const idx=new Map();
-  reponses.forEach(r=>{ if(r.n) idx.set(cle(r),r.a||r.q); });
-  const out=[];
-  enonces.forEach(e=>{
-    if(e.a) { out.push(e); return; }          /* déjà complet */
-    const rep=idx.get(cle(e))||idx.get(e.l+"|"+(e.n||0)+"|");
-    if(rep) out.push(Object.assign({},e,{a:rep}));
-  });
-  return out;
-}
-/* Le numéro de leçon peut figurer dans le nom du fichier plutôt que dans le
-   texte : « chap14.txt », « leçon 26-30 », « L07 ». */
-
-/* ---- lire la couche texte d'un PDF, sans bibliothèque ni connexion ----
-   Un PDF issu d'une reconnaissance de caractères porte son texte dans des flux
-   comprimés, et une table « ToUnicode » qui dit à quel caractère correspond
-   chaque code. On décomprime, on lit la table, on décode. Tout sur l'appareil. */
+/* ---- lire la couche de texte d'un PDF ----
+   La bibliothèque n'est mise en route qu'ici : tant qu'aucun PDF n'est ouvert,
+   les deux blocs restent inertes et rien n'est exécuté. */
 let pdfLib=null;
 async function chargePdfLib(){
   if(pdfLib) return pdfLib;
@@ -2420,115 +2400,40 @@ async function chargePdfLib(){
     URL.createObjectURL(new Blob([wk.textContent],{type:"text/javascript"}));
   return pdfLib;
 }
-/* Extraction de la couche de texte, page par page. Les lignes sont
-   reconstituées d'après la position verticale de chaque fragment. */
 async function texteDuPDF(file,avance){
   const lib=await chargePdfLib();
   const doc=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
-  const pages=[];
+  const out=[];
   for(let n=1;n<=doc.numPages;n++){
     if(avance) avance(n,doc.numPages);
     const pg=await doc.getPage(n);
     const c=await pg.getTextContent();
+    /* on regroupe par ligne d'après la position verticale, puis on ordonne
+       horizontalement : sans quoi les colonnes d'un tableau s'entremêlent. */
     const lignes=new Map();
     c.items.forEach(it=>{
       if(!it.str) return;
-      const y=Math.round((it.transform&&it.transform[5])||0);
-      const k=Math.round(y/3)*3;                 /* on tolère un léger décalage */
-      lignes.set(k,(lignes.get(k)||"")+it.str);
+      const y=Math.round(((it.transform&&it.transform[5])||0)/3)*3;
+      const x=(it.transform&&it.transform[4])||0;
+      if(!lignes.has(y)) lignes.set(y,[]);
+      lignes.get(y).push([x,it.str]);
     });
-    [...lignes.keys()].sort((a,b)=>b-a).forEach(k=>{
-      const t=lignes.get(k).trim();
-      if(t) pages.push(t);
+    [...lignes.keys()].sort((a,b)=>b-a).forEach(y=>{
+      const t=lignes.get(y).sort((a,b)=>a[0]-b[0]).map(p=>p[1]).join(" ")
+              .replace(/\s{2,}/g," ").trim();
+      if(t) out.push(t);
     });
   }
   try{ doc.destroy(); }catch(e){}
-  return pages.join("\n");
-}
-async function texteDuPDF_maison(file){
-  const u8=new Uint8Array(await file.arrayBuffer());
-  const bin=Array.from(u8,c=>String.fromCharCode(c)).join("");
-  const inflate=async oct=>{
-    try{
-      const f=new Blob([oct]).stream().pipeThrough(new DecompressionStream("deflate"));
-      return new Uint8Array(await new Response(f).arrayBuffer());
-    }catch(e){
-      try{
-        const f=new Blob([oct]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
-        return new Uint8Array(await new Response(f).arrayBuffer());
-      }catch(e2){ return null; }
-    }
-  };
-  /* on récupère chaque flux, décomprimé si besoin */
-  const flux=[];
-  /* « endstream » contient « stream » : sans cette précaution, chaque fin de
-     flux était prise pour un début. */
-  const re=/(^|[^d])stream\r?\n?/g; let mm;
-  while((mm=re.exec(bin))){
-    const d=mm.index+mm[0].length;
-    const f=bin.indexOf("endstream",d);
-    if(f<0) continue;
-    const brut=u8.subarray(d,f);
-    const avant=bin.slice(Math.max(0,mm.index-500),mm.index);
-    let txt;
-    if(/FlateDecode/.test(avant)){
-      const dec=await inflate(brut);
-      if(!dec) continue;
-      txt=new TextDecoder("latin1").decode(dec);
-    }else txt=new TextDecoder("latin1").decode(brut);
-    flux.push(txt);
-  }
-  /* les tables de correspondance, où qu'elles soient */
-  const table=new Map();
-  const hex=h=>String.fromCodePoint(parseInt(h,16));
-  flux.concat([bin]).forEach(t=>{
-    let m2;
-    const rc=/beginbfchar([\s\S]*?)endbfchar/g;
-    while((m2=rc.exec(t))){
-      const rp=/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>/g; let x;
-      while((x=rp.exec(m2[1]))){
-        let v=""; for(let i=0;i<x[2].length;i+=4) v+=hex(x[2].substr(i,4));
-        table.set(parseInt(x[1],16),v);
-      }
-    }
-    const rr=/beginbfrange([\s\S]*?)endbfrange/g;
-    while((m2=rr.exec(t))){
-      const rp=/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>/g; let x;
-      while((x=rp.exec(m2[1]))){
-        const a=parseInt(x[1],16), b=parseInt(x[2],16), c=parseInt(x[3],16);
-        for(let k=a;k<=b&&k-a<65536;k++) table.set(k,hex((c+k-a).toString(16)));
-      }
-    }
-  });
-  /* puis le texte lui-même : les opérateurs Tj et TJ */
-  const sortie=[];
-  flux.forEach(t=>{
-    if(!/T[jJ]/.test(t)) return;
-    let ligne="", m3;
-    const ops=/(?:\((?:\\.|[^()\\])*\)|<[0-9A-Fa-f\s]+>)\s*(?:TJ|Tj)|T\*|TD|Td|ET/g;
-    while((m3=ops.exec(t))){
-      const tok=m3[0];
-      if(/^(T\*|TD|Td|ET)$/.test(tok)){
-        if(ligne.trim()) sortie.push(ligne.trim());
-        ligne=""; continue;
-      }
-      const hx=tok.match(/<([0-9A-Fa-f\s]+)>/);
-      if(hx){
-        const h=hx[1].replace(/\s+/g,"");
-        for(let i=0;i<h.length;i+=4){
-          const code=parseInt(h.substr(i,4),16);
-          ligne+=table.has(code)?table.get(code):(code>31?String.fromCharCode(code):"");
-        }
-      }else{
-        const st=tok.match(/\(((?:\\.|[^()\\])*)\)/);
-        if(st) ligne+=st[1].replace(/\\([()\\])/g,"$1");
-      }
-    }
-    if(ligne.trim()) sortie.push(ligne.trim());
-  });
-  return sortie.join("\n");
+  return out.join("\n");
 }
 
+/* ---- reconnaître la structure d'un fichier d'exercices ----
+   Trois dispositions sont admises, celles que l'on rencontre en pratique :
+     · une ligne par item, énoncé et réponse séparés par une flèche ;
+     · un tableau à colonnes, l'énoncé puis son corrigé ;
+     · deux fichiers séparés, le cahier d'un côté, le corrigé de l'autre,
+       recoupés par leur numérotation. */
 function leconDuNom(nom){
   const n=String(nom).replace(/\.[a-z0-9]+$/i,"");
   const m=n.match(/(?:第|ch(?:ap(?:itre)?)?|le[çc]on|lesson|unit|l)\s*_?-?\s*(\d{1,2})/i)
@@ -2536,49 +2441,114 @@ function leconDuNom(nom){
   const k=m?+m[1]:0;
   return (k>=1&&k<=50)?k:0;
 }
+const P_VIDE=/aucun\s+corrig|sans\s+corrig|pas\s+de\s+corrig|dialogue\s+de\s+base|—|^-+$/i;
+
 function litExercices(txt,depart){
   const lignes=String(txt).replace(/\r/g,"").split("\n");
-  const out=[]; let lecon=depart||0, section="";
-  const NUM=/^\s*(?:[（(]?\s*)?(\d{1,2})\s*[\.、）)]\s*/;
+  const out=[]; let lecon=depart||0, section="", ecoute=false;
   const FLECHE=/\s*(?:→|⇒|=>|➡|―>|->)\s*/;
-  let ecoute=false;
+  /* « 1.B.3.2 », « 12.4 », « 3) », « 例: » … tout ce qui ouvre un item */
+  const REP=/^\s*(?:(\d{1,2})[.．])?([A-ZＡ-Ｚ]?[.．]?\d{0,2}(?:[.．]\d{1,2})*)\s*[)）.．、]?\s+/;
+  const NUM=/^\s*(?:[（(]?\s*)?(\d{1,2})\s*[.、）)]\s*/;
+
+  const pousse=(q,a,n)=>{
+    q=String(q||"").trim(); a=String(a||"").trim();
+    if(!q) return;
+    if(a&&P_VIDE.test(a)) a="";
+    if(!/[\u3040-\u30ff\u4e00-\u9fff]/.test(a||q)) return;
+    if(q.length>140||a.length>140) return;
+    out.push({l:lecon||0,n:n||0,q:q,a:a,s:section,ecoute:ecoute});
+  };
+
+  /* Disposition « Question … / Corrigé … », où les deux moitiés d'un item
+     occupent des lignes distinctes, parfois séparées par le mot Corrigé seul. */
+  let attente=null;
+
   lignes.forEach(l=>{
-    const t=l.trim();
-    if(!t) return;
-    /* L'OCR abîme volontiers les en-têtes : « 第 1 2 課 », « 第l3課 », un O pour
-       un zéro. On répare les confusions les plus fréquentes avant de lire. */
+    /* les puces de liste précèdent souvent l'item sur la même ligne */
+    const t=l.trim().replace(/^[•·▪◦‣*\u2022\u25cf\u25aa]+\s*/,"");
+    if(!t||/^[•·▪\-–—*]+$/.test(t)) return;
+
+    /* le chapitre — l'OCR abîme volontiers ces en-têtes, on les répare */
     const plein=x=>x.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xfee0));
-    /* on ne répare les lettres confondues qu'entre 第 et 課, jamais dans un mot */
     const rep=plein(t).replace(/第([^課]{0,6})課/g,
       (_,d)=>"第"+d.replace(/[lI|]/g,"1").replace(/[Oo]/g,"0")+"課");
     let m=rep.match(/第\s*([0-9]\s*[0-9]?)\s*課/)
-         ||plein(t).match(/(?:le[çc]on|lesson|unit)\s*[:.\-]?\s*([0-9]{1,2})/i)
-         ||plein(t).match(/^\s*([0-9]{1,2})\s*課\s*$/);
+        ||plein(t).match(/(?:chapitre|le[çc]on|lesson|unit)\s*[:.\-]?\s*([0-9]{1,2})/i)
+        ||plein(t).match(/^\s*([0-9]{1,2})\s*課\s*$/);
     if(m){
-      const n2=+String(m[1]).replace(/\s+/g,"");
-      if(n2>=1&&n2<=50){ lecon=n2; return; }
+      const k=+String(m[1]).replace(/\s+/g,"");
+      if(k>=1&&k<=50){ lecon=k; return; }
     }
-    m=t.match(/(練習\s*[ＡＢＣABC]|問題|文型|例文|会話|聴解|聞いて|Ｂ\s*\d+|B\s*\d+)/);
-    if(m&&t.length<24){ section=m[1]; ecoute=/聴解|聞いて/.test(m[1]); return; }
-    const num=(t.match(NUM)||[])[1];
-    if(!FLECHE.test(t)){
-      /* une ligne numérotée sans flèche : soit un énoncé qui attend son
-         corrigé, soit une réponse du corrigé. On la garde telle quelle. */
-      if(!num) return;
-      const seul=t.replace(NUM,"").trim();
-      if(!seul||seul.length>90) return;
-      out.push({l:lecon||0, n:+num, q:seul, a:"", s:section, ecoute:ecoute});
+
+    /* la section, et le repérage des exercices d'écoute */
+    m=t.match(/(練習\s*[ＡＢＣABC]|問題|文型|例文|会話|聴解|聞いて|Pratique\s*[ABC]|Probl[èe]mes?)/i);
+    if(m&&t.length<40){
+      section=m[1].replace(/\s+/g,"");
+      ecoute=/聴解|聞いて|会話|CD\s*\d/i.test(t);
       return;
     }
-    const parts=t.split(FLECHE);
-    if(parts.length<2) return;
-    let q=parts[0].replace(NUM,"").trim();
-    let a=parts.slice(1).join(" ").trim();
-    /* on écarte les lignes qui ne portent pas de japonais des deux côtés */
-    if(!/[\u3040-\u30ff\u4e00-\u9fff]/.test(a)) return;
-    if(!q||q.length>90||a.length>90) return;
-    const exemple=/^例|^れい/.test(q);
-    out.push({l:lecon||0, n:num?+num:0, q:q, a:a, s:section, ex:exemple, ecoute:ecoute});
+    if(/^\s*(?:num[ée]ro|exercice|corrig[ée])\b/i.test(t)&&t.length<40) return;
+
+    /* un énoncé annoncé par « Question » ouvre l'attente d'un corrigé */
+    let mq=t.match(/^(?:(\d{1,2})[.．](\d{1,3})\s*)?(?:question|énonc[ée]|enonc[ée]|問)\s*[:：]?\s*(.*)$/i);
+    if(mq&&(mq[3]||"").trim()){
+      if(attente&&attente.a) pousse(attente.q,attente.a,attente.n);
+      if(mq[1]){ const k=+mq[1]; if(k>=1&&k<=50) lecon=k; }
+      attente={q:mq[3].trim(),a:"",n:mq[2]?+mq[2]:0};
+      return;
+    }
+    /* le mot « Corrigé » seul annonce la réponse sur la ligne suivante */
+    if(/^(?:corrig[ée]s?|r[ée]ponse|答え?|解答)\s*[:：]?\s*$/i.test(t)) return;
+    let mc=t.match(/^(?:corrig[ée]s?|r[ée]ponse|答え?|解答)?\s*[:：]\s*(.+)$/i);
+    if(attente&&mc&&mc[1].trim()){
+      attente.a=(attente.a?attente.a+" ":"")+mc[1].trim();
+      pousse(attente.q,attente.a,attente.n);
+      attente=null;
+      return;
+    }
+    if(attente&&!attente.a&&/[\u3040-\u30ff\u4e00-\u9fff]/.test(t)&&t.length<140){
+      attente.a=t; pousse(attente.q,attente.a,attente.n); attente=null; return;
+    }
+
+    /* disposition 1 : une flèche sépare l'énoncé de la réponse */
+    if(FLECHE.test(t)){
+      const p=t.split(FLECHE);
+      const num=(t.match(NUM)||[])[1];
+      pousse(p[0].replace(NUM,"").replace(REP,""),p.slice(1).join(" "),num?+num:0);
+      return;
+    }
+
+    /* disposition 2 : un tableau, le repère puis l'énoncé puis le corrigé */
+    const mr=t.match(REP);
+    if(mr&&mr[2]){
+      const rang=(mr[2].match(/(\d{1,2})\s*$/)||[])[1];
+      const reste=t.slice(mr[0].length).trim();
+      /* le corrigé reprend souvent la numérotation : « 3) …… » */
+      const coupe=reste.match(/^(.*?)\s(?:\d{1,2}\s*[)）]\s*)(.+)$/);
+      if(coupe) pousse(coupe[1],coupe[2],rang?+rang:0);
+      else pousse(reste,"",rang?+rang:0);
+      return;
+    }
+
+    /* disposition 3 : une ligne numérotée simple, en attente de son corrigé */
+    const num=(t.match(NUM)||[])[1];
+    if(num) pousse(t.replace(NUM,""),"",+num);
+  });
+  if(attente&&attente.a) pousse(attente.q,attente.a,attente.n);
+  return out;
+}
+
+/* Recoupe un cahier et son corrigé : même leçon, même section, même rang. */
+function apparie(enonces,reponses){
+  const cle=x=>x.l+"|"+(x.n||0)+"|"+(x.s||"");
+  const idx=new Map();
+  reponses.forEach(r=>{ const v=r.a||r.q; if(r.n&&v) idx.set(cle(r),v); });
+  const out=[];
+  enonces.forEach(e=>{
+    if(e.a){ out.push(e); return; }
+    const rep=idx.get(cle(e))||idx.get(e.l+"|"+(e.n||0)+"|");
+    if(rep) out.push(Object.assign({},e,{a:rep}));
   });
   return out;
 }
@@ -2590,93 +2560,88 @@ VIEWS.perso=m=>{
 
   const av=el("div","card");
   av.innerHTML=`<div style="font-size:0.875rem;color:var(--mut);line-height:1.6">
-    Chargez un fichier texte contenant vos exercices : l'application le lit
+    Chargez un fichier contenant vos exercices : l'application le lit
     <b>sur votre appareil</b>, y repère les items et vous les pose un par un.
-    Rien n'est transmis ni ajouté aux données de l'application, et le contenu
-    n'entre pas dans vos sauvegardes exportées.</div>`;
+    Rien n'est transmis, rien n'est ajouté aux données de l'application, et le
+    contenu n'entre pas dans vos sauvegardes exportées.<br><br>
+    Ce que vous chargez relève de vous : n'y placez que du matériel dont vous
+    disposez légitimement.</div>`;
   m.appendChild(av);
 
   const inp=document.createElement("input");
-  inp.type="file"; inp.accept=".txt,.md,.csv,.pdf,text/plain,application/pdf"; inp.multiple=true; inp.style.display="none";
+  inp.type="file"; inp.accept=".txt,.md,.csv,.pdf,text/plain,application/pdf";
+  inp.multiple=true; inp.style.display="none";
+
   const box=el("div","card");
   box.appendChild(el("div","sec","Charger"));
-  box.appendChild(el("div","note","Les PDF sont lus directement, à condition qu'ils portent une couche de texte — c'est le cas des documents océrisés. Un scan en images ne peut pas être lu."));
-  box.appendChild(el("div","note","Deux façons de faire. <b>Un seul fichier</b> : une ligne par item, l'énoncé et la réponse séparés par une flèche →. <b>Deux fichiers</b> : le cahier d'un côté, le corrigé de l'autre — choisissez-les ensemble, ils seront recoupés par leçon et par numéro d'item. Les mentions « 第12課 » fixent la leçon."));
+  box.appendChild(el("div","note","Trois dispositions sont reconnues : une ligne par item avec une flèche → entre énoncé et réponse ; un tableau énoncé / corrigé ; ou deux fichiers séparés — le cahier et le corrigé — choisis ensemble et recoupés par leur numérotation."));
+  box.appendChild(el("div","note","Les PDF sont lus directement s'ils portent une couche de texte. Un scan en images ne peut pas l'être."));
   const b1=el("button","btn p w","Choisir des fichiers — texte ou PDF");
   b1.onclick=()=>inp.click();
   const b2=el("button","btn w","Coller un texte");
   b2.style.marginTop="8px";
-  b2.onclick=()=>{
-    const t=prompt("Collez ici vos exercices :");
-    if(t) { persoPending=litExercices(t); render(); }
-  };
+  b2.onclick=()=>{ const t=prompt("Collez ici vos exercices :");
+    if(t){ persoPending=litExercices(t).filter(x=>x.a); persoMuets=[]; render(); } };
+
   inp.onchange=async()=>{
     const fs=[...inp.files]; if(!fs.length) return;
-    /* Un manuel découpé en plusieurs fichiers : on les prend dans l'ordre de
-       leur nom, et la leçon se poursuit d'un fichier au suivant quand le
-       texte ne la rappelle pas. Le nom du fichier sert de second recours. */
     fs.sort((a,b)=>natCmp(a.name,b.name));
-    let tout=[], suite=0;
-    const muets=[];
+    const muets=[]; let groupes=[], suite=0;
     for(const f of fs){
       let txt;
       if(/\.pdf$/i.test(f.name)){
-        const av=el("div","note"); av.textContent="Lecture de "+f.name+"…";
-        box.appendChild(av);
-        try{
-          txt=await texteDuPDF(f,(n,tot)=>{ av.textContent="Lecture de "+f.name+" — page "+n+" sur "+tot; });
-        }catch(e){ txt=""; }
-        av.remove();
+        const avis=el("div","note"); avis.textContent="Lecture de "+f.name+"…";
+        box.appendChild(avis);
+        try{ txt=await texteDuPDF(f,(n,tot)=>{ avis.textContent="Lecture de "+f.name+" — page "+n+" sur "+tot; }); }
+        catch(e){ txt=""; }
+        avis.remove();
         if(!txt||txt.length<20){ muets.push(f.name); continue; }
       }else txt=await f.text();
       const lu=litExercices(txt, leconDuNom(f.name)||suite);
-      if(lu.length){ const der=lu[lu.length-1].l; if(der) suite=der; }
-      tout.push({nom:f.name,items:lu});
+      if(lu.length){ const d=lu[lu.length-1].l; if(d) suite=d; }
+      groupes.push({nom:f.name,items:lu});
     }
-    const pleins=tout.filter(x=>x.items.some(i=>i.a));
-    const vides=tout.filter(x=>!x.items.some(i=>i.a));
-    let res=[];
-    if(pleins.length&&vides.length){
-      /* le fichier complet sert de corrigé aux énoncés nus */
-      const rep=pleins.flatMap(x=>x.items);
-      const en=vides.flatMap(x=>x.items);
-      res=apparie(en,rep).concat(rep.filter(r=>r.a));
-    }else if(tout.length===2&&!pleins.length){
-      res=apparie(tout[0].items,tout[1].items);
-    }else{
-      res=tout.flatMap(x=>x.items).filter(x=>x.a);
-    }
-    persoPending=res; persoMuets=muets; render();
+    /* un fichier sans aucune réponse est un cahier : on le recoupe */
+    const pleins=groupes.filter(g=>g.items.some(i=>i.a));
+    const vides=groupes.filter(g=>!g.items.some(i=>i.a));
+    let res;
+    if(pleins.length&&vides.length)
+      res=apparie(vides.flatMap(g=>g.items),pleins.flatMap(g=>g.items))
+          .concat(pleins.flatMap(g=>g.items).filter(x=>x.a));
+    else if(groupes.length===2&&!pleins.length)
+      res=apparie(groupes[0].items,groupes[1].items);
+    else res=groupes.flatMap(g=>g.items).filter(x=>x.a);
+    /* on écarte les doublons exacts */
+    const vus=new Set();
+    persoPending=res.filter(x=>{ const k=x.l+"|"+x.q+"|"+x.a;
+      if(vus.has(k)) return false; vus.add(k); return true; });
+    persoMuets=muets; render();
   };
   box.appendChild(b1); box.appendChild(b2); box.appendChild(inp);
   m.appendChild(box);
 
-  /* ---- vérification avant enregistrement ---- */
   if(persoMuets&&persoMuets.length){
-    const w=el("div","card");
-    w.style.borderColor="var(--shu)";
+    const w=el("div","card"); w.style.borderColor="var(--shu)";
     w.innerHTML=`<div class="sec">Illisible : ${persoMuets.map(esc).join(", ")}</div>
-      <div class="note">Ce PDF ne contient pas de couche de texte exploitable — c'est
-      le cas des scans en images, et de certains PDF dont l'encodage m'échappe.
-      <br><br><b>La solution la plus simple :</b> ouvrez-le dans votre lecteur de PDF
-      et choisissez « Exporter en texte », ou copiez le texte et servez-vous du bouton
-      « Coller un texte ». Le fichier obtenu, lui, sera lu sans difficulté.</div>`;
+      <div class="note">Ce PDF ne porte pas de couche de texte exploitable — c'est
+      le cas des scans en images. Exportez-le en texte depuis votre lecteur, ou
+      servez-vous du bouton « Coller un texte ».</div>`;
     m.appendChild(w);
   }
+
+  /* ---- vérification avant enregistrement ---- */
   if(persoPending){
     const P=persoPending;
     const c=el("div","card");
     c.appendChild(el("h3",null,P.length+" item"+(P.length>1?"s":"")+" reconnu"+(P.length>1?"s":"")));
     if(!P.length){
-      c.appendChild(el("div","note","Aucune ligne exploitable. Vérifiez que chaque item comporte une flèche → entre l'énoncé et la réponse."));
+      c.appendChild(el("div","note","Aucune ligne exploitable. Vérifiez que chaque item comporte un énoncé et une réponse."));
     }else{
       const sansL=P.filter(x=>!x.l).length;
-      if(sansL) c.appendChild(el("div","note",sansL+" item"+(sansL>1?"s":"")+" sans leçon repérée : ils seront rangés dans la leçon "+S.ch+"."));
-      /* le détail par leçon : c'est là qu'un découpage mal reconnu se voit */
+      if(sansL) c.appendChild(el("div","note",sansL+" item"+(sansL>1?"s":"")+" sans leçon repérée : ils iront dans la leçon "+S.ch+"."));
       const parL={}; P.forEach(x=>{ const k=x.l||S.ch; parL[k]=(parL[k]||0)+1; });
       const cles=Object.keys(parL).map(Number).sort((a,b)=>a-b);
-      c.appendChild(el("div","note","Répartition : "+
-        cles.map(k=>"leçon "+k+" — "+parL[k]).join(" · ")));
+      c.appendChild(el("div","note","Répartition : "+cles.map(k=>"leçon "+k+" — "+parL[k]).join(" · ")));
       const g=el("div");
       P.slice(0,6).forEach(x=>{
         const d=el("div","ex");
@@ -2691,9 +2656,10 @@ VIEWS.perso=m=>{
     if(P.length){
       const ok=el("button","btn p","Enregistrer sur cet appareil");
       ok.onclick=async()=>{
+        const t0=Date.now().toString(36);
         for(let i=0;i<P.length;i++){
           const x=P[i];
-          await pPut({id:"e"+Date.now().toString(36)+"-"+i, l:x.l||S.ch, q:x.q, a:x.a, s:x.s||"", ecoute:x.ecoute?1:0});
+          await pPut({id:"e"+t0+"-"+i,l:x.l||S.ch,q:x.q,a:x.a,s:x.s||"",ecoute:x.ecoute?1:0});
         }
         persoPending=null; persoMuets=[]; persoCache=null; render();
         toast(P.length+" items enregistrés");
@@ -2726,22 +2692,21 @@ VIEWS.perso=m=>{
       b3.onclick=()=>{ persoLec=(persoLec===l?0:l); render(); };
       g.appendChild(b3);
     });
-    c.appendChild(g);
-    list.appendChild(c);
+    c.appendChild(g); list.appendChild(c);
 
     if(persoLec&&parL[persoLec]){
       const items=parL[persoLec];
       const d=el("div","card");
       d.appendChild(el("div","sec","Leçon "+persoLec+" · "+items.length+" items"));
       const cc=el("div","ctrl"); cc.style.marginTop="10px";
-      const go=el("button","btn p","S'exercer sur cette leçon");
-      go.onclick=()=>{
-        const qs=shuffle(items.map((x,i)=>({
+      const bJouer=el("button","btn p","S'exercer sur cette leçon");
+      bJouer.onclick=()=>{
+        const qs=shuffle(items.map(x=>({
           type:"perso",key:"P:"+x.id,l:x.l,head:"Mon matériel · leçon "+x.l,
           q:x.q,sub:x.s||"Complétez d'après votre énoncé.",a:x.a,o:[],
           ecoute:x.ecoute?x.l:0})));
         sess={qs:qs.slice(0,SIZE),i:0,res:[],mode:"perso",ans:[],shown:{},typed:{}};
-        go2("shugyo");
+        go("shugyo");
       };
       const sup=el("button","btn","Retirer cette leçon");
       sup.onclick=async()=>{
@@ -2749,8 +2714,7 @@ VIEWS.perso=m=>{
         for(const x of items) await pDel(x.id);
         persoCache=null; persoLec=0; render();
       };
-      cc.appendChild(go); cc.appendChild(sup);
-      d.appendChild(cc);
+      cc.appendChild(bJouer); cc.appendChild(sup); d.appendChild(cc);
       items.slice(0,8).forEach(x=>{
         const e=el("div","ex");
         e.innerHTML=`<div class="j">${jpw(x.q)}</div><div class="f">${jpw(x.a)}</div>`;
@@ -2769,7 +2733,6 @@ VIEWS.perso=m=>{
     tout.appendChild(bt); list.appendChild(tout);
   })();
 };
-const go2=v=>go(v);
 
 /* ================= 音読 — la répétition à voix haute ================= */
 /* Une consigne en français, un temps pour répondre, la correction en japonais,
@@ -7670,30 +7633,25 @@ VIEWS.shugyo=m=>{
       zc.appendChild(bs);
     }
   }
-  /* Un exercice d'écoute : on donne accès aux pistes de la leçon, celles que
-     vous avez importées. L'application ne sait pas laquelle correspond à quel
-     item — vous choisissez, et vous pouvez réécouter autant qu'il faut. */
+  /* Un item d'écoute : on donne accès aux pistes de la leçon, celles que vous
+     avez installées. L'application ignore laquelle correspond — vous choisissez. */
   if(q.ecoute){
-    const zeco=el("div","card");
-    zeco.appendChild(el("div","sec","Écoutez la piste de la leçon "+q.ecoute));
+    const z=el("div","card");
+    z.appendChild(el("div","sec","Écoutez la leçon "+q.ecoute));
     (async()=>{
       if(!audCache) audCache=await aAll();
       const pistes=audCache.filter(t=>t.l===q.ecoute);
-      if(!pistes.length){
-        zeco.appendChild(el("div","note","Aucune piste importée pour cette leçon. Rendez-vous dans 音声 pour les installer."));
-        return;
-      }
+      if(!pistes.length){ z.appendChild(el("div","note","Aucune piste importée pour cette leçon. Rendez-vous dans 音声.")); return; }
       pistes.forEach(t=>{
-        const li=el("div","word");
-        li.innerHTML=`<div class="l"><div class="k" style="font-size:0.85rem">${esc(t.name)}</div></div>`;
+        const w=el("div");
+        w.innerHTML=`<div class="f" style="margin-top:6px">${esc(t.name)}</div>`;
         const au=document.createElement("audio");
-        au.controls=true; au.preload="none"; au.style.cssText="width:100%;margin-top:6px";
+        au.controls=true; au.preload="none"; au.style.cssText="width:100%;margin-top:4px";
         au.src=URL.createObjectURL(t.blob);
-        const w=el("div"); w.appendChild(li); w.appendChild(au);
-        zeco.appendChild(w);
+        w.appendChild(au); z.appendChild(w);
       });
     })();
-    m.appendChild(zeco);
+    m.appendChild(z);
   }
   if(q.hint){
     const h=box.querySelector(".qhint");
@@ -8162,7 +8120,7 @@ async function askPersist(){
 })();
 </script>
 <!-- Lecture des PDF : pdf.js, Mozilla, licence Apache 2.0.
-     Inerte tant qu'aucun PDF n'est ouvert : le texte n'est évalué qu'à ce moment. -->
+     Inerte tant qu'aucun PDF n'est ouvert. -->
 <script type="text/plain" id="pdfjs">/**
  * @licstart The following is the entire license notice for the
  * JavaScript code in this page
