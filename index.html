@@ -2590,22 +2590,52 @@ VIEWS.perso=m=>{
   m.appendChild(av);
 
   const inp=document.createElement("input");
-  inp.type="file"; inp.accept=".txt,.md,.csv,.pdf,text/plain,application/pdf";
+  inp.type="file";
+  inp.accept=".txt,.md,.csv,.pdf,.zip,text/plain,application/pdf,application/zip";
   inp.multiple=true; inp.style.display="none";
+  /* Sélectionner un dossier entier : plus simple que de cocher trente fichiers.
+     Pris en charge sur ordinateur, et sur une partie des téléphones. */
+  const inpDir=document.createElement("input");
+  inpDir.type="file"; inpDir.multiple=true; inpDir.style.display="none";
+  try{ inpDir.webkitdirectory=true; inpDir.directory=true; }catch(e){}
 
   const box=el("div","card");
   box.appendChild(el("div","sec","Charger"));
   box.appendChild(el("div","note","Trois dispositions sont reconnues : une ligne par item avec une flèche → entre énoncé et réponse ; un tableau énoncé / corrigé ; ou deux fichiers séparés — le cahier et le corrigé — choisis ensemble et recoupés par leur numérotation."));
+  box.appendChild(el("div","note","Pour éviter de les cocher un par un : rassemblez vos fichiers dans une <b>archive .zip</b> et chargez-la telle quelle, ou choisissez le <b>dossier entier</b>. L'application ouvre l'archive et lit chaque fichier."));
   box.appendChild(el("div","note","Les PDF sont lus directement s'ils portent une couche de texte. Un scan en images ne peut pas l'être."));
-  const b1=el("button","btn p w","Choisir des fichiers — texte ou PDF");
+  const b1=el("button","btn p w","Choisir des fichiers — texte, PDF ou archive .zip");
   b1.onclick=()=>inp.click();
+  const bDir=el("button","btn w","Choisir un dossier entier");
+  bDir.style.marginTop="8px";
+  bDir.onclick=()=>inpDir.click();
   const b2=el("button","btn w","Coller un texte");
   b2.style.marginTop="8px";
   b2.onclick=()=>{ const t=prompt("Collez ici vos exercices :");
     if(t){ persoPending=litExercices(t).filter(x=>x.a); persoMuets=[]; render(); } };
 
-  inp.onchange=async()=>{
-    const fs=[...inp.files]; if(!fs.length) return;
+  const traite=async(depart)=>{
+    let fs=[...depart]; if(!fs.length) return;
+    /* une archive est ouverte sur place : rien à décompresser soi-même */
+    const arch=fs.filter(f=>/\.zip$/i.test(f.name));
+    if(arch.length){
+      const avis=el("div","note"); avis.textContent="Ouverture de l'archive…";
+      box.appendChild(avis);
+      try{
+        FILTRE_ARCHIVE=/\.(txt|md|csv|pdf)$/i;
+        let tout=[];
+        for(const a of arch){
+          const t=await litArchive(a,n=>{ avis.textContent="Ouverture de l'archive… "+n+" fichiers"; });
+          tout=tout.concat(t);
+        }
+        fs=tout.concat(fs.filter(f=>!/\.zip$/i.test(f.name)));
+      }catch(e){
+        avis.textContent="Archive illisible : "+e.message; FILTRE_ARCHIVE=null; return;
+      }
+      FILTRE_ARCHIVE=null; avis.remove();
+    }
+    fs=fs.filter(f=>/\.(txt|md|csv|pdf)$/i.test(f.name));
+    if(!fs.length){ toast("Aucun fichier exploitable"); return; }
     fs.sort((a,b)=>natCmp(a.name,b.name));
     const muets=[]; let groupes=[], suite=0;
     for(const f of fs){
@@ -2638,7 +2668,10 @@ VIEWS.perso=m=>{
       if(vus.has(k)) return false; vus.add(k); return true; });
     persoMuets=muets; render();
   };
-  box.appendChild(b1); box.appendChild(b2); box.appendChild(inp);
+  inp.onchange=()=>traite(inp.files);
+  inpDir.onchange=()=>traite(inpDir.files);
+  box.appendChild(b1); box.appendChild(bDir); box.appendChild(b2);
+  box.appendChild(inp); box.appendChild(inpDir);
   m.appendChild(box);
 
   if(persoMuets&&persoMuets.length){
@@ -7063,6 +7096,7 @@ let audLes=0, audCache=null, audPending=null;
    directement l'archive de l'éditeur, sans que l'utilisateur ait à la
    décompresser lui-même. Rien n'est envoyé nulle part, tout se passe sur
    l'appareil. */
+let FILTRE_ARCHIVE=null;
 async function litArchive(file, avance){
   const buf=await file.arrayBuffer();
   const dv=new DataView(buf), u8=new Uint8Array(buf);
@@ -7083,7 +7117,7 @@ async function litArchive(file, avance){
     const debut=dv.getUint32(p+42,true);
     const nom=new TextDecoder("utf-8").decode(u8.subarray(p+46,p+46+nLen));
     p+=46+nLen+eLen+cLen;
-    if(!/\.(mp3|m4a|aac|wav|ogg)$/i.test(nom)) continue;
+    if(!(FILTRE_ARCHIVE||/\.(mp3|m4a|aac|wav|ogg)$/i).test(nom)) continue;
     /* l'en-tête local donne la position réelle des données */
     const nL=dv.getUint16(debut+26,true), eL=dv.getUint16(debut+28,true);
     const d0=debut+30+nL+eL;
@@ -7097,7 +7131,7 @@ async function litArchive(file, avance){
     }else continue;
     /* on garde le chemin : « L13/02.mp3 » dit la leçon, « 02.mp3 » ne dit rien */
     const propre=nom.replace(/^\.?\//,"").replace(/\//g," ");
-    out.push(new File([donnees],propre,{type:"audio/mpeg"}));
+    out.push(new File([donnees],propre,{type:/\.pdf$/i.test(propre)?"application/pdf":"text/plain"}));
     if(avance) avance(out.length);
   }
   if(!out.length) throw new Error("Aucune piste audio dans cette archive.");
