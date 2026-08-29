@@ -6793,6 +6793,10 @@ VIEWS.audio=m=>{
     audPending={files:files.slice().sort((a,b)=>natCmp(a.name,b.name)),map:g.map,how:g.how};
     render();
   };
+  /* Le bouton d'import n'a plus lieu d'être si la leçon est déjà pourvue :
+     on ne le montre qu'en son absence, et l'on offre plus bas de quoi corriger. */
+  /* L'inventaire arrive après le rendu : on pose le bouton, puis on le retire
+     si la leçon s'avère déjà pourvue. */
   box.appendChild(btn); box.appendChild(inp);
   m.appendChild(box);
 
@@ -6847,6 +6851,7 @@ VIEWS.audio=m=>{
   (async()=>{
     if(!audCache) audCache=await aAll();
     const mine=audCache.filter(t=>t.l===audLes).sort((a,b)=>a.name.localeCompare(b.name));
+    if(mine.length&&btn.parentNode) btn.remove();
     list.innerHTML="";
     if(!mine.length){
       list.appendChild(el("div","empty","<b>音</b>Aucun fichier importé pour cette leçon."));
@@ -6868,6 +6873,47 @@ VIEWS.audio=m=>{
       list.appendChild(c);
     }
     const tot=audCache.length;
+    if(mine.length){
+      /* Déplacer d'un bloc : c'est l'erreur la plus courante, tout un lot posé
+         une leçon trop loin. Le fichier par fichier reste possible juste au-dessus. */
+      const cor=el("div","card");
+      cor.appendChild(el("div","sec","Corriger"));
+      cor.appendChild(el("div","note","Ces pistes ne sont pas à leur place ? Déplacez-les d'un bloc vers la leçon voisine, ou reprenez l'import depuis le début."));
+      const cc2=el("div","ctrl"); cc2.style.marginTop="10px";
+      [["◀ Vers la leçon "+Math.max(1,audLes-1),-1],["Vers la leçon "+Math.min(50,audLes+1)+" ▶",1]].forEach(([lab,d])=>{
+        const b2=el("button","btn",lab);
+        b2.disabled=(audLes+d<1||audLes+d>50);
+        b2.onclick=async()=>{
+          b2.disabled=true;
+          const cible=audLes+d;
+          for(const t of mine){
+            await aDel(t.id);
+            await aPut({id:cible+"|"+t.name, l:cible, name:t.name, blob:t.blob});
+          }
+          audCache=null; audLes=cible; render();
+          toast(mine.length+" piste"+(mine.length>1?"s":"")+" déplacée"+(mine.length>1?"s":"")+" vers la leçon "+cible);
+        };
+        cc2.appendChild(b2);
+      });
+      cor.appendChild(cc2);
+      const cc3=el("div","ctrl"); cc3.style.marginTop="8px";
+      const bR=el("button","btn","Retirer les pistes de cette leçon");
+      bR.onclick=async()=>{
+        if(!confirm("Retirer les "+mine.length+" pistes de la leçon "+audLes+" ?")) return;
+        for(const t of mine) await aDel(t.id);
+        audCache=null; render();
+      };
+      cc3.appendChild(bR);
+      const bT=el("button","btn","Tout reprendre");
+      bT.onclick=async()=>{
+        if(!confirm("Retirer les "+tot+" fichiers audio de cet appareil et recommencer ?")) return;
+        for(const t of audCache) await aDel(t.id);
+        audCache=null; audPending=null; render();
+      };
+      cc3.appendChild(bT);
+      cor.appendChild(cc3);
+      list.appendChild(cor);
+    }
     if(tot) list.appendChild(el("div","note",`${tot} fichier${tot>1?"s":""} au total sur cet appareil. Ils ne sont ni envoyés ni partagés.`));
   })();
 };
