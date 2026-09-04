@@ -1063,6 +1063,33 @@ function forms(w){
   if(kj&&/ます$/.test(kj)) f.kanji=Object.assign(allForms(kj,g,true),{ます:kj});
   return f;
 }
+
+/* Verbes : le libellé technique du groupe, pour l'apprentissage des formes.
+   v1 = 五段, v2 = 一段, v3 = irréguliers する et くる. */
+const VGRP={v1:{ja:"五段",fr:"godan",note:"La finale du dictionnaire varie selon la consonne (‑く, ‑す, ‑む, ‑ぐ, ‑ぶ, ‑ぬ, ‑つ, ‑る, ‑う). Ce sont les verbes à radical le plus mouvant, ceux dont la て forme demande le plus d'attention."},
+             v2:{ja:"一段",fr:"ichidan",note:"Le verbe se termine toujours par ‑る après une syllabe en い ou en え. Le radical ne change pas : on retire る et on ajoute la terminaison voulue."},
+             v3:{ja:"不規則",fr:"irrégulier",note:"Deux verbes seulement : する (et ses composés en ~します) et くる. Leurs formes sont à apprendre par cœur."}};
+
+/* Petit encadré résumé pour une entrée verbale du manuel :
+   forme du dictionnaire, groupe, et trois formes de base pour amorcer le travail. */
+function verbeResume(w){
+  const f=forms(w); if(!f) return null;
+  const gi=VGRP[w.c]; if(!gi) return null;
+  const pick=k=>((f.kanji&&f.kanji[k])||f[k]);
+  const c=el("div","card");
+  c.style.borderColor="var(--ai)";
+  c.innerHTML=`<h3>Formes du verbe <span class="tag" style="border-color:var(--ai);color:var(--ai)">${gi.ja} · ${gi.fr}</span></h3>`;
+  const g=el("div","conj");
+  const add=(lab,val)=>{ g.innerHTML+=`<span>${lab}</span><b>${jp(val)}</b>`; };
+  add("辞書 dictionnaire", pick("辞書"));
+  add("ない négatif", pick("ない"));
+  add("て forme て", pick("て"));
+  add("た passé", pick("た"));
+  c.appendChild(g);
+  c.appendChild(el("div","note",gi.note));
+  return c;
+}
+
 /* tableau affichable : libellé français, valeur, leçon d'apparition */
 const VSPEC=[
  ["ます — présent poli","ます",4],["ません — négatif poli","ません",4],
@@ -3985,6 +4012,7 @@ function wordSheet(t){
       ${info.l>0?`<span class="tag" style="border-color:var(--take);color:var(--take)">leçon ${info.l}</span>`:""}
       ${info.jm?'<span class="tag">hors manuel</span>':""}</div>`
      :'<div class="sheetfr" style="color:var(--mut)">Mot non répertorié — voyez le dictionnaire étendu.</div>'}
+    <div id="shVerb"></div>
     <div id="shAcc"></div>
     <div id="shAnt"></div>
     ${comp?`<div class="sec" style="margin:14px 0 4px">Composition — touchez un kanji pour son tracé</div><div class="comp">${comp}</div>`:""}
@@ -3998,6 +4026,10 @@ function wordSheet(t){
   $("#shDico",back).onclick=()=>{ close(); jq=t; go("jmdict"); };
   const wA=words(50).find(x=>x.k===t||x.j===t)||(info&&info.k?{k:info.k,j:info.j}:null);
   if(wA){ const ab=accentBloc(wA); if(ab) $("#shAcc",back).replaceWith(ab); }
+  const wV=(wA&&wA.c)?wA:(info?words(50).find(x=>x.k===info.k||x.j===info.j):null);
+  if(wV&&["v1","v2","v3"].includes(wV.c)){
+    const vb=verbeResume(wV); if(vb) $("#shVerb",back).replaceWith(vb);
+  }
   const ants=antonymesDe(wA?(wA.k||t):t);
   if(ants.length){
     const zone=el("div","antbloc");
@@ -5959,6 +5991,28 @@ VIEWS.trace=m=>{
     });
     m.appendChild(c);
   }
+  /* Verbes du manuel construits sur ce kanji : forme du dictionnaire
+     et groupe, sans avoir à ouvrir chaque fiche. */
+  const kVerbes=words(50).filter(w=>["v1","v2","v3"].includes(w.c)&&w.j&&w.j.indexOf(k.c)>=0);
+  if(kVerbes.length){
+    const c=el("div","card");
+    c.style.borderColor="var(--ai)";
+    c.appendChild(el("h3",null,"Verbes formés sur ce kanji"));
+    c.appendChild(el("div","note","La forme du dictionnaire — celle qui sert d'entrée dans les livres — et le groupe qui commande la conjugaison."));
+    kVerbes.forEach(w=>{
+      const f=forms(w); if(!f) return;
+      const gi=VGRP[w.c];
+      const dicK=(f.kanji&&f.kanji.辞書)||f.辞書;
+      const dicH=f.辞書;
+      const d=el("div","ex");
+      d.innerHTML=`<div class="j">${motCliquable(dicK,dicH)} <span class="tag" style="border-color:var(--ai);color:var(--ai)">${gi.ja} · ${gi.fr}</span>${w.l?` <span class="tag">L${w.l}</span>`:""}</div>
+        <div class="f">${esc(w.f)}</div>`;
+      d.onclick=e=>{ if(!e.target.closest(".kj")&&!e.target.closest(".wd")) say(dicK); };
+      c.appendChild(d);
+    });
+    m.appendChild(c);
+  }
+
   if(k.rad||(k.cp&&k.cp.length)){
     const c=el("div","card");
     c.appendChild(el("h3",null,"Composition"));
