@@ -7104,7 +7104,11 @@ async function aideAppel(key,msgs,onChunk){
   const body={
     contents: envoi.map(m=>({role:m.role, parts:m.parts})),
     systemInstruction:{parts:[{text:aideSysteme()}]},
-    generationConfig:{temperature:0.4}
+    /* Le thinking est activé par défaut sur Gemini 3.x. Sur le quota gratuit,
+       le modèle peut brûler tout son budget en raisonnement sans émettre
+       le moindre token de réponse. On le coupe : pour du décodage de page
+       la réflexion ouverte n'apporte rien. */
+    generationConfig:{temperature:0.4, thinkingConfig:{thinkingBudget:0}}
   };
   const res=await fetch(AIDE_URL(key),{
     method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)
@@ -7115,7 +7119,7 @@ async function aideAppel(key,msgs,onChunk){
     throw new Error(msg);
   }
   const reader=res.body.getReader(), dec=new TextDecoder();
-  let buf="";
+  let buf="", recu=false, bloc=null, fin=null;
   while(true){
     const {value,done}=await reader.read(); if(done) break;
     buf+=dec.decode(value,{stream:true});
@@ -7127,10 +7131,23 @@ async function aideAppel(key,msgs,onChunk){
       if(!data||data==="[DONE]") continue;
       try{
         const j=JSON.parse(data);
-        const t=j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts;
-        if(t) t.forEach(x=>{ if(x.text) onChunk(x.text); });
+        if(j.promptFeedback&&j.promptFeedback.blockReason) bloc=j.promptFeedback.blockReason;
+        const c=j.candidates&&j.candidates[0];
+        if(c){
+          if(c.finishReason&&c.finishReason!=="STOP") fin=c.finishReason;
+          const t=c.content&&c.content.parts;
+          if(t) t.forEach(x=>{ if(x.text){ onChunk(x.text); recu=true; } });
+        }
       }catch(e){}
     }
+  }
+  /* Rien reçu : on lève une erreur explicite plutôt que de laisser une bulle vide. */
+  if(bloc) throw new Error("Requête bloquée par un filtre de sécurité ("+bloc+")");
+  if(!recu){
+    if(fin==="SAFETY") throw new Error("Réponse bloquée par un filtre de sécurité.");
+    if(fin==="MAX_TOKENS") throw new Error("Réponse coupée avant le premier mot (MAX_TOKENS).");
+    if(fin==="RECITATION") throw new Error("Réponse refusée : ressemblance avec du contenu protégé.");
+    throw new Error("Réponse vide de Gemini"+(fin?" ("+fin+")":"")+".");
   }
 }
 
@@ -7163,6 +7180,7 @@ function aideChampSuivi(chat){
   b.onclick=async ()=>{
     const q=ta.value.trim(); if(!q||aideBusy) return;
     aideBusy=true; b.disabled=true; b.textContent="Envoi…";
+    aideEffaceErreur();
     aideMsg.push({role:"user", parts:[{text:q}], affiche:q});
     const rep={role:"model", parts:[{text:""}]}; aideMsg.push(rep);
     box.remove(); aideRedessiner(chat);
@@ -7171,12 +7189,23 @@ function aideChampSuivi(chat){
       const key=aideKey();
       await aideAppel(key,aideMsg,ch=>{ rep.parts[0].text+=ch; bulle.innerHTML=aideRendu(rep.parts[0].text); });
     } catch(e){
-      bulle.innerHTML=`<div style="color:var(--yama)">Erreur — ${esc(e.message)}</div>`;
-      aideMsg.pop();
+      aideMsg.pop(); aideMsg.pop();
+      aideErreur(e.message);
+      aideRedessiner(chat);
     }
     aideBusy=false;
     aideChampSuivi(chat);
   };
+}
+
+function aideErreur(msg){
+  const e=document.getElementById("aideErr"); if(!e) return;
+  e.innerHTML='<div class="note" style="border-left:3px solid var(--yama);color:var(--yama);background:color-mix(in srgb,var(--yama) 8%,transparent)"><b>解析 échoué —</b> '+esc(msg)+'</div>';
+  e.style.display="block";
+}
+function aideEffaceErreur(){
+  const e=document.getElementById("aideErr"); if(!e) return;
+  e.style.display="none"; e.innerHTML="";
 }
 
 VIEWS.aide=m=>{
@@ -7251,6 +7280,7 @@ VIEWS.aide=m=>{
   bar.appendChild(go);
   m.appendChild(bar);
 
+  const erreurZone=el("div"); erreurZone.id="aideErr"; erreurZone.style.display="none"; m.appendChild(erreurZone);
   const chat=el("div"); m.appendChild(chat);
 
   inp.onchange=async ()=>{
@@ -7271,21 +7301,28 @@ VIEWS.aide=m=>{
   go.onclick=async ()=>{
     if(!aideImgB64||aideBusy) return;
     aideBusy=true; go.disabled=true; shot.disabled=true; go.textContent="Analyse en cours…";
+    aideEffaceErreur();
     const q=opt.value.trim()||"Explique-moi cette page.";
     aideMsg.push({role:"user", parts:[{text:q},{inline_data:{mime_type:"image/jpeg",data:aideImgB64}}], affiche:q+" (photo envoyée)"});
     const rep={role:"model", parts:[{text:""}]}; aideMsg.push(rep);
     aideRedessiner(chat);
     const bulle=chat.lastElementChild.querySelector(".aidebody");
+    let ok=false;
     try{
       await aideAppel(key,aideMsg,ch=>{ rep.parts[0].text+=ch; bulle.innerHTML=aideRendu(rep.parts[0].text); });
+      ok=true;
     } catch(e){
-      bulle.innerHTML=`<div style="color:var(--yama)">Erreur — ${esc(e.message)}</div>`;
-      aideMsg.pop();
+      /* On retire la tentative entière (tour utilisateur ET tour modèle vide)
+         pour que le fil reste propre et que le prochain essai ne s'empile pas
+         par-dessus. L'erreur est affichée dans la zone persistante, en haut. */
+      aideMsg.pop(); aideMsg.pop();
+      aideErreur(e.message);
+      aideRedessiner(chat);
     }
     /* la photo a été envoyée : on la sort de la mémoire ET du DOM. */
     aideImgB64=null; preview.innerHTML=""; opt.value=""; shot.textContent="📷 Nouvelle photo";
     go.disabled=true; go.textContent="解析 · Analyser"; shot.disabled=false; aideBusy=false;
-    aideChampSuivi(chat);
+    if(ok||aideMsg.some(mm=>mm.role==="model"&&mm.parts[0].text)) aideChampSuivi(chat);
   };
 
   /* Restaurer l'affichage si on revient sur l'écran. */
