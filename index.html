@@ -123,6 +123,12 @@ button.stat{font:inherit;width:100%}
 .note b{color:var(--tx)}
 /* Fiches de conjugaison : mise en page dédiée pour distinguer les règles
    de chaque groupe et rendre le tableau des cas facilement scannable. */
+.aidebulle.u{border-left:3px solid var(--mut)}
+.aidebulle.m{border-left:3px solid var(--ai)}
+.aiderole{font-size:0.7812rem;color:var(--mut);margin-bottom:6px;font-weight:600}
+.aidebody{font-size:0.9062rem;line-height:1.65}
+.aideline{margin-bottom:2px}
+.aideSuivi{background:var(--surf2)}
 .refgrp{margin-top:14px;padding-top:10px;border-top:1px dashed var(--line)}
 .refgh{font-size:0.875rem;font-weight:600;color:var(--tx);margin-bottom:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .refregle{font-size:0.8438rem;color:var(--mut);line-height:1.6;margin-bottom:8px}
@@ -2224,7 +2230,8 @@ VIEWS.home=m=>{
     ["pieges","落とし穴","Pièges, oral et culture",Object.keys(D.pieges||{}).length+" fiches hors manuel"],
     ["culture","文化","Contexte culturel",Math.min(S.ch,50)+" notes"],
     ["audio","音声","Audio du manuel","Vos fichiers, hors ligne"],
-    ["manuel","本冊","Votre manuel","Le PDF que vous possédez"]]);
+    ["manuel","本冊","Votre manuel","Le PDF que vous possédez"],
+    ["aide","解説","Aide au manuel","Photographiez une page, obtenez l'explication"]]);
   groupe("S'entraîner",[
     ["arbre","道","Le chemin","Rang "+(tstate().rang+1)+" sur "+D.rangs.length],
     ["minna","練習","Exercices",D.minna.filter(x=>x.l<=S.ch).length+" séries et plus"],
@@ -7006,6 +7013,260 @@ async function litArchive(file, avance){
   if(!out.length) throw new Error("Aucune piste audio dans cette archive.");
   return out.sort((a,b)=>natCmp(a.name,b.name));
 }
+
+
+/* ================= 解説 — Aide au manuel =================
+   L'utilisateur photographie une page de son manuel ; l'image est envoyée
+   directement à l'API Gemini avec la clé de l'utilisateur, et l'explication
+   est rendue phrase par phrase. Rien n'est stocké : ni l'image, ni la
+   conversation. La clé, elle, est bien enregistrée localement (c'est son
+   objet — un identifiant réutilisable) et n'est jamais transmise ailleurs
+   qu'à Google. */
+
+
+function aideKey(){ try{ return localStorage.getItem("michi:gem:"+(UID||"_"))||""; }catch(e){ return ""; } }
+function aideKeySet(v){ try{ localStorage.setItem("michi:gem:"+(UID||"_"),v); }catch(e){} }
+function aideKeyDel(){ try{ localStorage.removeItem("michi:gem:"+(UID||"_")); }catch(e){} }
+
+const AIDE_MODEL = "gemini-2.5-flash";
+const AIDE_URL = k => "https://generativelanguage.googleapis.com/v1beta/models/"+AIDE_MODEL+":streamGenerateContent?alt=sse&key="+encodeURIComponent(k);
+
+/* État de l'écran, purement en mémoire — perdu au rechargement. */
+let aideMsg=[], aideImgB64=null, aideBusy=false;
+
+/* Consigne système : le contexte du niveau de l'apprenant et le format
+   d'analyse attendu. Recalculée à chaque appel pour tenir compte de S.ch. */
+function aideSysteme(){
+  return `Tu es un tuteur de japonais qui aide un apprenant francophone du manuel « Minna no Nihongo I » (niveau N5 puis N4). L'utilisateur en est à la leçon ${S.ch} sur 50.
+
+On te donne une photo d'une page du manuel : dialogues, phrases-modèles, exercices, tableau de vocabulaire, ou explication grammaticale. Décode toute la page.
+
+Pour chaque phrase ou expression japonaise identifiable :
+1. Recopie-la exactement (kanji + kana, particules incluses).
+2. Donne sa lecture complète en hiragana entre parenthèses.
+3. Donne une glose littérale, mot par mot ou groupe par groupe, en séparant les segments par « | » (japonais → français).
+4. Donne une traduction française naturelle.
+5. Si un point de grammaire nouveau ou récent (dans les trois dernières leçons, autour de la leçon ${S.ch}) apparaît, signale-le en une phrase.
+6. Signale un mot de vocabulaire particulièrement utile ou piégeux si le cas se présente.
+
+Si la page est une série d'exercices : numérote-les clairement, propose une réponse ou une piste, et explique pourquoi.
+Si la page est une liste de vocabulaire ou une leçon de grammaire, adapte le format sans forcer les six points ci-dessus.
+
+Écris tout en français, mais garde le japonais en écriture d'origine — jamais de romaji. Ne devine pas ce que tu ne lis pas clairement : signale les zones floues ou tronquées.`;
+}
+
+/* Redimensionne et encode une image en JPEG base64. On plafonne à 1600 px
+   sur le grand côté : la lisibilité d'une page reste largement suffisante
+   et l'envoi est plus rapide. */
+async function aideImage(file, maxSize, quality){
+  const url=URL.createObjectURL(file);
+  try{
+    const img=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=url; });
+    const w=img.naturalWidth,h=img.naturalHeight;
+    const scale=Math.min(1,maxSize/Math.max(w,h));
+    const cw=Math.max(1,Math.round(w*scale)), ch=Math.max(1,Math.round(h*scale));
+    const cv=document.createElement("canvas"); cv.width=cw; cv.height=ch;
+    const ctx=cv.getContext("2d"); ctx.fillStyle="#fff"; ctx.fillRect(0,0,cw,ch); ctx.drawImage(img,0,0,cw,ch);
+    const dataUrl=cv.toDataURL("image/jpeg",quality);
+    return dataUrl.split(",")[1];
+  } finally { URL.revokeObjectURL(url); }
+}
+
+/* Rendu ligne à ligne d'une réponse texte. On repasse le japonais par jpw()
+   pour hériter des furigana et du clic sur les kanji ; le gras et l'italique
+   markdown sont conservés. */
+function aideRendu(txt){
+  const lignes=String(txt||"").split("\n");
+  return lignes.map(l=>{
+    if(!l.trim()) return '<div style="height:6px"></div>';
+    let inner=jpw(l);
+    /* gras et italique markdown, appliqués après jpw qui a laissé passer les
+       étoiles telles quelles (esc les échappe en &#42; ? — voir escNoStar). */
+    inner=inner.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>").replace(/(^|[^*])\*([^*\n]+)\*/g,"$1<i>$2</i>");
+    /* petits titres # */
+    if(/^#{1,3}\s/.test(l)) inner='<b style="color:var(--tx)">'+inner.replace(/^#{1,3}\s?/,"")+'</b>';
+    return '<div class="aideline">'+inner+'</div>';
+  }).join("");
+}
+
+/* Appel streaming à Gemini. onChunk reçoit chaque fragment de texte. */
+async function aideAppel(key,msgs,onChunk){
+  const body={
+    contents: msgs.map(m=>({role:m.role, parts:m.parts})),
+    systemInstruction:{parts:[{text:aideSysteme()}]},
+    generationConfig:{temperature:0.4}
+  };
+  const res=await fetch(AIDE_URL(key),{
+    method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)
+  });
+  if(!res.ok){
+    const t=await res.text().catch(()=>""); let msg="HTTP "+res.status;
+    try{ const j=JSON.parse(t); if(j.error&&j.error.message) msg=j.error.message; }catch(e){}
+    throw new Error(msg);
+  }
+  const reader=res.body.getReader(), dec=new TextDecoder();
+  let buf="";
+  while(true){
+    const {value,done}=await reader.read(); if(done) break;
+    buf+=dec.decode(value,{stream:true});
+    const parts=buf.split("\n\n"); buf=parts.pop();
+    for(const p of parts){
+      const line=p.trim();
+      if(!line.startsWith("data:")) continue;
+      const data=line.slice(5).trim();
+      if(!data||data==="[DONE]") continue;
+      try{
+        const j=JSON.parse(data);
+        const t=j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts;
+        if(t) t.forEach(x=>{ if(x.text) onChunk(x.text); });
+      }catch(e){}
+    }
+  }
+}
+
+function aideRedessiner(chat){
+  chat.innerHTML="";
+  aideMsg.forEach(mm=>{
+    const c=el("div","card aidebulle "+(mm.role==="user"?"u":"m"));
+    if(mm.role==="user"){
+      c.innerHTML=`<div class="aiderole">Vous</div><div>${esc(mm.affiche||"(photo envoyée)")}</div>`;
+    } else {
+      c.innerHTML=`<div class="aiderole" style="color:var(--ai)">解説 · Gemini</div><div class="aidebody">${aideRendu(mm.parts[0].text)}</div>`;
+    }
+    chat.appendChild(c);
+  });
+}
+
+function aideChampSuivi(chat){
+  const old=chat.querySelector(".aideSuivi"); if(old) old.remove();
+  const box=el("div","card aideSuivi");
+  const ta=document.createElement("textarea"); ta.className="search"; ta.placeholder="Question de suivi…"; ta.rows=2;
+  ta.style.resize="vertical"; ta.style.fontFamily="inherit";
+  box.appendChild(ta);
+  const row=el("div","ctrl"); row.style.marginTop="8px";
+  const b=el("button","btn p","Envoyer");
+  const cl=el("button","btn","Nouvelle photo");
+  row.appendChild(b); row.appendChild(cl); box.appendChild(row);
+  chat.appendChild(box);
+
+  cl.onclick=()=>{ aideMsg=[]; render(); };
+  b.onclick=async ()=>{
+    const q=ta.value.trim(); if(!q||aideBusy) return;
+    aideBusy=true; b.disabled=true; b.textContent="Envoi…";
+    aideMsg.push({role:"user", parts:[{text:q}], affiche:q});
+    const rep={role:"model", parts:[{text:""}]}; aideMsg.push(rep);
+    box.remove(); aideRedessiner(chat);
+    const bulle=chat.lastElementChild.querySelector(".aidebody");
+    try{
+      const key=aideKey();
+      await aideAppel(key,aideMsg,ch=>{ rep.parts[0].text+=ch; bulle.innerHTML=aideRendu(rep.parts[0].text); });
+    } catch(e){
+      bulle.innerHTML=`<div style="color:var(--yama)">Erreur — ${esc(e.message)}</div>`;
+      aideMsg.pop();
+    }
+    aideBusy=false;
+    aideChampSuivi(chat);
+  };
+}
+
+VIEWS.aide=m=>{
+  head(m,"解説","Photographiez une page, obtenez l'explication");
+  const key=aideKey();
+
+  const av=el("div","note");
+  av.style.borderLeft="3px solid var(--ai)";
+  av.innerHTML='<b>Comment ça marche —</b> Une photo de la page part directement de votre appareil vers l\'API Google Gemini, avec votre clé personnelle. Michi ne conserve ni l\'image, ni la conversation ; tout disparaît en quittant l\'écran. Seule la clé est enregistrée localement pour ne pas avoir à la re-saisir. Les <a href="https://ai.google.dev/gemini-api/terms" target="_blank" style="color:var(--ai)">conditions de Google Gemini</a> s\'appliquent aux données transmises.';
+  m.appendChild(av);
+
+  /* Écran de configuration : d'abord si la clé manque, sinon repliable. */
+  const conf=el("div","card");
+  const detail=key
+    ? `<div style="font-size:0.8125rem;color:var(--mut)">Clé enregistrée sur cet appareil. <a class="cjlink" id="aideKch">Modifier ou retirer</a>.</div>`
+    : `<h3>Clé API Gemini</h3>
+       <div style="font-size:0.8125rem;color:var(--mut);line-height:1.55">Créez une clé gratuite sur <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--ai)">aistudio.google.com/apikey</a>. Elle reste sur votre appareil.</div>`;
+  conf.innerHTML=detail;
+  if(!key){
+    const ki=document.createElement("input"); ki.type="password"; ki.className="search"; ki.placeholder="Collez votre clé ici"; ki.style.marginTop="8px";
+    conf.appendChild(ki);
+    const kb=el("button","btn p","Enregistrer"); kb.style.marginTop="8px";
+    kb.onclick=()=>{ const v=ki.value.trim(); if(!v) return; aideKeySet(v); render(); };
+    conf.appendChild(kb);
+  }
+  m.appendChild(conf);
+  if(key){
+    const lk=$("#aideKch",conf);
+    if(lk) lk.onclick=()=>{
+      const ki=document.createElement("input"); ki.type="password"; ki.className="search"; ki.placeholder="Nouvelle clé (vide pour retirer)"; ki.style.marginTop="8px";
+      conf.appendChild(ki);
+      const row=el("div","ctrl"); row.style.marginTop="8px";
+      const kb=el("button","btn p","Enregistrer");
+      const kd=el("button","btn","Retirer la clé");
+      kb.onclick=()=>{ const v=ki.value.trim(); if(v){ aideKeySet(v); } render(); };
+      kd.onclick=()=>{ aideKeyDel(); aideMsg=[]; render(); };
+      row.appendChild(kb); row.appendChild(kd);
+      conf.appendChild(row);
+      lk.style.display="none";
+    };
+  }
+
+  if(!key) return;
+
+  /* Sélection d'une image + question éventuelle. */
+  const bar=el("div","card");
+  bar.appendChild(el("h3",null,"Une page du manuel"));
+  const inp=document.createElement("input"); inp.type="file"; inp.accept="image/*"; inp.capture="environment"; inp.style.display="none";
+  const shot=el("button","btn w p","📷 Prendre ou choisir une photo");
+  shot.onclick=()=>inp.click();
+  bar.appendChild(shot); bar.appendChild(inp);
+  const preview=el("div"); preview.style.marginTop="10px"; bar.appendChild(preview);
+  const opt=document.createElement("textarea"); opt.className="search"; opt.rows=2; opt.style.marginTop="10px"; opt.style.resize="vertical"; opt.style.fontFamily="inherit";
+  opt.placeholder="Optionnel : que voulez-vous savoir en particulier ? (« traduis chaque phrase », « corrige mes réponses »…)";
+  bar.appendChild(opt);
+  const go=el("button","btn w p","解析 · Analyser"); go.style.marginTop="10px"; go.disabled=true;
+  bar.appendChild(go);
+  m.appendChild(bar);
+
+  const chat=el("div"); m.appendChild(chat);
+
+  inp.onchange=async ()=>{
+    const f=inp.files&&inp.files[0]; if(!f) return;
+    shot.textContent="Traitement…"; shot.disabled=true;
+    try{
+      aideImgB64=await aideImage(f,1600,0.85);
+      preview.innerHTML=`<img src="data:image/jpeg;base64,${aideImgB64}" style="max-width:100%;border-radius:8px;border:1px solid var(--line);display:block">`;
+      go.disabled=false;
+      shot.textContent="📷 Changer de photo";
+    } catch(e){
+      preview.innerHTML='<div style="color:var(--yama)">Impossible de lire l\'image.</div>';
+      shot.textContent="📷 Réessayer";
+    }
+    shot.disabled=false;
+  };
+
+  go.onclick=async ()=>{
+    if(!aideImgB64||aideBusy) return;
+    aideBusy=true; go.disabled=true; shot.disabled=true; go.textContent="Analyse en cours…";
+    const q=opt.value.trim()||"Explique-moi cette page.";
+    aideMsg.push({role:"user", parts:[{text:q},{inline_data:{mime_type:"image/jpeg",data:aideImgB64}}], affiche:q+" (photo envoyée)"});
+    const rep={role:"model", parts:[{text:""}]}; aideMsg.push(rep);
+    aideRedessiner(chat);
+    const bulle=chat.lastElementChild.querySelector(".aidebody");
+    try{
+      await aideAppel(key,aideMsg,ch=>{ rep.parts[0].text+=ch; bulle.innerHTML=aideRendu(rep.parts[0].text); });
+    } catch(e){
+      bulle.innerHTML=`<div style="color:var(--yama)">Erreur — ${esc(e.message)}</div>`;
+      aideMsg.pop();
+    }
+    /* la photo a été envoyée : on la sort de la mémoire ET du DOM. */
+    aideImgB64=null; preview.innerHTML=""; opt.value=""; shot.textContent="📷 Nouvelle photo";
+    go.disabled=true; go.textContent="解析 · Analyser"; shot.disabled=false; aideBusy=false;
+    aideChampSuivi(chat);
+  };
+
+  /* Restaurer l'affichage si on revient sur l'écran. */
+  if(aideMsg.length){ aideRedessiner(chat); aideChampSuivi(chat); }
+};
+
 
 VIEWS.audio=m=>{
   head(m,"音声","L'audio officiel du manuel, sur votre appareil");
