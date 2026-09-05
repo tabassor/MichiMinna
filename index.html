@@ -7103,7 +7103,34 @@ function aideRendu(txt){
 }
 
 /* Appel streaming à Gemini. onChunk reçoit chaque fragment de texte. */
-async function aideAppel(key,msgs,onChunk){
+/* Motifs d'erreur qu'on considère temporaires : Gemini nous demande simplement
+   d'attendre. Sur le tier gratuit, les pics de charge (« high demand ») et les
+   dépassements de quota court terme sont réguliers. */
+const AIDE_RETRIABLE=/high demand|rate limit|quota|unavailable|overloaded|please try again|temporarily|try again later|resource has been exhausted|deadline exceeded/i;
+const AIDE_MAX_TENTATIVES=20;
+
+/* Fenêtre d'attente qui grandit puis plafonne à 30 s. */
+function aideAttente(n){
+  const paliers=[3000,6000,10000,15000,20000,25000,30000];
+  return paliers[Math.min(n,paliers.length-1)];
+}
+
+async function aideAppel(key,msgs,onChunk,onReprise){
+  for(let tentative=0; tentative<=AIDE_MAX_TENTATIVES; tentative++){
+    try{
+      await aideAppelUnique(key,msgs,onChunk);
+      return;
+    } catch(e){
+      const rejouable = e._status===429 || (e._status>=500&&e._status<=599) || AIDE_RETRIABLE.test(e.message||"");
+      if(!rejouable||tentative===AIDE_MAX_TENTATIVES) throw e;
+      const attente=aideAttente(tentative);
+      if(onReprise) onReprise(tentative+1, AIDE_MAX_TENTATIVES, attente, e.message);
+      await new Promise(r=>setTimeout(r,attente));
+    }
+  }
+}
+
+async function aideAppelUnique(key,msgs,onChunk){
   /* On n'envoie que les tours complets. Le dernier tour « model » est vide
      par construction — c'est la bulle qu'on remplit à réception. Gemini
      refuse un fil qui se termine sur un tour du modèle. */
@@ -7128,7 +7155,7 @@ async function aideAppel(key,msgs,onChunk){
   if(!res.ok){
     const t=await res.text().catch(()=>""); let msg="HTTP "+res.status;
     try{ const j=JSON.parse(t); if(j.error&&j.error.message) msg=j.error.message; }catch(e){}
-    throw new Error(msg);
+    const err=new Error(msg); err._status=res.status; throw err;
   }
   const j=await res.json();
   if(j.promptFeedback&&j.promptFeedback.blockReason) throw new Error("Requête bloquée par un filtre de sécurité ("+j.promptFeedback.blockReason+")");
@@ -7184,7 +7211,11 @@ function aideChampSuivi(chat){
     const bulle=chat.lastElementChild.querySelector(".aidebody");
     try{
       const key=aideKey();
-      await aideAppel(key,aideMsg,ch=>{ rep.parts[0].text+=ch; bulle.innerHTML=aideRendu(rep.parts[0].text); });
+      await aideAppel(key,aideMsg,
+        ch=>{ rep.parts[0].text+=ch; bulle.innerHTML=aideRendu(rep.parts[0].text); },
+        (n,tot,ms,motif)=>{
+          bulle.innerHTML='<div style="color:var(--mut);font-style:italic">Gemini est saturé — nouvelle tentative '+n+'/'+tot+' dans '+Math.round(ms/1000)+' s…<br><span style="font-size:0.75rem">'+esc(motif)+'</span></div>';
+        });
     } catch(e){
       aideMsg.pop(); aideMsg.pop();
       aideErreur(e.message);
@@ -7306,7 +7337,11 @@ VIEWS.aide=m=>{
     const bulle=chat.lastElementChild.querySelector(".aidebody");
     let ok=false;
     try{
-      await aideAppel(key,aideMsg,ch=>{ rep.parts[0].text+=ch; bulle.innerHTML=aideRendu(rep.parts[0].text); });
+      await aideAppel(key,aideMsg,
+        ch=>{ rep.parts[0].text+=ch; bulle.innerHTML=aideRendu(rep.parts[0].text); },
+        (n,tot,ms,motif)=>{
+          bulle.innerHTML='<div style="color:var(--mut);font-style:italic">Gemini est saturé — nouvelle tentative '+n+'/'+tot+' dans '+Math.round(ms/1000)+' s…<br><span style="font-size:0.75rem">'+esc(motif)+'</span></div>';
+        });
       ok=true;
     } catch(e){
       /* On retire la tentative entière (tour utilisateur ET tour modèle vide)
