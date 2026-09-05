@@ -7035,7 +7035,7 @@ function aideKeyDel(){ try{ localStorage.removeItem("michi:gem:"+(UID||"_")); }c
 const AIDE_MODEL_DEF = "gemini-3.6-flash";
 function aideModel(){ try{ return localStorage.getItem("michi:gem:m:"+(UID||"_"))||AIDE_MODEL_DEF; }catch(e){ return AIDE_MODEL_DEF; } }
 function aideModelSet(v){ try{ if(v&&v!==AIDE_MODEL_DEF) localStorage.setItem("michi:gem:m:"+(UID||"_"),v); else localStorage.removeItem("michi:gem:m:"+(UID||"_")); }catch(e){} }
-const AIDE_URL = k => "https://generativelanguage.googleapis.com/v1beta/models/"+aideModel()+":streamGenerateContent?alt=sse&key="+encodeURIComponent(k);
+const AIDE_URL = k => "https://generativelanguage.googleapis.com/v1beta/models/"+aideModel()+":generateContent?key="+encodeURIComponent(k);
 
 /* État de l'écran, purement en mémoire — perdu au rechargement. */
 let aideMsg=[], aideImgB64=null, aideBusy=false;
@@ -7098,7 +7098,7 @@ function aideRendu(txt){
 /* Appel streaming à Gemini. onChunk reçoit chaque fragment de texte. */
 async function aideAppel(key,msgs,onChunk){
   /* On n'envoie que les tours complets. Le dernier tour « model » est vide
-     par construction — c'est la bulle qu'on remplit par streaming. Gemini
+     par construction — c'est la bulle qu'on remplit à réception. Gemini
      refuse un fil qui se termine sur un tour du modèle. */
   const envoi=msgs.filter((m,i)=>!(m.role==="model"&&i===msgs.length-1&&(!m.parts[0]||!m.parts[0].text)));
   /* Attention aux champs de configuration :
@@ -7123,48 +7123,21 @@ async function aideAppel(key,msgs,onChunk){
     try{ const j=JSON.parse(t); if(j.error&&j.error.message) msg=j.error.message; }catch(e){}
     throw new Error(msg);
   }
-  const reader=res.body.getReader(), dec=new TextDecoder();
-  let buf="", recu=false, bloc=null, fin=null, nChunks=0, dernier=null, thoughts=false;
-  while(true){
-    const {value,done}=await reader.read(); if(done) break;
-    buf+=dec.decode(value,{stream:true});
-    const parts=buf.split("\n\n"); buf=parts.pop();
-    for(const p of parts){
-      const line=p.trim();
-      if(!line.startsWith("data:")) continue;
-      const data=line.slice(5).trim();
-      if(!data||data==="[DONE]") continue;
-      nChunks++; dernier=data;
-      try{
-        const j=JSON.parse(data);
-        if(j.promptFeedback&&j.promptFeedback.blockReason) bloc=j.promptFeedback.blockReason;
-        const c=j.candidates&&j.candidates[0];
-        if(c){
-          if(c.finishReason&&c.finishReason!=="STOP") fin=c.finishReason;
-          const t=c.content&&c.content.parts;
-          if(t) t.forEach(x=>{
-            if(x.thought) thoughts=true;
-            if(x.text){ onChunk(x.text); recu=true; }
-          });
-        }
-      }catch(e){}
-    }
-  }
-  /* Diagnostic détaillé quand rien n'a été rendu : Gemini renvoie parfois
-     un finishReason exploitable, parfois seulement du raisonnement sans texte.
-     On inclut un extrait du dernier chunk pour identifier le motif. */
-  if(bloc) throw new Error("Requête bloquée par un filtre de sécurité ("+bloc+")");
-  if(!recu){
+  const j=await res.json();
+  if(j.promptFeedback&&j.promptFeedback.blockReason) throw new Error("Requête bloquée par un filtre de sécurité ("+j.promptFeedback.blockReason+")");
+  const c=j.candidates&&j.candidates[0];
+  const fin=c&&c.finishReason;
+  const parts=c&&c.content&&c.content.parts;
+  let out="", thoughts=false;
+  if(parts) parts.forEach(x=>{ if(x.thought) thoughts=true; if(x.text) out+=x.text; });
+  if(!out){
     if(fin==="SAFETY") throw new Error("Réponse bloquée par un filtre de sécurité.");
     if(fin==="MAX_TOKENS") throw new Error("Réponse coupée avant le premier mot (MAX_TOKENS). Essayez une image plus lisible ou une question plus courte.");
     if(fin==="RECITATION") throw new Error("Réponse refusée : ressemblance avec du contenu protégé.");
-    if(thoughts) throw new Error("Le modèle a raisonné mais n'a produit aucun texte de sortie"+(fin?" ("+fin+")":"")+". Essayez un autre modèle ou re-photographiez.");
-    let m="Réponse vide";
-    if(fin) m+=" ("+fin+")";
-    if(!nChunks) m+=" — aucun chunk SSE reçu du serveur";
-    else if(dernier) m+=" — dernier chunk : "+dernier.slice(0,180)+(dernier.length>180?"…":"");
-    throw new Error(m);
+    if(thoughts) throw new Error("Le modèle a raisonné mais n'a produit aucun texte de sortie"+(fin?" ("+fin+")":"")+".");
+    throw new Error("Réponse vide"+(fin?" ("+fin+")":"")+".");
   }
+  onChunk(out);
 }
 
 function aideRedessiner(chat){
@@ -7174,7 +7147,8 @@ function aideRedessiner(chat){
     if(mm.role==="user"){
       c.innerHTML=`<div class="aiderole">Vous</div><div>${esc(mm.affiche||"(photo envoyée)")}</div>`;
     } else {
-      c.innerHTML=`<div class="aiderole" style="color:var(--ai)">解説 · Gemini</div><div class="aidebody">${aideRendu(mm.parts[0].text)}</div>`;
+      const t=mm.parts&&mm.parts[0]&&mm.parts[0].text||"";
+      c.innerHTML=`<div class="aiderole" style="color:var(--ai)">解説 · Gemini</div><div class="aidebody">${t?aideRendu(t):'<div style="color:var(--mut);font-style:italic">Analyse en cours… (jusqu\'à 30 secondes)</div>'}</div>`;
     }
     chat.appendChild(c);
   });
