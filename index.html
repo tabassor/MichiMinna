@@ -7028,8 +7028,14 @@ function aideKey(){ try{ return localStorage.getItem("michi:gem:"+(UID||"_"))||"
 function aideKeySet(v){ try{ localStorage.setItem("michi:gem:"+(UID||"_"),v); }catch(e){} }
 function aideKeyDel(){ try{ localStorage.removeItem("michi:gem:"+(UID||"_")); }catch(e){} }
 
-const AIDE_MODEL = "gemini-2.5-flash";
-const AIDE_URL = k => "https://generativelanguage.googleapis.com/v1beta/models/"+AIDE_MODEL+":streamGenerateContent?alt=sse&key="+encodeURIComponent(k);
+/* Modèle par défaut — Gemini renomme régulièrement ses modèles.
+   La valeur est modifiable dans l'écran (« Modèle utilisé, changer »)
+   et enregistrée en local par utilisateur.
+   Endpoint : v1beta streamGenerateContent, flux SSE. */
+const AIDE_MODEL_DEF = "gemini-3.6-flash";
+function aideModel(){ try{ return localStorage.getItem("michi:gem:m:"+(UID||"_"))||AIDE_MODEL_DEF; }catch(e){ return AIDE_MODEL_DEF; } }
+function aideModelSet(v){ try{ if(v&&v!==AIDE_MODEL_DEF) localStorage.setItem("michi:gem:m:"+(UID||"_"),v); else localStorage.removeItem("michi:gem:m:"+(UID||"_")); }catch(e){} }
+const AIDE_URL = k => "https://generativelanguage.googleapis.com/v1beta/models/"+aideModel()+":streamGenerateContent?alt=sse&key="+encodeURIComponent(k);
 
 /* État de l'écran, purement en mémoire — perdu au rechargement. */
 let aideMsg=[], aideImgB64=null, aideBusy=false;
@@ -7181,7 +7187,8 @@ VIEWS.aide=m=>{
   /* Écran de configuration : d'abord si la clé manque, sinon repliable. */
   const conf=el("div","card");
   const detail=key
-    ? `<div style="font-size:0.8125rem;color:var(--mut)">Clé enregistrée sur cet appareil. <a class="cjlink" id="aideKch">Modifier ou retirer</a>.</div>`
+    ? `<div style="font-size:0.8125rem;color:var(--mut)">Clé enregistrée sur cet appareil. <a class="cjlink" id="aideKch">Modifier ou retirer</a>.</div>
+       <div style="font-size:0.7812rem;color:var(--mut);margin-top:8px">Modèle utilisé : <code style="background:var(--surf2);padding:1px 6px;border-radius:4px">${esc(aideModel())}</code> <a class="cjlink" id="aideMch">changer</a></div>`
     : `<h3>Clé API Gemini</h3>
        <div style="font-size:0.8125rem;color:var(--mut);line-height:1.55">Créez une clé gratuite sur <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--ai)">aistudio.google.com/apikey</a>. Elle reste sur votre appareil.</div>`;
   conf.innerHTML=detail;
@@ -7206,6 +7213,20 @@ VIEWS.aide=m=>{
       row.appendChild(kb); row.appendChild(kd);
       conf.appendChild(row);
       lk.style.display="none";
+    };
+    const mk=$("#aideMch",conf);
+    if(mk) mk.onclick=()=>{
+      const wrap=el("div"); wrap.style.marginTop="8px";
+      const mi=document.createElement("input"); mi.type="text"; mi.className="search";
+      mi.placeholder="ex. gemini-3.6-flash · vide = défaut ("+AIDE_MODEL_DEF+")";
+      mi.value=aideModel();
+      wrap.appendChild(mi);
+      const rr=el("div","ctrl"); rr.style.marginTop="8px";
+      const mb=el("button","btn p","Enregistrer");
+      mb.onclick=()=>{ aideModelSet(mi.value.trim()); render(); };
+      rr.appendChild(mb); wrap.appendChild(rr);
+      conf.appendChild(wrap);
+      mk.style.display="none";
     };
   }
 
