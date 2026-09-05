@@ -7097,8 +7097,12 @@ function aideRendu(txt){
 
 /* Appel streaming à Gemini. onChunk reçoit chaque fragment de texte. */
 async function aideAppel(key,msgs,onChunk){
+  /* On n'envoie que les tours complets. Le dernier tour « model » est vide
+     par construction — c'est la bulle qu'on remplit par streaming. Gemini
+     refuse un fil qui se termine sur un tour du modèle. */
+  const envoi=msgs.filter((m,i)=>!(m.role==="model"&&i===msgs.length-1&&(!m.parts[0]||!m.parts[0].text)));
   const body={
-    contents: msgs.map(m=>({role:m.role, parts:m.parts})),
+    contents: envoi.map(m=>({role:m.role, parts:m.parts})),
     systemInstruction:{parts:[{text:aideSysteme()}]},
     generationConfig:{temperature:0.4}
   };
