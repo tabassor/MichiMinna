@@ -121,6 +121,24 @@ button.stat{font:inherit;width:100%}
 .appl .f{font-size:0.8125rem;color:var(--mut);margin-top:2px}
 .note{background:var(--surf2);border-radius:10px;padding:10px;font-size:0.8125rem;color:var(--mut);margin-top:10px}
 .note b{color:var(--tx)}
+/* Fiches de conjugaison : mise en page dédiée pour distinguer les règles
+   de chaque groupe et rendre le tableau des cas facilement scannable. */
+.refgrp{margin-top:14px;padding-top:10px;border-top:1px dashed var(--line)}
+.refgh{font-size:0.875rem;font-weight:600;color:var(--tx);margin-bottom:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.refregle{font-size:0.8438rem;color:var(--mut);line-height:1.6;margin-bottom:8px}
+.reftab{display:flex;flex-direction:column;gap:4px;margin:6px 0}
+.reftrow{display:grid;grid-template-columns:minmax(96px,auto) 1fr;gap:10px;align-items:baseline;font-size:0.875rem;padding:3px 0}
+.reftrans{color:var(--dim);font-family:var(--disp);font-weight:400}
+.refex{font-family:var(--disp);color:var(--tx)}
+.reflist{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.refline{font-size:0.875rem;color:var(--tx);line-height:1.55}
+.reftnote{color:var(--mut);font-size:0.7812rem;margin-left:6px}
+.refexc{background:color-mix(in srgb,var(--yama) 10%,transparent);border-left:2px solid var(--yama);padding:8px 10px;border-radius:6px;margin-top:8px}
+.refexch{font-weight:600;color:var(--yama);font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px}
+.refvar{margin-top:14px;padding-top:10px;border-top:1px dashed var(--line)}
+.refvarh{font-size:0.75rem;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px}
+.cjlink{color:var(--ai);text-decoration:none;border-bottom:1px dotted var(--ai);cursor:pointer}
+.cjlink:active{opacity:.7}
 .tag{display:inline-block;font-size:0.625rem;padding:2px 7px;border-radius:99px;border:1px solid var(--line);color:var(--dim);vertical-align:middle}
 .tag.due{border-color:var(--shu);color:var(--shu)}
 .filters{display:flex;gap:6px;overflow-x:auto;overscroll-behavior-x:contain;padding:2px 0 10px;
@@ -1080,15 +1098,227 @@ function verbeResume(w){
   c.style.borderColor="var(--ai)";
   c.innerHTML=`<h3>Formes du verbe <span class="tag" style="border-color:var(--ai);color:var(--ai)">${gi.ja} · ${gi.fr}</span></h3>`;
   const g=el("div","conj");
-  const add=(lab,val)=>{ g.innerHTML+=`<span>${lab}</span><b>${jp(val)}</b>`; };
-  add("辞書 dictionnaire", pick("辞書"));
-  add("ない négatif", pick("ない"));
-  add("て forme て", pick("て"));
-  add("た passé", pick("た"));
+  const add=(lab,key,val)=>{ g.innerHTML+=`<span><a class="cjlink" data-cj="${esc(key)}">${lab}</a></span><b>${jp(val)}</b>`; };
+  add("辞書 dictionnaire","辞書", pick("辞書"));
+  add("ない négatif","ない", pick("ない"));
+  add("て forme て","て", pick("て"));
+  add("た passé","た", pick("た"));
   c.appendChild(g);
   c.appendChild(el("div","note",gi.note));
+  /* liens vers les fiches de conjugaison */
+  g.querySelectorAll(".cjlink").forEach(a=>{
+    a.onclick=ev=>{ ev.stopPropagation(); conjSheet(a.dataset.cj); };
+  });
   return c;
 }
+
+/* ============ fiches de conjugaison ============
+   Chaque entrée décrit une forme conjuguée du japonais : à quoi elle sert,
+   et comment on la construit selon le groupe du verbe. Les entrées sont
+   accessibles depuis la vue « 要点 » (filtrage par chapitre) et depuis
+   n'importe quel tableau de conjugaison, en cliquant sur le libellé d'une
+   forme. */
+const CONJ_REFS = {
+ "ます":{ja:"ます",fr:"présent poli",lecon:4,
+   but:"La forme neutre polie, apprise en tout premier. Le manuel part toujours de la forme ~ます pour introduire un verbe, avant de passer à sa forme du dictionnaire.",
+   v1:{regle:"On retire ~ます pour obtenir la base い : par exemple 書きます → 書き. Pour la forme du dictionnaire, on remplace ensuite cette syllabe finale en い par la syllabe correspondante de la colonne う ; dans l'autre sens (dictionnaire → poli), on va de う vers い puis on ajoute ます.",
+       tab:[["う ⇄ い","会う ⇄ 会います"],["く ⇄ き","書く ⇄ 書きます"],["ぐ ⇄ ぎ","泳ぐ ⇄ 泳ぎます"],["す ⇄ し","話す ⇄ 話します"],["つ ⇄ ち","待つ ⇄ 待ちます"],["ぬ ⇄ に","死ぬ ⇄ 死にます"],["ぶ ⇄ び","遊ぶ ⇄ 遊びます"],["む ⇄ み","飲む ⇄ 飲みます"],["る ⇄ り","作る ⇄ 作ります"]]},
+   v2:{regle:"On retire る et on ajoute ます.",ex:[["食べる → 食べます"],["見る → 見ます"],["起きる → 起きます"]]},
+   v3:{ex:[["する → します"],["来る → 来ます (きます)"],["勉強する → 勉強します"]]},
+   variantes:[["ません","négatif — remplacer ます par ません"],["ました","passé — remplacer ます par ました"],["ませんでした","passé négatif — remplacer ます par ませんでした"]]},
+
+ "たい":{ja:"たい",fr:"envie de faire",lecon:13,
+   but:"Exprime le désir personnel : « je veux ~ ». Se comporte ensuite comme un adjectif en い : 食べたい, 食べたくない, 食べたかった, 食べたければ…",
+   v1:{regle:"On construit la base ~ます (colonne い) et on remplace ます par たい.",
+       tab:[["う → い+たい","会う → 会いたい"],["く → き+たい","書く → 書きたい"],["む → み+たい","飲む → 飲みたい"]]},
+   v2:{regle:"On retire る et on ajoute たい.",ex:[["食べる → 食べたい"],["見る → 見たい"]]},
+   v3:{ex:[["する → したい"],["来る → 来たい (きたい)"]]},
+   notes:["N'exprime que la volonté propre. Pour dire que quelqu'un d'autre veut, on emploie ~たがっている : 子供が食べたがっている.","La forme polie se fait en ajoutant です : 食べたいです."]},
+
+ "て":{ja:"て",fr:"forme て",lecon:14,
+   but:"La forme la plus polyvalente du japonais. Elle enchaîne les actions, forme la demande polie ~てください, et sert de base à quantité d'expressions : ~ている, ~てもいい, ~てから, ~てはいけない, ~ていく, ~てくる, ~てあげる…",
+   v1:{regle:"La terminaison de la forme du dictionnaire commande le suffixe. C'est le tableau le plus important à mémoriser : rien ne remplace le fait de l'avoir en tête pour former la て au vol.",
+       tab:[["う, つ, る → って","会って · 待って · 作って"],["む, ぶ, ぬ → んで","飲んで · 遊んで · 死んで"],["く → いて","書いて"],["ぐ → いで","泳いで"],["す → して","話して"]],
+       exc:[["行く → 行って","seule exception à la règle du く. La forme attendue 行いて n'existe pas. À retenir absolument."]]},
+   v2:{regle:"On retire る et on ajoute て.",ex:[["食べる → 食べて"],["見る → 見て"]]},
+   v3:{ex:[["する → して"],["来る → 来て (きて)"],["勉強する → 勉強して"]]}},
+
+ "ています":{ja:"ています",fr:"action en cours ou état résultant",lecon:14,
+   but:"Deux emplois principaux à ne pas confondre : soit une action en cours (« être en train de ~ »), soit un état résultant qui persiste dans le présent (« être marié », « habiter », « connaître »).",
+   v1:{regle:"Forme て + いる (poli いる → います).",ex:[["書く → 書いています"],["読む → 読んでいます"]]},
+   v2:{ex:[["食べる → 食べています"]]},
+   v3:{ex:[["する → しています"],["来る → 来ています"]]},
+   notes:["Au registre familier, い disparaît le plus souvent : 食べてる, 読んでる. À reconnaître à l'oral et dans les manga, à éviter à l'écrit soutenu.","Certains verbes, une fois passés à ~ている, décrivent un état, pas une action : 結婚しています signifie « être marié » (et non « être en train de se marier »), 住んでいます « habiter », 知っています « connaître »."]},
+
+ "ない":{ja:"ない",fr:"négatif neutre",lecon:17,
+   but:"Le négatif informel, équivalent neutre de ~ません. Se comporte ensuite comme un adjectif en い : なかった (passé), なくて (enchaînement), なければ (conditionnel).",
+   v1:{regle:"On remplace la syllabe finale de la forme du dictionnaire (colonne う) par la syllabe correspondante de la colonne あ, puis on ajoute ない. Attention : la terminaison う ne devient pas あ mais わ.",
+       tab:[["う → わ+ない","会う → 会わない"],["く → か+ない","書く → 書かない"],["ぐ → が+ない","泳ぐ → 泳がない"],["す → さ+ない","話す → 話さない"],["つ → た+ない","待つ → 待たない"],["ぬ → な+ない","死ぬ → 死なない"],["ぶ → ば+ない","遊ぶ → 遊ばない"],["む → ま+ない","飲む → 飲まない"],["る → ら+ない","作る → 作らない"]],
+       exc:[["ある → ない","exception majeure : le négatif d'ある n'est pas あらない mais ない (le mot ない lui-même — « il n'y a pas »)."]]},
+   v2:{regle:"On retire る et on ajoute ない.",ex:[["食べる → 食べない"],["見る → 見ない"]]},
+   v3:{ex:[["する → しない"],["来る → 来ない (こない)"]]},
+   variantes:[["なかった","passé négatif (L20) — remplacer ない par なかった : 食べなかった, 行かなかった, しなかった, 来なかった."]]},
+
+ "辞書":{ja:"辞書",fr:"forme du dictionnaire",lecon:18,
+   but:"La forme brute du verbe, sans marque de politesse ni de temps. C'est celle qu'on cherche dans un 辞書 japonais — d'où son nom — et le pivot depuis lequel se dérivent la plupart des autres formes.",
+   v1:{regle:"Depuis la forme ~ます, on remplace la syllabe finale (colonne い) par la syllabe correspondante de la colonne う.",
+       tab:[["い → う","会います → 会う"],["き → く","書きます → 書く"],["ぎ → ぐ","泳ぎます → 泳ぐ"],["し → す","話します → 話す"],["ち → つ","待ちます → 待つ"],["び → ぶ","遊びます → 遊ぶ"],["み → む","飲みます → 飲む"],["り → る","作ります → 作る"]]},
+   v2:{regle:"On retire ます et on ajoute る.",ex:[["食べます → 食べる"],["見ます → 見る"]]},
+   v3:{ex:[["します → する"],["来ます → 来る (くる)"]]},
+   notes:["Un verbe dont la forme du dictionnaire finit en ~いる ou ~える n'est pas forcément 一段. Sont notoirement 五段, malgré les apparences : 帰る (かえる), 走る (はしる), 切る (きる), 入る (はいる), 知る (しる), 要る (いる), しゃべる. Le groupe est une donnée du dictionnaire — l'apparence de la finale ne tranche pas seule."]},
+
+ "た":{ja:"た",fr:"passé neutre",lecon:19,
+   but:"Le passé informel. Se construit exactement comme la forme て, en remplaçant て par た et で par だ. Sert aussi de base à ~たら et ~たり.",
+   v1:{regle:"Mêmes règles d'euphonie (音便) que la forme て — c'est la même conjugaison à un caractère près.",
+       tab:[["う, つ, る → った","会った · 待った · 作った"],["む, ぶ, ぬ → んだ","飲んだ · 遊んだ · 死んだ"],["く → いた","書いた"],["ぐ → いだ","泳いだ"],["す → した","話した"]],
+       exc:[["行く → 行った","comme pour la forme て — pas 行いた."]]},
+   v2:{regle:"On retire る et on ajoute た.",ex:[["食べる → 食べた"],["見る → 見た"]]},
+   v3:{ex:[["する → した"],["来る → 来た (きた)"]]}},
+
+ "たら":{ja:"たら",fr:"si, quand (large)",lecon:25,
+   but:"Conditionnel à emploi large : « si ~ », « une fois que ~ », « quand ~ ». La construction la plus souple : elle peut porter sur un fait ponctuel, réel ou hypothétique.",
+   v1:{regle:"Passé neutre (た/だ) + ら.",ex:[["書く → 書いたら"],["飲む → 飲んだら"],["行く → 行ったら"]]},
+   v2:{ex:[["食べる → 食べたら"],["見る → 見たら"]]},
+   v3:{ex:[["する → したら"],["来る → 来たら (きたら)"]]},
+   notes:["Contrairement à ば ou と, ~たら peut décrire un fait ponctuel du passé : 家に帰ったら、誰もいなかった — « quand je suis rentré, il n'y avait personne »."]},
+
+ "可能":{ja:"可能",fr:"potentiel — pouvoir faire",lecon:27,
+   but:"« Pouvoir ~ », « être capable de ~ ». Le complément d'objet direct passe alors typiquement de を à が : パンを食べる → パンが食べられる.",
+   v1:{regle:"On remplace la syllabe finale du dictionnaire (colonne う) par la syllabe de la colonne え, puis on ajoute る.",
+       tab:[["う → え+る","会う → 会える"],["く → け+る","書く → 書ける"],["む → め+る","飲む → 飲める"],["る → れ+る","作る → 作れる"]]},
+   v2:{regle:"On retire る et on ajoute られる. Attention : cette forme est identique à celle du passif — le contexte tranche.",
+       ex:[["食べる → 食べられる"],["見る → 見られる"]],
+       notes:["En japonais familier, on entend souvent la forme brève dite ら-抜き : 食べれる, 見れる. À reconnaître à l'oral, mais à ne pas produire dans un écrit soutenu."]},
+   v3:{ex:[["する → できる","irrégulier — pas しられる ni しれる."],["来る → 来られる (こられる)"]]}},
+
+ "意向":{ja:"意向",fr:"volitif — allons ~, je vais ~",lecon:31,
+   but:"Exprime l'intention personnelle (« je vais ~ ») ou l'invitation informelle (« allons ~ »). C'est l'équivalent neutre de ~ましょう.",
+   v1:{regle:"On remplace la syllabe finale du dictionnaire (colonne う) par la syllabe de la colonne お, puis on ajoute う.",
+       tab:[["く → こ+う","書く → 書こう"],["む → も+う","飲む → 飲もう"],["う → お+う","会う → 会おう"],["る → ろ+う","作る → 作ろう"]]},
+   v2:{regle:"On retire る et on ajoute よう.",ex:[["食べる → 食べよう"],["見る → 見よう"]]},
+   v3:{ex:[["する → しよう"],["来る → 来よう (こよう)"]]}},
+
+ "命令":{ja:"命令",fr:"impératif — ordre brut",lecon:33,
+   but:"Ordre direct, très brusque. À réserver aux situations où l'autorité ou l'urgence prime : armée, avertissement, langage masculin très familier, panneaux. Dans la vie courante, on préfère ~てください.",
+   v1:{regle:"On remplace la syllabe finale du dictionnaire (colonne う) par la syllabe de la colonne え, et on n'ajoute rien.",
+       tab:[["く → け","書く → 書け"],["む → め","飲む → 飲め"],["う → え","会う → 会え"],["る → れ","作る → 作れ"]]},
+   v2:{regle:"On retire る et on ajoute ろ.",ex:[["食べる → 食べろ"],["見る → 見ろ"]]},
+   v3:{ex:[["する → しろ","(la forme classique せよ existe aussi.)"],["来る → 来い (こい)","irrégulier."]]},
+   variantes:[["禁止","Interdiction — forme du dictionnaire + な : 食べるな « ne mange pas », 行くな « n'y va pas ». Aussi brusque que l'impératif, mêmes contextes d'emploi."]]},
+
+ "ば":{ja:"ば",fr:"conditionnel ば",lecon:35,
+   but:"Conditionnel à valeur générale ou hypothétique : « si ~ ». Très employé pour les vérités générales, les règles, les proverbes, et dans les tournures figées du type ~ばよかった (« si seulement j'avais… »).",
+   v1:{regle:"On remplace la syllabe finale du dictionnaire (colonne う) par la syllabe de la colonne え, puis on ajoute ば.",
+       tab:[["く → け+ば","書く → 書けば"],["む → め+ば","飲む → 飲めば"],["う → え+ば","会う → 会えば"]]},
+   v2:{regle:"On retire る et on ajoute れば.",ex:[["食べる → 食べれば"],["見る → 見れば"]]},
+   v3:{ex:[["する → すれば"],["来る → 来れば (くれば)"]]}},
+
+ "受身":{ja:"受身",fr:"passif",lecon:37,
+   but:"« Être ~ par ~ ». Le sujet subit l'action. En japonais, le passif porte souvent une nuance de gêne ou de mal subi — c'est le passif adversatif : 雨に降られた « je me suis fait avoir par la pluie ».",
+   v1:{regle:"On remplace la syllabe finale du dictionnaire (colonne う) par la syllabe de la colonne あ, puis on ajoute れる. Comme pour la forme ない, う devient わ, pas あ.",
+       tab:[["う → わ+れる","言う → 言われる"],["く → か+れる","書く → 書かれる"],["む → ま+れる","飲む → 飲まれる"],["る → ら+れる","作る → 作られる"]]},
+   v2:{regle:"On retire る et on ajoute られる. Cette forme est identique à celle du potentiel — le contexte fait la différence.",
+       ex:[["食べる → 食べられる"],["見る → 見られる"]]},
+   v3:{ex:[["する → される"],["来る → 来られる (こられる)"]]}},
+
+ "使役":{ja:"使役",fr:"causatif — faire ou laisser faire",lecon:48,
+   but:"« Faire faire », « laisser faire » — le sujet oblige, autorise ou incite quelqu'un d'autre à agir. La personne à qui l'on fait faire est marquée par に (contrainte non violente) ou を (contrainte plus directe, pour les intransitifs).",
+   v1:{regle:"On remplace la syllabe finale du dictionnaire (colonne う) par la syllabe de la colonne あ, puis on ajoute せる. う devient わ.",
+       tab:[["う → わ+せる","歌う → 歌わせる"],["く → か+せる","書く → 書かせる"],["む → ま+せる","飲む → 飲ませる"]]},
+   v2:{regle:"On retire る et on ajoute させる.",ex:[["食べる → 食べさせる"],["見る → 見させる"]]},
+   v3:{ex:[["する → させる","irrégulier — pas しさせる."],["来る → 来させる (こさせる)"]]},
+   variantes:[["使役受身","Causatif-passif — « être forcé de ~ ». Se construit sur le causatif + られる : 食べさせられる, 来させられる, させられる. Pour les 五段, la contraction せられる → される est courante : 書かせられる → 書かされる. Elle est bloquée pour les verbes en す (話す → 話させられる, jamais 話さされる — sinon on aurait deux さ à la suite)."]]}
+};
+
+/* Correspondance entre les libellés du tableau de conjugaison et la fiche
+   qui explique la forme : les variantes (ません, ました…) renvoient à leur
+   forme mère. */
+const CONJ_REF_KEY = {
+ "ます":"ます","ません":"ます","ました":"ます","ませんでした":"ます",
+ "たい":"たい",
+ "て":"て","ています":"ています",
+ "ない":"ない","なかった":"ない",
+ "辞書":"辞書",
+ "た":"た",
+ "たら":"たら",
+ "可能":"可能",
+ "意向":"意向",
+ "命令":"命令","禁止":"命令",
+ "ば":"ば",
+ "受身":"受身",
+ "使役":"使役","使役受身":"使役"
+};
+
+/* Rend une fiche de conjugaison sous forme de carte (utilisable dans la
+   vue 要点 ou dans une feuille ouverte depuis un tableau). */
+function conjRefCard(key){
+  const r=CONJ_REFS[key]; if(!r) return null;
+  const c=el("div","card");
+  c.style.borderColor="var(--ai)";
+  c.innerHTML=`<h3><span class="jpx" style="color:var(--ai)">${esc(r.ja)}</span> ${esc(r.fr)} <span class="tag">L${r.lecon}</span></h3>
+    <div style="font-size:0.8438rem;color:var(--mut);line-height:1.65;margin-top:6px">${jpCite(r.but)}</div>`;
+  const grp=(gname,label,g)=>{
+    if(!g) return;
+    const sec=el("div","refgrp");
+    sec.innerHTML=`<div class="refgh"><span class="tag" style="border-color:var(--ai);color:var(--ai)">${gname}</span> ${label}</div>`;
+    if(g.regle) sec.appendChild(el("div","refregle",jpCite(g.regle)));
+    if(g.tab){
+      const t=el("div","reftab");
+      g.tab.forEach(row=>{
+        const r0=jpCite(row[0]), r1=row[1]?jpCite(row[1]):"";
+        t.innerHTML+=`<div class="reftrow"><span class="reftrans jpx">${r0}</span>${r1?`<span class="refex jpx">${r1}</span>`:""}</div>`;
+      });
+      sec.appendChild(t);
+    }
+    if(g.ex){
+      const ul=el("div","reflist");
+      g.ex.forEach(row=>{
+        ul.innerHTML+=`<div class="refline"><span class="jpx">${jpCite(row[0])}</span>${row[1]?` <span class="reftnote">${esc(row[1])}</span>`:""}</div>`;
+      });
+      sec.appendChild(ul);
+    }
+    if(g.exc){
+      const box=el("div","refexc");
+      box.innerHTML='<div class="refexch">Exception</div>';
+      g.exc.forEach(([a,b])=>{ box.innerHTML+=`<div class="refline"><span class="jpx">${jpCite(a)}</span> — ${jpCite(b)}</div>`; });
+      sec.appendChild(box);
+    }
+    if(g.notes) g.notes.forEach(n=>sec.appendChild(el("div","note",jpCite(n))));
+    c.appendChild(sec);
+  };
+  grp("五段","(godan)",r.v1);
+  grp("一段","(ichidan)",r.v2);
+  grp("不規則","(irrégulier)",r.v3);
+  if(r.variantes){
+    const v=el("div","refvar");
+    v.innerHTML='<div class="refvarh">Variantes</div>';
+    r.variantes.forEach(([a,b])=>{ v.innerHTML+=`<div class="refline" style="margin-top:4px"><b class="jpx">${jpCite(a)}</b> — ${jpCite(b)}</div>`; });
+    c.appendChild(v);
+  }
+  if(r.notes) r.notes.forEach(n=>c.appendChild(el("div","note",jpCite(n))));
+  return c;
+}
+
+/* Ouvre une fiche de conjugaison en modale, comme la fiche d'un mot. */
+function conjSheet(key){
+  const card=conjRefCard(key); if(!card) return;
+  card.style.borderColor="var(--line)";
+  card.style.margin="0";
+  const back=document.createElement("div"); back.className="sheet";
+  const box=el("div","sheetbox");
+  const h=el("div","sheethead");
+  h.innerHTML=`<div><div class="jpx" style="font-size:1.375rem;line-height:1.2;color:var(--ai)">活用 · ${esc(CONJ_REFS[key].ja)}</div>
+    <div style="font-size:0.8125rem;color:var(--mut);margin-top:2px">Formation par groupe</div></div>
+    <button class="ico" id="cjX">✕</button>`;
+  box.appendChild(h);
+  box.appendChild(card);
+  back.appendChild(box);
+  document.body.appendChild(back);
+  const close=()=>back.remove();
+  back.onclick=e=>{ if(e.target===back) close(); };
+  $("#cjX",back).onclick=close;
+}
+
 
 /* tableau affichable : libellé français, valeur, leçon d'apparition */
 const VSPEC=[
@@ -1124,7 +1354,7 @@ function conjTable(w,all){
     if(!all&&l>S.ch) return;
     let [kn,kj]=pick(k); if(!kn) return;
     if(DERIVED[k]){ kn=kn+" ／ "+polite(kn); if(kj) kj=kj+" ／ "+polite(kj); }
-    rows.push({lab:lab,val:(S.script==="kana"?kn:(kj||kn)),l:l});
+    rows.push({lab:lab,val:(S.script==="kana"?kn:(kj||kn)),l:l,k:k});
   });
   return rows;
 }
@@ -2236,7 +2466,16 @@ VIEWS.dico=m=>{
     if(dcat==="exp"&&w.c!=="exp") return false;
     if(dcat==="adv"&&w.c!=="adv") return false;
     if(dcat==="q"&&w.c!=="q") return false;
-    if(dq){const q=dq.toLowerCase(); if(!(w.k.includes(dq)||w.j.includes(dq)||w.f.toLowerCase().includes(q))) return false;}
+    if(dq){
+      const q=dq.toLowerCase();
+      let ok=w.k.includes(dq)||w.j.includes(dq)||w.f.toLowerCase().includes(q);
+      /* pour les verbes, on cherche aussi la forme du dictionnaire (たべる, 食べる) */
+      if(!ok&&["v1","v2","v3"].includes(w.c)){
+        const f=forms(w);
+        if(f&&(f.辞書.includes(dq)||(f.kanji&&f.kanji.辞書&&f.kanji.辞書.includes(dq)))) ok=true;
+      }
+      if(!ok) return false;
+    }
     return true;
   }
   function list(){
@@ -2246,15 +2485,26 @@ VIEWS.dico=m=>{
     if(!ws.length){box.appendChild(el("div","empty","<b>空</b>Rien ne correspond à cette recherche."));return;}
     ws.slice(0,300).forEach(w=>{
       const id=w.k+"|"+w.l, isf=S.fav.includes(id);
+      /* Pour les verbes, l'entrée principale est la forme du dictionnaire —
+         comme dans un vrai 辞書 japonais. La forme ~ます reste rappelée
+         en dessous pour ne pas rompre le lien avec le manuel. */
+      const isVerb=["v1","v2","v3"].includes(w.c);
+      const vf=isVerb?forms(w):null;
+      const kJ=(vf&&vf.kanji&&vf.kanji.辞書)||(isVerb?"":w.j||"");
+      const kK=(vf&&vf.辞書)||w.k||"";
+      const primJ=kJ, primK=kK.split("・")[0];
+      const altSub=(S.script==="kana"||!kJ)?(kJ||""):kK;
+      const masuRappel=vf?((vf.kanji&&vf.kanji.ます)||vf.ます):"";
       const d=el("div","word");
-      d.innerHTML=`<div class="l"><div class="k">${motCliquable(w.j,w.k.split("・")[0])} ${sub(w)?`<em>${esc(sub(w))}</em>`:""}</div>
+      d.innerHTML=`<div class="l"><div class="k">${motCliquable(primJ,primK)} ${altSub?`<em>${esc(altSub)}</em>`:""}</div>
         <div class="f">${esc(w.f)} <span class="tag">${CATS[w.c]||w.c}</span> <span class="tag">L${w.l}</span>${
           (w.th||[]).map(t=>{const o=D.themes.find(x=>x.id===t);
             return o?` <span class="tag th">${esc(o.j)}</span>`:"";}).join("")}${
-          ["v1","v2","v3","ai","na"].includes(w.c)?' <span class="tag" style="border-color:var(--ai);color:var(--ai)">▾ formes</span>':""}</div></div>
+          masuRappel?` <span class="tag" style="border-color:var(--mut);color:var(--mut)">ます <span class="jpx">${esc(masuRappel)}</span></span>`:""}${
+          isVerb||["ai","na"].includes(w.c)?' <span class="tag" style="border-color:var(--ai);color:var(--ai)">▾ formes</span>':""}</div></div>
         <div class="r"><button class="ico">🔊</button><button class="ico${isf?" on":""}">★</button></div>`;
       const [spk,fav]=d.querySelectorAll(".ico");
-      spk.onclick=()=>say(w.k||w.j);
+      spk.onclick=()=>say(primK||primJ||w.k||w.j);
       fav.onclick=()=>{ if(isf)S.fav=S.fav.filter(x=>x!==id); else S.fav.push(id); save(); list(); };
       const na=accentDe(w);
       if(na!==null){
@@ -2276,7 +2526,14 @@ VIEWS.dico=m=>{
         const old=d.querySelector(".conj"); if(old){old.remove();return;}
         const rows=anyTable(w,false); if(!rows||!rows.length) return;
         const c=el("div","conj");
-        rows.forEach(r=>{ c.innerHTML+=`<span>${esc(r.lab)}</span><b>${jp(r.val)}</b>`; });
+        rows.forEach(r=>{
+          const rk=r.k?(CONJ_REF_KEY[r.k]||r.k):null;
+          const lab=rk?`<a class="cjlink" data-cj="${esc(rk)}">${esc(r.lab)}</a>`:esc(r.lab);
+          c.innerHTML+=`<span>${lab}</span><b>${jp(r.val)}</b>`;
+        });
+        c.querySelectorAll(".cjlink").forEach(a=>{
+          a.onclick=ev=>{ ev.stopPropagation(); conjSheet(a.dataset.cj); };
+        });
         d.appendChild(c);
       };
       box.appendChild(d);
@@ -5354,20 +5611,45 @@ VIEWS.fiches=m=>{
   head(m,"要点","Les points de grammaire, resserrés");
   filterBar(m,"fiches","Chercher une notion : « forme て », « passif »…",()=>render());
   const q=FQ.fiches||"";
+  /* Fiches de conjugaison : une par forme, filtrées comme les points de
+     grammaire par le chapitre courant. */
+  const cKeys=Object.keys(CONJ_REFS).filter(k=>{
+    const r=CONJ_REFS[k]; if(r.lecon>S.ch) return false;
+    if(!q) return true;
+    const bag=[r.ja,r.fr,r.but];
+    ["v1","v2","v3"].forEach(g=>{
+      const gv=r[g]; if(!gv) return;
+      if(gv.regle) bag.push(gv.regle);
+      (gv.tab||[]).forEach(row=>row.forEach(c=>bag.push(c)));
+      (gv.ex||[]).forEach(row=>row.forEach(c=>bag.push(c)));
+      (gv.notes||[]).forEach(n=>bag.push(n));
+    });
+    (r.variantes||[]).forEach(([a,b])=>{bag.push(a);bag.push(b);});
+    (r.notes||[]).forEach(n=>bag.push(n));
+    return fMatch(q,...bag);
+  });
   const fs=D.fiches.filter(f=>f.l<=S.ch)
     .filter(f=>fMatch(q,f.t,f.body.map(b=>b[0]+" "+b[1]).join(" ")));
-  if(q){ m.appendChild(el("div","sec",fs.length+" fiche"+(fs.length>1?"s":"")));
-    if(!fs.length) m.appendChild(el("div","empty","<b>無</b>Aucune fiche ne correspond.")); }
-  fs.forEach(f=>{
-    const c=el("div","card");
-    c.appendChild(el("h3",null,esc(f.t)+` <span class="tag">L${f.l}</span>`));
-    f.body.forEach(([t,b])=>{
-      c.appendChild(el("div","ex",
-        `<div style="font-size:0.8125rem;font-weight:700;margin-bottom:3px">${esc(t)}</div>
-         <div class="jpx" style="font-size:0.9375rem;white-space:pre-line;color:var(--mut)">${jp(b)}</div>`));
+  if(q){ const total=cKeys.length+fs.length;
+    m.appendChild(el("div","sec",total+" fiche"+(total>1?"s":"")));
+    if(!total) m.appendChild(el("div","empty","<b>無</b>Aucune fiche ne correspond.")); }
+  if(cKeys.length){
+    m.appendChild(el("div","sec","活用 — Conjugaison des verbes"));
+    cKeys.forEach(k=>{ const c=conjRefCard(k); if(c) m.appendChild(c); });
+  }
+  if(fs.length){
+    if(cKeys.length) m.appendChild(el("div","sec","文法 — Points de grammaire"));
+    fs.forEach(f=>{
+      const c=el("div","card");
+      c.appendChild(el("h3",null,esc(f.t)+` <span class="tag">L${f.l}</span>`));
+      f.body.forEach(([t,b])=>{
+        c.appendChild(el("div","ex",
+          `<div style="font-size:0.8125rem;font-weight:700;margin-bottom:3px">${esc(t)}</div>
+           <div class="jpx" style="font-size:0.9375rem;white-space:pre-line;color:var(--mut)">${jp(b)}</div>`));
+      });
+      m.appendChild(c);
     });
-    m.appendChild(c);
-  });
+  }
 };
 let cjAll=false;
 VIEWS.conjug=m=>{
@@ -5388,7 +5670,15 @@ VIEWS.conjug=m=>{
       c.innerHTML=`<h3><span class="jpx">${jp(disp(w))}</span> <span class="tag">${CATS[w.c]}</span> <span class="tag">L${w.l}</span></h3>
         <div style="font-size:0.8125rem;color:var(--mut)">${esc(w.f)}</div>`;
       const g=el("div","conj");
-      rows.forEach(r=>{ g.innerHTML+=`<span>${esc(r.lab)}${r.l>S.ch?' <i style="color:var(--yama);font-style:normal">L'+r.l+'</i>':''}</span><b>${jp(r.val)}</b>`; });
+      rows.forEach(r=>{
+        const rk=r.k?(CONJ_REF_KEY[r.k]||r.k):null;
+        const suf=r.l>S.ch?' <i style="color:var(--yama);font-style:normal">L'+r.l+'</i>':'';
+        const lab=rk?`<a class="cjlink" data-cj="${esc(rk)}">${esc(r.lab)}</a>${suf}`:esc(r.lab)+suf;
+        g.innerHTML+=`<span>${lab}</span><b>${jp(r.val)}</b>`;
+      });
+      g.querySelectorAll(".cjlink").forEach(a=>{
+        a.onclick=ev=>{ ev.stopPropagation(); conjSheet(a.dataset.cj); };
+      });
       c.appendChild(g); box.appendChild(c);
     });
   }
