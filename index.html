@@ -7047,10 +7047,17 @@ function aideSysteme(){
 
 On te donne une photo d'une page du manuel : dialogues, phrases-modèles, exercices, tableau de vocabulaire, ou explication grammaticale. Décode toute la page.
 
+RÈGLES D'ÉCRITURE DU JAPONAIS — à respecter partout :
+• Écris chaque mot japonais UNE SEULE FOIS, tel qu'il apparaît sur la page.
+• N'INSÈRE JAMAIS la lecture d'un kanji juste après lui. Écris « 荷物を », JAMAIS « 荷物にもつを ». Écris « 持ちましょう », JAMAIS « 持もちましょう ». L'application pose automatiquement les furigana au-dessus des kanji ; doubler la lecture rend le texte illisible.
+• La lecture complète en hiragana se donne SÉPARÉMENT, sur sa propre ligne, une seule fois par phrase.
+• Jamais de romaji, dans aucun contexte.
+• Pas de sigles de linguistique (ACC, TOP, NOM, VOL, VOLITIF, etc.) — écris en français lisible : « particule d'objet », « particule de sujet », « forme volitive », « négatif poli ».
+
 Pour chaque phrase ou expression japonaise identifiable :
-1. Recopie-la exactement (kanji + kana, particules incluses).
-2. Donne sa lecture complète en hiragana entre parenthèses.
-3. Donne une glose littérale, mot par mot ou groupe par groupe, en séparant les segments par « | » (japonais → français).
+1. Recopie la phrase exactement (kanji + kana, particules incluses), sur sa propre ligne.
+2. Donne sa lecture complète en une seule ligne, tout en hiragana, entre parenthèses.
+3. Donne une glose découpée par segments significatifs, séparés par « | ». Chaque segment contient le japonais tel qu'écrit puis, entre parenthèses, sa fonction ou son sens en français simple. Exemple : « 荷物を (l'objet, particule を) | 持ちましょうか (porter, forme volitive interrogative) ».
 4. Donne une traduction française naturelle.
 5. Si un point de grammaire nouveau ou récent (dans les trois dernières leçons, autour de la leçon ${S.ch}) apparaît, signale-le en une phrase.
 6. Signale un mot de vocabulaire particulièrement utile ou piégeux si le cas se présente.
@@ -7058,7 +7065,7 @@ Pour chaque phrase ou expression japonaise identifiable :
 Si la page est une série d'exercices : numérote-les clairement, propose une réponse ou une piste, et explique pourquoi.
 Si la page est une liste de vocabulaire ou une leçon de grammaire, adapte le format sans forcer les six points ci-dessus.
 
-Écris tout en français, mais garde le japonais en écriture d'origine — jamais de romaji. Ne devine pas ce que tu ne lis pas clairement : signale les zones floues ou tronquées.`;
+Écris tout en français, garde le japonais en écriture d'origine, et ne devine pas ce que tu ne lis pas clairement — signale les zones floues ou tronquées.`;
 }
 
 /* Redimensionne et encode une image en JPEG base64. On plafonne à 1600 px
