@@ -209,6 +209,8 @@ button.stat{font:inherit;width:100%}
 .dojocpt{text-align:center;font-size:0.75rem;color:var(--dim);margin-top:10px}
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;margin-top:10px}
 .pcell{display:flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:var(--r-sm);padding:4px 6px}
+.pcell-l{font-size:0.6875rem;color:var(--ai);min-width:26px;background:none;border:0;padding:0;cursor:pointer;font-weight:600}
+.pcell-l:disabled{color:var(--mut);cursor:default;font-weight:400}
 .pcell span{font-size:0.6875rem;color:var(--mut);min-width:22px}
 .pcell input{width:100%;min-width:0;background:none;border:0;color:var(--tx);font-family:var(--disp);
   font-size:0.875rem;padding:0;text-align:right}
@@ -4294,6 +4296,18 @@ function wordSheet(t){
   if(wV&&["v1","v2","v3"].includes(wV.c)){
     const vb=verbeResume(wV); if(vb) $("#shVerb",back).replaceWith(vb);
   }
+  /* Repère de contexte : première page d'un PDF importé où ce mot apparaît. */
+  const cle=(wA&&wA.k)||(info&&info.k);
+  const ref=cle?pdfChercheMot(cle):null;
+  if(ref){
+    const chip=el("div","note");
+    chip.style.marginTop="10px";
+    chip.innerHTML='<b>Dans votre manuel —</b> présenté page '+ref.page+'. <a class="cjlink" style="margin-left:6px">Ouvrir</a>';
+    chip.querySelector("a").onclick=(e)=>{ e.stopPropagation(); ouvrirManuelVolPage(ref.id, ref.page); };
+    /* On l'insère juste avant la fin de la fiche, sous les blocs déjà présents. */
+    const anchor=back.querySelector("#shComp")||back.querySelector("#shAnt")||back.querySelector("#shAcc");
+    if(anchor) anchor.after(chip); else back.querySelector(".sheetbox").appendChild(chip);
+  }
   const ants=antonymesDe(wA?(wA.k||t):t);
   if(ants.length){
     const zone=el("div","antbloc");
@@ -6795,6 +6809,95 @@ async function mAll(){ try{ const db=await mdb();
 async function mDel(id){ const db=await mdb();
   return new Promise(res=>{const t=db.transaction("t","readwrite");t.objectStore("t").delete(id);t.oncomplete=()=>res();}); }
 
+
+/* ================= outillage PDF (texte) =================
+   pdf.js est chargé à la demande depuis un CDN — coût nul pour l'app
+   principale (le PWA reste léger), et une seule fois par appareil
+   grâce au cache du navigateur. Le texte extrait est ensuite conservé
+   en local avec le fichier ; aucun besoin de pdf.js pour la suite. */
+const PDFJS_BASE = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/";
+let pdfLibP=null;
+async function pdfLib(){
+  if(pdfLibP) return pdfLibP;
+  pdfLibP=(async()=>{
+    const mod=await import(PDFJS_BASE+"pdf.min.mjs");
+    mod.GlobalWorkerOptions.workerSrc=PDFJS_BASE+"pdf.worker.min.mjs";
+    return mod;
+  })();
+  return pdfLibP;
+}
+
+/* Extrait le texte de chaque page du PDF, dans l'ordre. `progress(i,n)`
+   permet d'afficher une barre pendant l'import. Renvoie un tableau de
+   chaînes, une par page (index PDF, 1-indexé décalé). */
+async function pdfExtraire(file, progress){
+  const lib=await pdfLib();
+  const buf=await file.arrayBuffer();
+  const doc=await lib.getDocument({data:buf.slice(0)}).promise;
+  const pages=new Array(doc.numPages);
+  for(let i=1;i<=doc.numPages;i++){
+    const p=await doc.getPage(i);
+    const c=await p.getTextContent();
+    pages[i-1]=c.items.map(x=>x.str).join(" ");
+    if(progress) progress(i,doc.numPages);
+    p.cleanup();
+  }
+  doc.destroy();
+  return pages;
+}
+
+/* Détecte l'index des leçons en cherchant « 第X課 » dans le texte extrait.
+   On garde la première page où chaque leçon apparaît. Renvoie { leçon → page PDF }. */
+function pdfDetecteLecons(pages){
+  const found={};
+  const re=/第\s*(\d{1,2})\s*課/g;
+  pages.forEach((t,i)=>{
+    let m; re.lastIndex=0;
+    while((m=re.exec(t))!==null){
+      const l=+m[1];
+      if(l>=1&&l<=50&&!found[l]) found[l]=i+1;
+    }
+  });
+  return found;
+}
+
+/* Construit un index inverse « mot du manuel → première page où il apparaît ».
+   La correspondance est faite d'abord sur la forme en kanji (plus distinctive),
+   puis sur la forme en kana à défaut. Renvoie { clé kana → page PDF }. */
+function pdfIndexeVocab(pages, mots){
+  const idx={};
+  for(const w of mots){
+    if(!w||!w.k) continue;
+    const kj=w.j&&w.j.length>=2?w.j:null;
+    const kn=w.k&&w.k.length>=2?w.k:null;
+    let trouve=0;
+    if(kj) for(let i=0;i<pages.length;i++){ if(pages[i].indexOf(kj)>=0){ trouve=i+1; break; } }
+    if(!trouve&&kn) for(let i=0;i<pages.length;i++){ if(pages[i].indexOf(kn)>=0){ trouve=i+1; break; } }
+    if(trouve) idx[w.k]=trouve;
+  }
+  return idx;
+}
+
+/* Renvoie { volumeId, page } pour la première occurrence d'un mot dans les
+   volumes importés qui ont un index. Sert aux fiches de mot. */
+function pdfChercheMot(cle){
+  if(!MANUELS) return null;
+  for(const v of MANUELS){
+    if(v.idxVocab&&v.idxVocab[cle]) return {id:v.id, page:v.idxVocab[cle]};
+  }
+  return null;
+}
+
+/* Ouverture directe d'un volume à une page donnée (pour les liens contextuels
+   depuis les fiches). */
+function ouvrirManuelVolPage(volId, page){
+  const v=MANUELS&&MANUELS.find(x=>x.id===volId);
+  if(!v) return;
+  if(!murl[v.id]) murl[v.id]=URL.createObjectURL(v.f);
+  window.open(murl[v.id]+(page?"#page="+page:""),"_blank","noopener");
+}
+
+
 let MANUELS=null, murl={};
 async function chargeManuels(){ MANUELS=await mAll(); return MANUELS; }
 /* le volume qui couvre une leçon donnée */
@@ -6840,16 +6943,43 @@ VIEWS.manuel=m=>{
   if(!MANUELS.length) c.appendChild(el("div","empty","<b>—</b>Aucun volume importé."));
   MANUELS.forEach(v=>{
     const d=el("div","word");
+    const marqueTexte = v.pages ? ' <span class="tag" style="border-color:var(--take);color:var(--take)">texte extrait</span>' : "";
     d.innerHTML=`<div class="l"><div class="k" style="font-size:0.9375rem">${esc(v.nom)}</div>
-      <div class="f">leçons ${v.lmin} à ${v.lmax} · ${Math.round((v.f.size||0)/1048576)} Mo</div></div>
-      <div class="r"><button class="ico">✕</button></div>`;
-    d.querySelector(".ico").onclick=async e=>{
+      <div class="f">leçons ${v.lmin} à ${v.lmax} · ${Math.round((v.f.size||0)/1048576)} Mo${marqueTexte}</div></div>
+      <div class="r"><button class="btn p" style="padding:6px 10px;font-size:0.8125rem">本 Ouvrir</button><button class="ico" title="Retirer ce volume">✕</button></div>`;
+    const [bo,bx]=d.querySelectorAll(".r > button");
+    bo.onclick=e=>{ e.stopPropagation(); ouvrirManuel(v.lmin); };
+    bx.onclick=async e=>{
       e.stopPropagation();
       if(!confirm("Retirer « "+v.nom+" » de cet appareil ?")) return;
       await mDel(v.id); MANUELS=null; render();
     };
-    d.onclick=()=>ouvrirManuel(v.lmin);
     c.appendChild(d);
+    /* Sur les volumes déjà importés sans extraction : proposer de la lancer
+       maintenant, sans devoir ré-importer le fichier. */
+    if(!v.pages){
+      const ex=el("button","btn","Extraire le texte (une fois)");
+      ex.style.marginTop="6px"; ex.style.fontSize="12.5px";
+      ex.onclick=async()=>{
+        ex.disabled=true; ex.textContent="Extraction en cours…";
+        try{
+          const pages=await pdfExtraire(v.f);
+          const idxVocab=pdfIndexeVocab(pages, words(50));
+          const det=pdfDetecteLecons(pages);
+          const nDet=Object.keys(det).length;
+          if(nDet){
+            S.pages=S.pages||{};
+            if(confirm(nDet+" pages de leçon détectées. Préremplir l'index ?")){
+              Object.keys(det).forEach(k=>{ S.pages[k]=det[k]; });
+              save();
+            }
+          }
+          await mPut(Object.assign({},v,{pages:pages,idxVocab:idxVocab}));
+          MANUELS=null; render(); toast("Texte extrait");
+        } catch(e){ ex.disabled=false; ex.textContent="Extraire le texte (une fois)"; toast("Échec : "+e.message); }
+      };
+      c.appendChild(ex);
+    }
   });
 
   const inp=document.createElement("input");
@@ -6858,8 +6988,29 @@ VIEWS.manuel=m=>{
     const f=inp.files[0]; if(!f) return;
     const lmin=+prompt("Première leçon couverte par ce fichier ?","1")||1;
     const lmax=+prompt("Dernière leçon couverte ?",String(Math.min(50,lmin+24)))||50;
-    await mPut({id:"m"+Date.now().toString(36),nom:f.name,f:f,lmin:lmin,lmax:lmax});
-    MANUELS=null; render(); toast("Volume importé");
+    const id="m"+Date.now().toString(36);
+    /* Extraction du texte (option 3) : pdf.js chargé une fois depuis CDN,
+       texte stocké avec le fichier, index vocab construit dans la foulée. */
+    const doIt=confirm("Extraire le texte de ce PDF pour activer la recherche interne, l'auto-détection des pages de leçon et l'analyse à partir d'une page ?\n\npdf.js sera chargé une fois depuis un CDN public.");
+    let pages=null, idxVocab=null;
+    if(doIt){
+      try{
+        toast("Extraction en cours…");
+        pages=await pdfExtraire(f);
+        idxVocab=pdfIndexeVocab(pages, words(50));
+        const det=pdfDetecteLecons(pages);
+        const nDet=Object.keys(det).length;
+        if(nDet){
+          S.pages=S.pages||{};
+          if(confirm(nDet+" pages de leçon détectées dans le PDF. Préremplir l'index ?")){
+            Object.keys(det).forEach(k=>{ S.pages[k]=det[k]; });
+            save();
+          }
+        }
+      } catch(e){ toast("Extraction échouée : "+e.message); }
+    }
+    await mPut({id:id,nom:f.name,f:f,lmin:lmin,lmax:lmax,pages:pages,idxVocab:idxVocab});
+    MANUELS=null; render(); toast("Volume importé"+(pages?" — texte extrait":""));
   };
   const bi=el("button","btn p w","Importer un PDF");
   bi.onclick=()=>inp.click();
@@ -6876,14 +7027,26 @@ VIEWS.manuel=m=>{
   const g=el("div","pgrid");
   for(let l=1;l<=50;l++){
     if(!manuelDe(l)) continue;
-    const w=el("label","pcell");
+    /* Le label enveloppait autrefois l'input entier ; un clic sur l'étiquette
+       « L7 » focalisait donc la case. En passant à un div on peut faire de
+       cette étiquette un bouton d'ouverture. */
+    const w=el("div","pcell");
+    const lab=document.createElement("button");
+    lab.className="pcell-l"; lab.type="button"; lab.textContent="L"+l;
+    lab.title="Ouvrir le manuel à cette leçon";
+    lab.disabled=!S.pages[l];
+    lab.onclick=()=>ouvrirManuel(l);
+    w.appendChild(lab);
     const i2=document.createElement("input");
     i2.type="number"; i2.min="1"; i2.inputMode="numeric";
     i2.value=(S.pages[l]||""); i2.placeholder="—";
-    i2.onchange=()=>{ const v2=+i2.value;
+    i2.onchange=()=>{
+      const v2=+i2.value;
       if(v2>0) S.pages[l]=v2; else delete S.pages[l];
-      save(); };
-    w.innerHTML=`<span>L${l}</span>`;
+      save();
+      /* On rafraîchit l'état du bouton sans refaire tout le rendu. */
+      lab.disabled=!S.pages[l];
+    };
     w.appendChild(i2);
     g.appendChild(w);
   }
@@ -6904,6 +7067,48 @@ VIEWS.manuel=m=>{
   cc.appendChild(bp); cc.appendChild(bz);
   ix.appendChild(cc);
   m.appendChild(ix);
+
+  /* Recherche plein texte dans les PDF importés qui ont été extraits.
+     Simple parcours de chaque page ; on affiche les pages qui contiennent
+     la requête, avec un extrait autour, et un lien pour ouvrir la page. */
+  const avecTexte=MANUELS.filter(v=>v.pages&&v.pages.length);
+  if(avecTexte.length){
+    const rs=el("div","card");
+    rs.appendChild(el("div","sec","Rechercher dans le PDF"));
+    const q=document.createElement("input"); q.type="text"; q.className="search";
+    q.placeholder="Ex : « すみません », « ~ましょう », « 家族 »";
+    rs.appendChild(q);
+    const out=el("div"); out.style.marginTop="10px"; rs.appendChild(out);
+    let tRech=null;
+    q.oninput=()=>{
+      clearTimeout(tRech);
+      tRech=setTimeout(()=>{
+        const needle=q.value.trim();
+        out.innerHTML="";
+        if(!needle) return;
+        let n=0;
+        for(const v of avecTexte){
+          for(let i=0;i<v.pages.length && n<50;i++){
+            const t=v.pages[i]; const k=t.indexOf(needle);
+            if(k<0) continue;
+            n++;
+            const avant=Math.max(0,k-40), apres=Math.min(t.length,k+needle.length+80);
+            const bit=(avant>0?"…":"")+t.slice(avant,k)+"「"+needle+"」"+t.slice(k+needle.length,apres)+(apres<t.length?"…":"");
+            const d=el("div","word");
+            d.innerHTML=`<div class="l"><div class="k" style="font-size:0.875rem">${esc(v.nom.replace(/\.[^.]+$/,""))} · p. ${i+1}</div>
+              <div class="jpx" style="font-size:0.8438rem;color:var(--mut);line-height:1.55;margin-top:2px">${jpw(bit)}</div></div>
+              <div class="r"><button class="btn" style="padding:4px 10px;font-size:0.75rem">本 Ouvrir</button></div>`;
+            d.querySelector(".btn").onclick=e=>{ e.stopPropagation(); ouvrirManuelVolPage(v.id, i+1); };
+            out.appendChild(d);
+          }
+          if(n>=50) break;
+        }
+        if(!n) out.innerHTML='<div class="empty"><b>無</b>Aucune occurrence.</div>';
+        else if(n>=50) out.appendChild(el("div","note","Plus de 50 résultats — affinez la recherche."));
+      },200);
+    };
+    m.appendChild(rs);
+  }
 };
 
 /* ================= audio des leçons ================= */
@@ -7296,10 +7501,26 @@ VIEWS.aide=m=>{
   /* Sélection d'une image + question éventuelle. */
   const bar=el("div","card");
   bar.appendChild(el("h3",null,"Une page du manuel"));
-  const inp=document.createElement("input"); inp.type="file"; inp.accept="image/*"; inp.style.display="none";
-  const shot=el("button","btn w p","📷 Prendre ou choisir une photo");
-  shot.onclick=()=>inp.click();
-  bar.appendChild(shot); bar.appendChild(inp);
+  /* Deux inputs distincts : celui « capture » va directement à l'appareil
+     photo, l'autre laisse le sélecteur natif (galerie et fichiers). Sur
+     certains appareils/navigateurs, un input unique sans « capture »
+     n'expose plus la caméra — d'où la séparation. */
+  const inpCam=document.createElement("input"); inpCam.type="file"; inpCam.accept="image/*"; inpCam.capture="environment"; inpCam.style.display="none";
+  const inpFic=document.createElement("input"); inpFic.type="file"; inpFic.accept="image/*"; inpFic.style.display="none";
+  const row=el("div","ctrl");
+  const btnCam=el("button","btn p","📷 Prendre une photo");
+  const btnFic=el("button","btn","🖼️ Choisir dans la galerie");
+  btnCam.style.flex="1"; btnFic.style.flex="1";
+  btnCam.onclick=()=>inpCam.click();
+  btnFic.onclick=()=>inpFic.click();
+  row.appendChild(btnCam); row.appendChild(btnFic);
+  bar.appendChild(row); bar.appendChild(inpCam); bar.appendChild(inpFic);
+  /* Alias pour ne pas casser la suite du code qui référençait « shot ». */
+  const shot={ get disabled(){return btnCam.disabled;},
+               set disabled(v){btnCam.disabled=v;btnFic.disabled=v;},
+               set textContent(v){btnCam.textContent=v;btnFic.style.display=v.startsWith("📷 Nouvelle")||v.startsWith("📷 Changer")?"none":"";} };
+  const inp={ set onchange(fn){ inpCam.onchange=fn; inpFic.onchange=fn; },
+              get files(){ return (inpCam.files&&inpCam.files.length?inpCam.files:inpFic.files)||null; } };
   const preview=el("div"); preview.style.marginTop="10px"; bar.appendChild(preview);
   const opt=document.createElement("textarea"); opt.className="search"; opt.rows=2; opt.style.marginTop="10px"; opt.style.resize="vertical"; opt.style.fontFamily="inherit";
   opt.placeholder="Optionnel : que voulez-vous savoir en particulier ? (« traduis chaque phrase », « corrige mes réponses »…)";
@@ -7307,6 +7528,62 @@ VIEWS.aide=m=>{
   const go=el("button","btn w p","解析 · Analyser"); go.style.marginTop="10px"; go.disabled=true;
   bar.appendChild(go);
   m.appendChild(bar);
+
+  /* Voie alternative : analyser une page d'un PDF importé, sans photo.
+     On envoie directement le texte extrait — plus rapide, plus précis
+     (pas d'OCR), et gratuit en tokens image. Visible seulement si au
+     moins un volume a été extrait. */
+  if(MANUELS===null) chargeManuels();
+  const volsTexte=(MANUELS||[]).filter(v=>v.pages&&v.pages.length);
+  if(volsTexte.length){
+    const cp=el("div","card");
+    cp.appendChild(el("h3",null,"Ou une page de votre manuel importé"));
+    cp.appendChild(el("div","note","Envoie directement le texte de la page à Gemini, sans photo. Plus rapide et plus précis quand le PDF a été extrait."));
+    const row=el("div","ctrl"); row.style.marginTop="8px"; row.style.flexWrap="wrap";
+    const selV=document.createElement("select"); selV.className="search"; selV.style.flex="2";
+    volsTexte.forEach(v=>{
+      const o=document.createElement("option"); o.value=v.id; o.textContent=v.nom.replace(/\.[^.]+$/,"");
+      selV.appendChild(o);
+    });
+    const numP=document.createElement("input"); numP.type="number"; numP.min="1"; numP.className="search"; numP.style.flex="1"; numP.placeholder="p.";
+    row.appendChild(selV); row.appendChild(numP);
+    cp.appendChild(row);
+    const goP=el("button","btn w p","解析 · Analyser cette page"); goP.style.marginTop="10px";
+    cp.appendChild(goP);
+    m.appendChild(cp);
+
+    goP.onclick=async()=>{
+      if(aideBusy) return;
+      const v=volsTexte.find(x=>x.id===selV.value);
+      const np=+numP.value;
+      if(!v||!np||np<1||np>v.pages.length){ toast("Page hors du volume"); return; }
+      const texte=v.pages[np-1]||"";
+      if(!texte.trim()){ toast("Cette page ne contient pas de texte extrait"); return; }
+      aideBusy=true; goP.disabled=true; goP.textContent="Analyse en cours…";
+      aideEffaceErreur();
+      const question="Analyse la page suivante du manuel (page "+np+" du PDF, texte brut) :\n\n"+texte.slice(0,10000);
+      aideMsg.push({role:"user", parts:[{text:question}], affiche:"Page "+np+" de « "+v.nom.replace(/\.[^.]+$/,"")+" »"});
+      const rep={role:"model", parts:[{text:""}]}; aideMsg.push(rep);
+      aideRedessiner(chat);
+      const bulle=chat.lastElementChild.querySelector(".aidebody");
+      let ok=false;
+      try{
+        await aideAppel(key,aideMsg,
+          ch=>{ rep.parts[0].text+=ch; bulle.innerHTML=aideRendu(rep.parts[0].text); },
+          (n,tot,ms,motif)=>{
+            bulle.innerHTML='<div style="color:var(--mut);font-style:italic">Gemini est saturé — nouvelle tentative '+n+'/'+tot+' dans '+Math.round(ms/1000)+' s…<br><span style="font-size:0.75rem">'+esc(motif)+'</span></div>';
+          });
+        ok=true;
+      } catch(e){
+        aideMsg.pop(); aideMsg.pop();
+        aideErreur(e.message);
+        aideRedessiner(chat);
+      }
+      goP.disabled=false; goP.textContent="解析 · Analyser cette page";
+      aideBusy=false;
+      if(ok||aideMsg.some(mm=>mm.role==="model"&&mm.parts[0].text)) aideChampSuivi(chat);
+    };
+  }
 
   const erreurZone=el("div"); erreurZone.id="aideErr"; erreurZone.style.display="none"; m.appendChild(erreurZone);
   const chat=el("div"); m.appendChild(chat);
