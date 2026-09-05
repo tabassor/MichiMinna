@@ -4300,9 +4300,12 @@ function wordSheet(t){
   const cle=(wA&&wA.k)||(info&&info.k);
   const ref=cle?pdfChercheMot(cle):null;
   if(ref){
+    const vRef=MANUELS&&MANUELS.find(x=>x.id===ref.id);
+    const imp=pdfPageVers(vRef,ref.page);
+    const affp = (vRef&&vRef.offset&&imp>=1) ? ("page "+imp) : ("page PDF "+ref.page);
     const chip=el("div","note");
     chip.style.marginTop="10px";
-    chip.innerHTML='<b>Dans votre manuel —</b> présenté page '+ref.page+'. <a class="cjlink" style="margin-left:6px">Ouvrir</a>';
+    chip.innerHTML='<b>Dans votre manuel —</b> présenté '+affp+'. <a class="cjlink" style="margin-left:6px">Ouvrir</a>';
     chip.querySelector("a").onclick=(e)=>{ e.stopPropagation(); ouvrirManuelVolPage(ref.id, ref.page); };
     /* On l'insère juste avant la fin de la fiche, sous les blocs déjà présents. */
     const anchor=back.querySelector("#shComp")||back.querySelector("#shAnt")||back.querySelector("#shAcc");
@@ -6878,6 +6881,36 @@ function pdfIndexeVocab(pages, mots){
   return idx;
 }
 
+/* Détecte le décalage « page imprimée 1 → page PDF N » à partir du texte
+   extrait. On repère les petits nombres isolés (headers/footers) au début
+   et à la fin de chaque page PDF, on calcule les différences pdf−imprimée,
+   et on garde celle qui revient le plus souvent (au moins 10 pages
+   concordantes). Renvoie N (la page PDF pour l'imprimée 1), ou null. */
+function pdfDetecteDecalage(pages){
+  const cands=[];
+  pages.forEach((t,i)=>{
+    const bornes=[t.slice(0,80), t.slice(-80)];
+    bornes.forEach(section=>{
+      const re=/(?:^|[\s\|—\-])(\d{1,3})(?:$|[\s\|—\-])/g;
+      let m;
+      while((m=re.exec(section))!==null){
+        const p=+m[1];
+        if(p>=1&&p<500) cands.push({pdf:i+1, printed:p});
+      }
+    });
+  });
+  const cnt={};
+  cands.forEach(c=>{ const k=c.pdf-c.printed; cnt[k]=(cnt[k]||0)+1; });
+  const best=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];
+  if(!best||best[1]<10) return null;
+  return (+best[0])+1;
+}
+
+/* Conversions entre numéro imprimé dans le livre et numéro de page PDF.
+   Si le volume n'a pas de décalage connu, les deux sont identiques. */
+function pdfPageDe(v,imprime){ return imprime + ((v&&v.offset)?v.offset-1:0); }
+function pdfPageVers(v,pdfPage){ return v&&v.offset ? pdfPage-v.offset+1 : pdfPage; }
+
 /* Renvoie { volumeId, page } pour la première occurrence d'un mot dans les
    volumes importés qui ont un index. Sert aux fiches de mot. */
 function pdfChercheMot(cle){
@@ -6893,8 +6926,7 @@ function pdfChercheMot(cle){
 function ouvrirManuelVolPage(volId, page){
   const v=MANUELS&&MANUELS.find(x=>x.id===volId);
   if(!v) return;
-  if(!murl[v.id]) murl[v.id]=URL.createObjectURL(v.f);
-  window.open(murl[v.id]+(page?"#page="+page:""),"_blank","noopener");
+  ouvrirBlobPDF(v,page);
 }
 
 
@@ -6909,12 +6941,26 @@ function pageDe(l){
   return (ix&&ix>0)?ix:null;
 }
 /* ouvre le volume à la page voulue, dans un onglet */
+/* Ouverture du PDF via un wrapper HTML : Chrome et de nombreux
+   navigateurs mobiles suppriment l'ancre #page=N sur les URL blob:
+   quand le PDF est ouvert directement. En l'affichant via <embed>
+   dans une page HTML, l'ancre est bien honorée. Le wrapper est
+   révoqué après une minute pour éviter la fuite de mémoire. */
+function ouvrirBlobPDF(v,pg){
+  if(!murl[v.id]) murl[v.id]=URL.createObjectURL(v.f);
+  const pdfUrl=murl[v.id]+(pg?"#page="+pg:"");
+  const titre=(v.nom||"Manuel").replace(/[<>]/g,"");
+  const html='<!doctype html><html><head><meta charset="utf-8"><title>'+titre+
+    '</title><style>html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#222}embed{width:100%;height:100vh;border:0;display:block}</style></head>'+
+    '<body><embed src="'+pdfUrl+'" type="application/pdf"></body></html>';
+  const shim=URL.createObjectURL(new Blob([html],{type:"text/html"}));
+  window.open(shim,"_blank");
+  setTimeout(()=>URL.revokeObjectURL(shim),60000);
+}
 function ouvrirManuel(l){
   const v=manuelDe(l);
   if(!v){ toast("Aucun manuel importé pour cette leçon"); return; }
-  if(!murl[v.id]) murl[v.id]=URL.createObjectURL(v.f);
-  const pg=pageDe(l);
-  window.open(murl[v.id]+(pg?"#page="+pg:""),"_blank","noopener");
+  ouvrirBlobPDF(v,pageDe(l));
 }
 /* un bouton réutilisable, affiché seulement si un manuel couvre la leçon */
 function boutonManuel(l){
@@ -6944,8 +6990,9 @@ VIEWS.manuel=m=>{
   MANUELS.forEach(v=>{
     const d=el("div","word");
     const marqueTexte = v.pages ? ' <span class="tag" style="border-color:var(--take);color:var(--take)">texte extrait</span>' : "";
+    const marqueDec = (v.pages&&v.offset) ? ' <span class="tag" title="page PDF pour la page 1 imprimée">décalage +'+(v.offset-1)+'</span>' : "";
     d.innerHTML=`<div class="l"><div class="k" style="font-size:0.9375rem">${esc(v.nom)}</div>
-      <div class="f">leçons ${v.lmin} à ${v.lmax} · ${Math.round((v.f.size||0)/1048576)} Mo${marqueTexte}</div></div>
+      <div class="f">leçons ${v.lmin} à ${v.lmax} · ${Math.round((v.f.size||0)/1048576)} Mo${marqueTexte}${marqueDec}</div></div>
       <div class="r"><button class="btn p" style="padding:6px 10px;font-size:0.8125rem">本 Ouvrir</button><button class="ico" title="Retirer ce volume">✕</button></div>`;
     const [bo,bx]=d.querySelectorAll(".r > button");
     bo.onclick=e=>{ e.stopPropagation(); ouvrirManuel(v.lmin); };
@@ -6957,6 +7004,18 @@ VIEWS.manuel=m=>{
     c.appendChild(d);
     /* Sur les volumes déjà importés sans extraction : proposer de la lancer
        maintenant, sans devoir ré-importer le fichier. */
+    if(v.pages){
+      const off=el("button","btn","Régler le décalage PDF ↔ livre");
+      off.style.marginTop="6px"; off.style.fontSize="12.5px";
+      off.onclick=async()=>{
+        const rep=prompt("À quelle page PDF se trouve la page imprimée « 1 » ? (Vide pour retirer le décalage.)", String(v.offset||""));
+        if(rep===null) return;
+        const v0=+rep;
+        await mPut(Object.assign({},v,{offset:v0>0?v0:null}));
+        MANUELS=null; render(); toast(v0>0?"Décalage enregistré":"Décalage retiré");
+      };
+      c.appendChild(off);
+    }
     if(!v.pages){
       const ex=el("button","btn","Extraire le texte (une fois)");
       ex.style.marginTop="6px"; ex.style.fontSize="12.5px";
@@ -6974,7 +7033,15 @@ VIEWS.manuel=m=>{
               save();
             }
           }
-          await mPut(Object.assign({},v,{pages:pages,idxVocab:idxVocab}));
+          let offset=v.offset||null;
+          const sug=pdfDetecteDecalage(pages);
+          if(sug&&!offset){
+            if(confirm("Le PDF semble démarrer à la page « 1 » imprimée à sa page PDF "+sug+". Utiliser ce décalage ?")) offset=sug;
+          } else if(!offset){
+            const rep=prompt("Décalage PDF ↔ livre : à quelle page PDF se trouve la page imprimée « 1 » ? (Vide si aucun décalage.)","");
+            const v0=+rep; if(v0>0) offset=v0;
+          }
+          await mPut(Object.assign({},v,{pages:pages,idxVocab:idxVocab,offset:offset}));
           MANUELS=null; render(); toast("Texte extrait");
         } catch(e){ ex.disabled=false; ex.textContent="Extraire le texte (une fois)"; toast("Échec : "+e.message); }
       };
@@ -6993,6 +7060,7 @@ VIEWS.manuel=m=>{
        texte stocké avec le fichier, index vocab construit dans la foulée. */
     const doIt=confirm("Extraire le texte de ce PDF pour activer la recherche interne, l'auto-détection des pages de leçon et l'analyse à partir d'une page ?\n\npdf.js sera chargé une fois depuis un CDN public.");
     let pages=null, idxVocab=null;
+    let offset=null;
     if(doIt){
       try{
         toast("Extraction en cours…");
@@ -7007,9 +7075,19 @@ VIEWS.manuel=m=>{
             save();
           }
         }
+        /* Décalage entre page imprimée dans le livre et page PDF —
+           utile pour l'analyse d'une page, la recherche et les repères
+           de fiches. On propose l'auto-détection, sinon on laisse vide. */
+        const sug=pdfDetecteDecalage(pages);
+        if(sug){
+          if(confirm("Le PDF semble démarrer à la page « 1 » imprimée à sa page PDF "+sug+". Utiliser ce décalage pour les numéros de page ?")) offset=sug;
+        } else {
+          const rep=prompt("Décalage entre le PDF et la numérotation du livre : à quelle page PDF se trouve la page imprimée « 1 » ? (Laissez vide si le PDF n'a pas de préliminaires.)","");
+          const v0=+rep; if(v0>0) offset=v0;
+        }
       } catch(e){ toast("Extraction échouée : "+e.message); }
     }
-    await mPut({id:id,nom:f.name,f:f,lmin:lmin,lmax:lmax,pages:pages,idxVocab:idxVocab});
+    await mPut({id:id,nom:f.name,f:f,lmin:lmin,lmax:lmax,pages:pages,idxVocab:idxVocab,offset:offset});
     MANUELS=null; render(); toast("Volume importé"+(pages?" — texte extrait":""));
   };
   const bi=el("button","btn p w","Importer un PDF");
@@ -7094,11 +7172,14 @@ VIEWS.manuel=m=>{
             n++;
             const avant=Math.max(0,k-40), apres=Math.min(t.length,k+needle.length+80);
             const bit=(avant>0?"…":"")+t.slice(avant,k)+"「"+needle+"」"+t.slice(k+needle.length,apres)+(apres<t.length?"…":"");
+            const pdfP=i+1;
+            const imp=pdfPageVers(v,pdfP);
+            const libel=(v.offset&&imp>=1)?"p. "+imp+" (PDF "+pdfP+")":"page PDF "+pdfP;
             const d=el("div","word");
-            d.innerHTML=`<div class="l"><div class="k" style="font-size:0.875rem">${esc(v.nom.replace(/\.[^.]+$/,""))} · p. ${i+1}</div>
+            d.innerHTML=`<div class="l"><div class="k" style="font-size:0.875rem">${esc(v.nom.replace(/\.[^.]+$/,""))} · ${libel}</div>
               <div class="jpx" style="font-size:0.8438rem;color:var(--mut);line-height:1.55;margin-top:2px">${jpw(bit)}</div></div>
               <div class="r"><button class="btn" style="padding:4px 10px;font-size:0.75rem">本 Ouvrir</button></div>`;
-            d.querySelector(".btn").onclick=e=>{ e.stopPropagation(); ouvrirManuelVolPage(v.id, i+1); };
+            d.querySelector(".btn").onclick=e=>{ e.stopPropagation(); ouvrirManuelVolPage(v.id, pdfP); };
             out.appendChild(d);
           }
           if(n>=50) break;
@@ -7545,7 +7626,7 @@ VIEWS.aide=m=>{
       const o=document.createElement("option"); o.value=v.id; o.textContent=v.nom.replace(/\.[^.]+$/,"");
       selV.appendChild(o);
     });
-    const numP=document.createElement("input"); numP.type="number"; numP.min="1"; numP.className="search"; numP.style.flex="1"; numP.placeholder="p.";
+    const numP=document.createElement("input"); numP.type="number"; numP.min="1"; numP.className="search"; numP.style.flex="1"; numP.placeholder="p. imprimée";
     row.appendChild(selV); row.appendChild(numP);
     cp.appendChild(row);
     const goP=el("button","btn w p","解析 · Analyser cette page"); goP.style.marginTop="10px";
@@ -7555,14 +7636,16 @@ VIEWS.aide=m=>{
     goP.onclick=async()=>{
       if(aideBusy) return;
       const v=volsTexte.find(x=>x.id===selV.value);
-      const np=+numP.value;
-      if(!v||!np||np<1||np>v.pages.length){ toast("Page hors du volume"); return; }
+      const imp=+numP.value;
+      if(!v||!imp||imp<1){ toast("Numéro de page invalide"); return; }
+      const np=pdfPageDe(v,imp);
+      if(np<1||np>v.pages.length){ toast("Page hors du volume (PDF "+np+"/"+v.pages.length+")"); return; }
       const texte=v.pages[np-1]||"";
       if(!texte.trim()){ toast("Cette page ne contient pas de texte extrait"); return; }
       aideBusy=true; goP.disabled=true; goP.textContent="Analyse en cours…";
       aideEffaceErreur();
-      const question="Analyse la page suivante du manuel (page "+np+" du PDF, texte brut) :\n\n"+texte.slice(0,10000);
-      aideMsg.push({role:"user", parts:[{text:question}], affiche:"Page "+np+" de « "+v.nom.replace(/\.[^.]+$/,"")+" »"});
+      const question="Analyse la page suivante du manuel (page "+imp+" imprimée dans le livre, texte brut extrait du PDF) :\n\n"+texte.slice(0,10000);
+      aideMsg.push({role:"user", parts:[{text:question}], affiche:"Page "+imp+" (imprimée) de « "+v.nom.replace(/\.[^.]+$/,"")+" »"});
       const rep={role:"model", parts:[{text:""}]}; aideMsg.push(rep);
       aideRedessiner(chat);
       const bulle=chat.lastElementChild.querySelector(".aidebody");
