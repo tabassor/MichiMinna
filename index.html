@@ -7235,7 +7235,7 @@ VIEWS.aide=m=>{
   /* Sélection d'une image + question éventuelle. */
   const bar=el("div","card");
   bar.appendChild(el("h3",null,"Une page du manuel"));
-  const inp=document.createElement("input"); inp.type="file"; inp.accept="image/*"; inp.capture="environment"; inp.style.display="none";
+  const inp=document.createElement("input"); inp.type="file"; inp.accept="image/*"; inp.style.display="none";
   const shot=el("button","btn w p","📷 Prendre ou choisir une photo");
   shot.onclick=()=>inp.click();
   bar.appendChild(shot); bar.appendChild(inp);
