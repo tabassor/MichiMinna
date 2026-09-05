@@ -7101,14 +7101,20 @@ async function aideAppel(key,msgs,onChunk){
      par construction — c'est la bulle qu'on remplit par streaming. Gemini
      refuse un fil qui se termine sur un tour du modèle. */
   const envoi=msgs.filter((m,i)=>!(m.role==="model"&&i===msgs.length-1&&(!m.parts[0]||!m.parts[0].text)));
+  /* Le raisonnement est activé par défaut sur Gemini 3.x et peut brûler
+     tout le budget de sortie sans émettre le moindre token — d'où les
+     réponses vides. On l'écrase au minimum. Attention : la 3.x accepte
+     thinkingLevel ("low"|"medium"|"high"), la 2.5 accepte thinkingBudget
+     (entier). Envoyer le mauvais champ provoque un refus. La température
+     est dépréciée sur les 3.x, on la garde uniquement pour les 2.5. */
+  const mdl=aideModel();
+  const gc={};
+  if(/gemini-[3-9]/.test(mdl)) gc.thinkingConfig={thinkingLevel:"low"};
+  else if(/gemini-2\.5/.test(mdl)){ gc.thinkingConfig={thinkingBudget:0}; gc.temperature=0.4; }
   const body={
     contents: envoi.map(m=>({role:m.role, parts:m.parts})),
     systemInstruction:{parts:[{text:aideSysteme()}]},
-    /* Le thinking est activé par défaut sur Gemini 3.x. Sur le quota gratuit,
-       le modèle peut brûler tout son budget en raisonnement sans émettre
-       le moindre token de réponse. On le coupe : pour du décodage de page
-       la réflexion ouverte n'apporte rien. */
-    generationConfig:{temperature:0.4, thinkingConfig:{thinkingBudget:0}}
+    generationConfig: gc
   };
   const res=await fetch(AIDE_URL(key),{
     method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)
