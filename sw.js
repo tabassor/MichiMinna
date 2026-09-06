@@ -1,5 +1,5 @@
 /* みち — service worker */
-const V = 'michi-bffe53e832';
+const V = 'michi-5d3c9f7a62';
 const ASSETS = ['./', './manifest.webmanifest',
                 './icon-192-v3.png', './icon-512-v3.png',
                 './icon-maskable-192-v3.png', './icon-maskable-512-v3.png',

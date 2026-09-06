@@ -6980,6 +6980,13 @@ function ouvrirManuelVolPage(volId, page){
 let MANUELS=null, murl={};
 async function chargeManuels(){ MANUELS=await mAll(); return MANUELS; }
 /* le volume qui couvre une leçon donnée */
+/* Nom d'affichage : override utilisateur si renommé, sinon nom du fichier
+   moins son extension. Sert partout où on présente le volume. */
+function volNom(v){
+  if(!v) return "";
+  const ext=(v.nom||"").replace(/\.[^.]+$/,"");
+  return v.nomAffichage || ext;
+}
 function manuelDe(l){
   return (MANUELS||[]).find(v=>l>=(v.lmin||1)&&l<=(v.lmax||50));
 }
@@ -6997,7 +7004,7 @@ function ouvrirBlobPDF(v,pg){
   if(!murl[v.id]) murl[v.id]=URL.createObjectURL(v.f);
   const pdfUrl=murl[v.id];
   const startPage=(pg&&pg>0)?pg:1;
-  const titre=(v.nom||"Manuel").replace(/[<>"'\\]/g,"");
+  const titre=(volNom(v)||"Manuel").replace(/[<>"'\\]/g,"");
   const html=`<!doctype html>
 <html>
 <head>
@@ -7160,19 +7167,32 @@ VIEWS.manuel=m=>{
     const d=el("div","word");
     const marqueTexte = v.pages ? ' <span class="tag" style="border-color:var(--take);color:var(--take)">texte extrait</span>' : "";
     const marqueDec = (v.pages&&v.offset) ? ' <span class="tag" title="page PDF pour la page 1 imprimée">décalage +'+(v.offset-1)+'</span>' : "";
-    d.innerHTML=`<div class="l"><div class="k" style="font-size:0.9375rem">${esc(v.nom)}</div>
+    d.innerHTML=`<div class="l"><div class="k" style="font-size:0.9375rem">${esc(volNom(v))}${v.nomAffichage?' <span class="tag" style="border-color:var(--mut);color:var(--mut)" title="Nom du fichier : '+esc(v.nom)+'">renommé</span>':""}</div>
       <div class="f">leçons ${v.lmin} à ${v.lmax} · ${Math.round((v.f.size||0)/1048576)} Mo${marqueTexte}${marqueDec}</div></div>
       <div class="r"><button class="btn p" style="padding:6px 10px;font-size:0.8125rem">本 Ouvrir</button><button class="ico" title="Retirer ce volume">✕</button></div>`;
     const [bo,bx]=d.querySelectorAll(".r > button");
     bo.onclick=e=>{ e.stopPropagation(); ouvrirManuel(v.lmin); };
     bx.onclick=async e=>{
       e.stopPropagation();
-      if(!confirm("Retirer « "+v.nom+" » de cet appareil ?")) return;
+      if(!confirm("Retirer « "+volNom(v)+" » de cet appareil ?")) return;
       await mDel(v.id); MANUELS=null; render();
     };
     c.appendChild(d);
     /* Sur les volumes déjà importés sans extraction : proposer de la lancer
        maintenant, sans devoir ré-importer le fichier. */
+    /* Renommer : donne un nom lisible aux fichiers dont le nom d'origine
+       est peu parlant (téléchargements, suffixes techniques). Le nom du
+       fichier réel n'est pas modifié. */
+    const rn=el("button","btn","Renommer");
+    rn.style.marginTop="6px"; rn.style.fontSize="12.5px"; rn.style.marginRight="6px";
+    rn.onclick=async()=>{
+      const rep=prompt("Nom d\'affichage pour ce volume :\n(Vide = revenir au nom du fichier.)", volNom(v));
+      if(rep===null) return;
+      const val=rep.trim();
+      await mPut(Object.assign({},v,{nomAffichage: val||null}));
+      MANUELS=null; render(); toast(val?"Renommé":"Nom d\'affichage retiré");
+    };
+    c.appendChild(rn);
     if(v.pages){
       const off=el("button","btn","Régler le décalage PDF ↔ livre");
       off.style.marginTop="6px"; off.style.fontSize="12.5px";
@@ -7345,7 +7365,7 @@ VIEWS.manuel=m=>{
             const imp=pdfPageVers(v,pdfP);
             const libel=(v.offset&&imp>=1)?"p. "+imp+" (PDF "+pdfP+")":"page PDF "+pdfP;
             const d=el("div","word");
-            d.innerHTML=`<div class="l"><div class="k" style="font-size:0.875rem">${esc(v.nom.replace(/\.[^.]+$/,""))} · ${libel}</div>
+            d.innerHTML=`<div class="l"><div class="k" style="font-size:0.875rem">${esc(volNom(v))} · ${libel}</div>
               <div class="jpx" style="font-size:0.8438rem;color:var(--mut);line-height:1.55;margin-top:2px">${jpw(bit)}</div></div>
               <div class="r"><button class="btn" style="padding:4px 10px;font-size:0.75rem">本 Ouvrir</button></div>`;
             d.querySelector(".btn").onclick=e=>{ e.stopPropagation(); ouvrirManuelVolPage(v.id, pdfP); };
@@ -7568,6 +7588,7 @@ function aideCachePrefSet(on){
 }
 
 let aideMsg=[], aideImgB64=null, aideBusy=false;
+let aideReglagesOuvert=false;
 
 /* Consigne système : le contexte du niveau de l'apprenant et le format
    d'analyse attendu. Recalculée à chaque appel pour tenir compte de S.ch. */
@@ -7745,7 +7766,7 @@ function aideRedessiner(chat){
   if(aideMsg.length && aideMsg[0].source){
     const src=aideMsg[0].source;
     const v=(MANUELS||[]).find(x=>x.id===src.vol);
-    const nom=v?v.nom.replace(/\.[^.]+$/,""):"?";
+    const nom=v?volNom(v):"?";
     const h=el("div","card");
     h.style.borderColor="var(--ai)";
     h.style.padding="10px 12px";
@@ -7763,7 +7784,13 @@ function aideRedessiner(chat){
   aideMsg.forEach(mm=>{
     const c=el("div","card aidebulle "+(mm.role==="user"?"u":"m"));
     if(mm.role==="user"){
-      c.innerHTML=`<div class="aiderole">Vous</div><div>${esc(mm.affiche||"(photo envoyée)")}</div>`;
+      /* Pour les messages issus d'une page PDF, on normalise à l'affichage :
+         le nom du volume est déjà dans l'entête au-dessus, pas besoin de le
+         redonner. Ça nettoie aussi les vieux caches créés avec l'ancienne
+         formulation. */
+      let disp = mm.affiche || "(photo envoyée)";
+      if(mm.source) disp = "Analyse de la page "+mm.source.page+" (imprimée)";
+      c.innerHTML=`<div class="aiderole">Vous</div><div>${esc(disp)}</div>`;
     } else {
       const t=mm.parts&&mm.parts[0]&&mm.parts[0].text||"";
       c.innerHTML=`<div class="aiderole" style="color:var(--ai)">解説 · Gemini</div><div class="aidebody">${t?aideRendu(t):'<div style="color:var(--mut);font-style:italic">Analyse en cours… (jusqu\'à 30 secondes)</div>'}</div>`;
@@ -7870,7 +7897,7 @@ async function aideLancePDF(v, imp, forceRefresh){
 
   const question="Analyse cette page du manuel Minna no Nihongo I — c'est la page "+imp+" imprimée dans le livre. Elle est envoyée en image telle que je la vois.";
   aideMsg.push({role:"user", parts:[{text:question},{inlineData:{mimeType:"image/jpeg",data:imgB64}}],
-    affiche:"Page "+imp+" (imprimée) de « "+v.nom.replace(/\.[^.]+$/,"")+" »",
+    affiche:"Analyse de la page "+imp+" (imprimée)",
     source:{vol:v.id, page:imp}});
   const rep={role:"model", parts:[{text:""}]};
   aideMsg.push(rep);
@@ -7917,6 +7944,26 @@ VIEWS.aide=m=>{
   head(m,"解説","Photographiez une page, obtenez l'explication");
   const key=aideKey();
 
+  /* Réglages repliés par défaut quand la clé est déjà configurée : la page
+     se concentre sur l'utile (analyser une photo ou une page). Ouverture
+     explicite via le petit lien en haut à droite. Sans clé, on force
+     l'affichage des réglages puisque la clé est indispensable. */
+  const showConf = !key || aideReglagesOuvert;
+  if(key){
+    const tools=el("div");
+    tools.style.textAlign="right";
+    tools.style.marginTop="-4px";
+    tools.style.marginBottom="4px";
+    const gear=document.createElement("a");
+    gear.className="cjlink";
+    gear.style.fontSize="13px";
+    gear.textContent=aideReglagesOuvert?"▲ Masquer les réglages":"⚙︎ Réglages";
+    gear.onclick=()=>{ aideReglagesOuvert=!aideReglagesOuvert; render(); };
+    tools.appendChild(gear);
+    m.appendChild(tools);
+  }
+
+  if(showConf){
   const av=el("div","note");
   av.style.borderLeft="3px solid var(--ai)";
   av.innerHTML='<b>Comment ça marche —</b> L\'image ou la page part directement de votre appareil vers l\'API Google Gemini, avec votre clé personnelle. Les photos ne sont jamais conservées. Les analyses de pages du PDF importé sont conservées localement quand le cache est actif (voir ci-dessous), pour vous éviter de dépenser de l\'énergie IA sur une même page revisitée. Seule la clé est enregistrée localement pour ne pas avoir à la re-saisir. Les <a href="https://ai.google.dev/gemini-api/terms" target="_blank" style="color:var(--ai)">conditions de Google Gemini</a> s\'appliquent aux données transmises.';
@@ -7968,8 +8015,10 @@ VIEWS.aide=m=>{
     };
   }
 
+  }
   if(!key) return;
 
+  if(showConf){
   /* Carte de gestion du cache d'analyses : toggle activé/désactivé, statistiques,
      bouton pour tout vider. Choix explicite mémoire locale ↔ énergie IA. */
   const cache=el("div","card");
@@ -7998,6 +8047,7 @@ VIEWS.aide=m=>{
       ctrl.appendChild(cl);
     }
   })();
+  }
 
   /* Sélection d'une image + question éventuelle. */
   const bar=el("div","card");
@@ -8043,7 +8093,7 @@ VIEWS.aide=m=>{
     const row=el("div","ctrl"); row.style.marginTop="8px"; row.style.flexWrap="wrap";
     const selV=document.createElement("select"); selV.className="search"; selV.style.flex="2";
     volsTexte.forEach(v=>{
-      const o=document.createElement("option"); o.value=v.id; o.textContent=v.nom.replace(/\.[^.]+$/,"");
+      const o=document.createElement("option"); o.value=v.id; o.textContent=volNom(v);
       selV.appendChild(o);
     });
     const numP=document.createElement("input"); numP.type="number"; numP.min="1"; numP.className="search"; numP.style.flex="1"; numP.placeholder="p. imprimée";
