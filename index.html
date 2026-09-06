@@ -6967,11 +6967,10 @@ function pageDe(l){
 }
 /* ouvre le volume à la page voulue, dans un onglet */
 /* Ouverture du PDF via un mini-viewer pdf.js embarqué dans un wrapper HTML.
-   La voie <embed src="blob:...#page=N"> était fiable sur desktop mais échouait
-   sur mobile : Android Chrome et iOS Safari soit ignorent l'ancre, soit
-   déclenchent un téléchargement, soit ouvrent un viewer système qui ne parse
-   pas #page=. Un viewer pdf.js local, qui rend la page sur canvas, contourne
-   tous ces cas et gère en plus la navigation page suivante/précédente. */
+   Le viewer rend sur canvas (à DPR jusqu'à 3× pour la finesse) et superpose
+   une couche de texte invisible mais sélectionnable — l'utilisateur peut
+   copier le texte comme depuis un vrai lecteur PDF. Boutons de zoom qui
+   re-rendent à la taille demandée plutôt qu'agrandir des pixels. */
 function ouvrirBlobPDF(v,pg){
   if(!murl[v.id]) murl[v.id]=URL.createObjectURL(v.f);
   const pdfUrl=murl[v.id];
@@ -6985,13 +6984,22 @@ function ouvrirBlobPDF(v,pg){
 <title>${titre}</title>
 <style>
 html,body{margin:0;padding:0;height:100%;background:#333;color:#eee;font-family:-apple-system,system-ui,sans-serif;overscroll-behavior:none}
-#bar{position:fixed;top:0;left:0;right:0;height:44px;background:#222;display:flex;align-items:center;padding:0 8px;gap:8px;z-index:10;box-shadow:0 1px 4px rgba(0,0,0,.4)}
-#bar button{background:#444;color:#eee;border:0;padding:8px 12px;border-radius:4px;font-size:1rem;min-width:44px;cursor:pointer}
+#bar{position:fixed;top:0;left:0;right:0;height:44px;background:#222;display:flex;align-items:center;padding:0 8px;gap:6px;z-index:10;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+#bar button{background:#444;color:#eee;border:0;padding:8px 10px;border-radius:4px;font-size:1rem;min-width:38px;cursor:pointer;font-family:inherit}
 #bar button:disabled{opacity:.35;cursor:default}
-#pg{flex:1;text-align:center;font-size:0.875rem}
-#pg input{width:60px;background:#111;color:#eee;border:1px solid #555;border-radius:3px;padding:2px 4px;text-align:center;font-size:0.875rem}
+#pg{flex:1;text-align:center;font-size:0.875rem;min-width:0}
+#pg input{width:56px;background:#111;color:#eee;border:1px solid #555;border-radius:3px;padding:2px 4px;text-align:center;font-size:0.875rem}
+#zl{font-size:0.75rem;color:#999;min-width:42px;text-align:center}
 #pane{position:absolute;top:44px;bottom:0;left:0;right:0;overflow:auto;text-align:center;-webkit-overflow-scrolling:touch}
-canvas{display:block;margin:8px auto;box-shadow:0 4px 12px rgba(0,0,0,.5);background:#fff;max-width:100%}
+#wrap{position:relative;display:inline-block;margin:8px auto;box-shadow:0 4px 12px rgba(0,0,0,.5);background:#fff;line-height:0}
+canvas{display:block;max-width:none}
+/* Couche de texte pdf.js : invisible mais sélectionnable/copiable.
+   L'opacité très basse (mais non nulle) est nécessaire sur certains
+   navigateurs pour que la sélection soit possible. */
+.textLayer{position:absolute;left:0;top:0;right:0;bottom:0;overflow:hidden;opacity:.001;line-height:1;text-align:initial;transform-origin:0 0;forced-color-adjust:none}
+.textLayer span{color:transparent;position:absolute;white-space:pre;cursor:text;transform-origin:0% 0%}
+.textLayer ::selection{background:rgba(80,140,255,.35);color:transparent}
+.textLayer br{color:transparent}
 #msg{padding:40px 20px;text-align:center;color:#aaa;font-size:0.875rem;line-height:1.6}
 </style>
 </head>
@@ -6999,9 +7007,12 @@ canvas{display:block;margin:8px auto;box-shadow:0 4px 12px rgba(0,0,0,.5);backgr
 <div id="bar">
   <button id="prev" aria-label="Précédente">◀</button>
   <div id="pg"><input id="np" type="number" min="1" value="${startPage}"> / <span id="tot">—</span></div>
+  <button id="zo" aria-label="Zoom −">−</button>
+  <span id="zl">100%</span>
+  <button id="zi" aria-label="Zoom +">+</button>
   <button id="next" aria-label="Suivante">▶</button>
 </div>
-<div id="pane"><div id="msg">Chargement du viewer…</div><canvas id="c" hidden></canvas></div>
+<div id="pane"><div id="msg">Chargement du viewer…</div><div id="wrap" hidden><canvas id="c"></canvas><div class="textLayer" id="t"></div></div></div>
 <scr\ipt type="module">
 const PDF_URL=${JSON.stringify(pdfUrl)};
 const START=${startPage};
@@ -7012,32 +7023,55 @@ try{
   const doc=await lib.getDocument(PDF_URL).promise;
   const tot=doc.numPages;
   $("tot").textContent=tot; $("np").max=tot;
-  $("msg").hidden=true; $("c").hidden=false;
-  const canvas=$("c"), ctx=canvas.getContext("2d");
+  $("msg").hidden=true; $("wrap").hidden=false;
+  const canvas=$("c"), ctx=canvas.getContext("2d",{alpha:false});
+  const tLayer=$("t"), wrap=$("wrap");
   let cur=Math.max(1,Math.min(tot,START));
+  let userZoom=1; /* 1.0 = ajusté à la largeur ; 1.5 = 150 %, etc. */
   async function render(n){
     cur=Math.max(1,Math.min(tot,n));
     $("np").value=cur; $("prev").disabled=cur<=1; $("next").disabled=cur>=tot;
+    $("zl").textContent=Math.round(userZoom*100)+"%";
     const p=await doc.getPage(cur);
-    const dpr=Math.min(window.devicePixelRatio||1,2);
+    const dpr=Math.min(window.devicePixelRatio||1,3);
     const targetW=$("pane").clientWidth-16;
     const v1=p.getViewport({scale:1});
-    const scale=Math.min(3,targetW/v1.width);
-    const v=p.getViewport({scale:scale*dpr});
-    canvas.width=v.width; canvas.height=v.height;
-    canvas.style.width=(v.width/dpr)+"px"; canvas.style.height=(v.height/dpr)+"px";
-    await p.render({canvasContext:ctx,viewport:v}).promise;
+    /* Échelle CSS = fit width × zoom utilisateur ; échelle de rendu = ×DPR
+       pour la finesse d'écran sans changer la taille visible. */
+    const cssScale=Math.min(5,(targetW/v1.width)*userZoom);
+    const cssView=p.getViewport({scale:cssScale});
+    const renderView=p.getViewport({scale:cssScale*dpr});
+    canvas.width=renderView.width; canvas.height=renderView.height;
+    canvas.style.width=cssView.width+"px"; canvas.style.height=cssView.height+"px";
+    wrap.style.width=cssView.width+"px"; wrap.style.height=cssView.height+"px";
+    await p.render({canvasContext:ctx,viewport:renderView}).promise;
+    /* Couche de texte : positionnée à l'échelle CSS pour que la sélection
+       corresponde à ce que l'utilisateur voit. */
+    tLayer.innerHTML="";
+    tLayer.style.width=cssView.width+"px";
+    tLayer.style.height=cssView.height+"px";
+    const tc=await p.getTextContent();
+    if(lib.TextLayer){
+      await new lib.TextLayer({textContentSource:tc,container:tLayer,viewport:cssView}).render();
+    } else if(lib.renderTextLayer){
+      await lib.renderTextLayer({textContentSource:tc,container:tLayer,viewport:cssView}).promise;
+    }
     p.cleanup(); $("pane").scrollTop=0;
   }
   await render(cur);
   $("prev").onclick=()=>render(cur-1);
   $("next").onclick=()=>render(cur+1);
   $("np").onchange=e=>render(+e.target.value);
+  $("zi").onclick=()=>{ userZoom=Math.min(4,+(userZoom+0.25).toFixed(2)); render(cur); };
+  $("zo").onclick=()=>{ userZoom=Math.max(0.5,+(userZoom-0.25).toFixed(2)); render(cur); };
   let rt;
   addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>render(cur),200)});
   addEventListener("keydown",e=>{
+    if(e.target.tagName==="INPUT") return;
     if(e.key==="ArrowLeft"||e.key==="PageUp") render(cur-1);
     else if(e.key==="ArrowRight"||e.key==="PageDown"||e.key===" "){e.preventDefault();render(cur+1)}
+    else if(e.key==="+"||e.key==="="){userZoom=Math.min(4,userZoom+0.25);render(cur)}
+    else if(e.key==="-"){userZoom=Math.max(0.5,userZoom-0.25);render(cur)}
   });
 }catch(e){
   $("msg").textContent="Erreur de chargement : "+e.message;
@@ -7429,7 +7463,8 @@ TA MISSION — décoder TOUT ce que la page apporte pédagogiquement, avec autan
 
 CE QUE TU EXAMINES SUR LA PAGE :
 • Le texte japonais — dialogues, phrases-modèles, exercices, listes de vocabulaire, explications de grammaire, notes en petits caractères.
-• Les illustrations, dessins, photos, pictogrammes, schémas — décris ce qu'ils représentent et pourquoi ils sont là (situation d'énonciation, contexte culturel, mise en scène du vocabulaire ou de la grammaire). C'est souvent la clé pour comprendre ce qu'exprime réellement une phrase.
+• Les illustrations, dessins, photos, pictogrammes, schémas — décris ce qu'ils représentent et pourquoi ils sont là. C'est souvent la clé pour comprendre ce qu'exprime réellement une phrase.
+• DANS LES EXERCICES : l'illustration ne décore pas, elle porte l'énoncé. Le manuel Minna no Nihongo utilise massivement les images pour poser des exercices : montrer un objet à nommer, désigner une personne dont on doit parler, mettre en scène une situation à décrire, présenter un plan à commenter, indiquer une heure à dire. INTERPRÈTE ACTIVEMENT chaque illustration d'exercice — décris ce qu'elle montre en détail, puis sers-t'en pour comprendre ce qui est demandé et proposer la réponse. Ne saute jamais un exercice illustré sous prétexte que le texte seul est court : l'essentiel est dans l'image. Si un exercice est du type « regardez le dessin et… », c'est un exercice-image et l'analyse doit reposer sur ta lecture du dessin.
 • La structure de la page — titres, sections, encadrés, tableaux, numérotation des exercices, tout indice typographique.
 • Toute annotation, remarque marginale, ou signe qui a une valeur pédagogique.
 
