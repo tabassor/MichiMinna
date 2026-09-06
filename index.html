@@ -6966,21 +6966,90 @@ function pageDe(l){
   return (ix&&ix>0)?ix:null;
 }
 /* ouvre le volume à la page voulue, dans un onglet */
-/* Ouverture du PDF via un wrapper HTML : Chrome et de nombreux
-   navigateurs mobiles suppriment l'ancre #page=N sur les URL blob:
-   quand le PDF est ouvert directement. En l'affichant via <embed>
-   dans une page HTML, l'ancre est bien honorée. Le wrapper est
-   révoqué après une minute pour éviter la fuite de mémoire. */
+/* Ouverture du PDF via un mini-viewer pdf.js embarqué dans un wrapper HTML.
+   La voie <embed src="blob:...#page=N"> était fiable sur desktop mais échouait
+   sur mobile : Android Chrome et iOS Safari soit ignorent l'ancre, soit
+   déclenchent un téléchargement, soit ouvrent un viewer système qui ne parse
+   pas #page=. Un viewer pdf.js local, qui rend la page sur canvas, contourne
+   tous ces cas et gère en plus la navigation page suivante/précédente. */
 function ouvrirBlobPDF(v,pg){
   if(!murl[v.id]) murl[v.id]=URL.createObjectURL(v.f);
-  const pdfUrl=murl[v.id]+(pg?"#page="+pg:"");
-  const titre=(v.nom||"Manuel").replace(/[<>]/g,"");
-  const html='<!doctype html><html><head><meta charset="utf-8"><title>'+titre+
-    '</title><style>html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#222}embed{width:100%;height:100vh;border:0;display:block}</style></head>'+
-    '<body><embed src="'+pdfUrl+'" type="application/pdf"></body></html>';
+  const pdfUrl=murl[v.id];
+  const startPage=(pg&&pg>0)?pg:1;
+  const titre=(v.nom||"Manuel").replace(/[<>"'\\]/g,"");
+  const html=`<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=yes">
+<title>${titre}</title>
+<style>
+html,body{margin:0;padding:0;height:100%;background:#333;color:#eee;font-family:-apple-system,system-ui,sans-serif;overscroll-behavior:none}
+#bar{position:fixed;top:0;left:0;right:0;height:44px;background:#222;display:flex;align-items:center;padding:0 8px;gap:8px;z-index:10;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+#bar button{background:#444;color:#eee;border:0;padding:8px 12px;border-radius:4px;font-size:1rem;min-width:44px;cursor:pointer}
+#bar button:disabled{opacity:.35;cursor:default}
+#pg{flex:1;text-align:center;font-size:0.875rem}
+#pg input{width:60px;background:#111;color:#eee;border:1px solid #555;border-radius:3px;padding:2px 4px;text-align:center;font-size:0.875rem}
+#pane{position:absolute;top:44px;bottom:0;left:0;right:0;overflow:auto;text-align:center;-webkit-overflow-scrolling:touch}
+canvas{display:block;margin:8px auto;box-shadow:0 4px 12px rgba(0,0,0,.5);background:#fff;max-width:100%}
+#msg{padding:40px 20px;text-align:center;color:#aaa;font-size:0.875rem;line-height:1.6}
+</style>
+</head>
+<body>
+<div id="bar">
+  <button id="prev" aria-label="Précédente">◀</button>
+  <div id="pg"><input id="np" type="number" min="1" value="${startPage}"> / <span id="tot">—</span></div>
+  <button id="next" aria-label="Suivante">▶</button>
+</div>
+<div id="pane"><div id="msg">Chargement du viewer…</div><canvas id="c" hidden></canvas></div>
+<scr\ipt type="module">
+const PDF_URL=${JSON.stringify(pdfUrl)};
+const START=${startPage};
+const $=id=>document.getElementById(id);
+try{
+  const lib=await import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs");
+  lib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
+  const doc=await lib.getDocument(PDF_URL).promise;
+  const tot=doc.numPages;
+  $("tot").textContent=tot; $("np").max=tot;
+  $("msg").hidden=true; $("c").hidden=false;
+  const canvas=$("c"), ctx=canvas.getContext("2d");
+  let cur=Math.max(1,Math.min(tot,START));
+  async function render(n){
+    cur=Math.max(1,Math.min(tot,n));
+    $("np").value=cur; $("prev").disabled=cur<=1; $("next").disabled=cur>=tot;
+    const p=await doc.getPage(cur);
+    const dpr=Math.min(window.devicePixelRatio||1,2);
+    const targetW=$("pane").clientWidth-16;
+    const v1=p.getViewport({scale:1});
+    const scale=Math.min(3,targetW/v1.width);
+    const v=p.getViewport({scale:scale*dpr});
+    canvas.width=v.width; canvas.height=v.height;
+    canvas.style.width=(v.width/dpr)+"px"; canvas.style.height=(v.height/dpr)+"px";
+    await p.render({canvasContext:ctx,viewport:v}).promise;
+    p.cleanup(); $("pane").scrollTop=0;
+  }
+  await render(cur);
+  $("prev").onclick=()=>render(cur-1);
+  $("next").onclick=()=>render(cur+1);
+  $("np").onchange=e=>render(+e.target.value);
+  let rt;
+  addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>render(cur),200)});
+  addEventListener("keydown",e=>{
+    if(e.key==="ArrowLeft"||e.key==="PageUp") render(cur-1);
+    else if(e.key==="ArrowRight"||e.key==="PageDown"||e.key===" "){e.preventDefault();render(cur+1)}
+  });
+}catch(e){
+  $("msg").textContent="Erreur de chargement : "+e.message;
+}
+<\/script>
+</body>
+</html>`;
   const shim=URL.createObjectURL(new Blob([html],{type:"text/html"}));
   window.open(shim,"_blank");
-  setTimeout(()=>URL.revokeObjectURL(shim),60000);
+  /* révocation retardée : pdf.js peut mettre 2-3 s à télécharger la première
+     fois depuis le CDN ; on laisse largement le temps au wrapper de tenir. */
+  setTimeout(()=>URL.revokeObjectURL(shim),120000);
 }
 function ouvrirManuel(l){
   const v=manuelDe(l);
