@@ -7033,11 +7033,14 @@ canvas{display:block;max-width:none}
   <span id="zl">100%</span>
   <button id="zi" aria-label="Zoom +">+</button>
   <button id="next" aria-label="Suivante">▶</button>
+  <button id="an" aria-label="Analyser la page avec Gemini" title="Analyser avec Gemini" style="background:#3f5faa;font-weight:600">解</button>
 </div>
 <div id="pane"><div id="msg">Chargement du viewer…</div><div id="wrap" hidden><canvas id="c"></canvas><div class="textLayer" id="t"></div></div></div>
 <scr\ipt type="module">
 const PDF_URL=${JSON.stringify(pdfUrl)};
 const START=${startPage};
+const VOL_ID=${JSON.stringify(v.id)};
+const OFFSET=${v.offset||0};
 const $=id=>document.getElementById(id);
 try{
   const lib=await import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs");
@@ -7095,6 +7098,22 @@ try{
     else if(e.key==="+"||e.key==="="){userZoom=Math.min(4,userZoom+0.25);render(cur)}
     else if(e.key==="-"){userZoom=Math.max(0.5,userZoom-0.25);render(cur)}
   });
+  /* Bouton 解 : envoie la page en cours à l'écran d'analyse de Michi.
+     On convertit la page PDF courante en page imprimée (via l'offset du
+     volume) pour rester cohérent avec le tag utilisé partout ailleurs. */
+  $("an").onclick=()=>{
+    const printed=OFFSET>0 ? (cur-OFFSET+1) : cur;
+    if(printed<1){ alert("Cette page est dans les préliminaires du PDF, pas dans le corps du livre. Naviguez à une page numérotée du livre pour l'analyser."); return; }
+    if(window.opener && !window.opener.closed){
+      try{
+        window.opener.focus();
+        window.opener.postMessage({type:"michi:analyze", vol:VOL_ID, page:printed}, "*");
+        setTimeout(()=>window.close(), 100);
+      }catch(e){ alert("Impossible de contacter Michi : "+e.message); }
+    } else {
+      alert("La fenêtre Michi n'est plus ouverte — rouvrez l'app pour envoyer la page à l'analyse.");
+    }
+  };
 }catch(e){
   $("msg").textContent="Erreur de chargement : "+e.message;
 }
@@ -7474,6 +7493,80 @@ function aideModelSet(v){ try{ if(v&&v!==AIDE_MODEL_DEF) localStorage.setItem("m
 const AIDE_URL = k => "https://generativelanguage.googleapis.com/v1beta/models/"+aideModel()+":generateContent?key="+encodeURIComponent(k);
 
 /* État de l'écran, purement en mémoire — perdu au rechargement. */
+/* Cache local des analyses Gemini de pages du PDF importé.
+   Clé : "volId:page_imprimée" — une entrée par page décryptée. Chaque entrée
+   stocke le fil complet (question initiale avec l'image, réponse, tout suivi).
+   L'image est conservée pour que les questions de suivi aient encore le
+   contexte visuel de Gemini. Coût typique : ~250 Ko par page. */
+function adb(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open("michi-analyses",1);
+    r.onupgradeneeded=()=>{ if(!r.result.objectStoreNames.contains("t")) r.result.createObjectStore("t",{keyPath:"k"}); };
+    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
+  });
+}
+async function analysePut(vol,page,msgs){
+  try{ const db=await adb();
+    return await new Promise((res,rej)=>{
+      const t=db.transaction("t","readwrite");
+      t.objectStore("t").put({k:vol+":"+page, vol:vol, page:page, at:Date.now(), msgs:msgs});
+      t.oncomplete=()=>res(); t.onerror=()=>rej(t.error);
+    });
+  }catch(e){}
+}
+async function analyseGet(vol,page){
+  try{ const db=await adb();
+    return await new Promise((res,rej)=>{
+      const t=db.transaction("t","readonly");
+      const q=t.objectStore("t").get(vol+":"+page);
+      q.onsuccess=()=>res(q.result||null); q.onerror=()=>rej(q.error);
+    });
+  }catch(e){ return null; }
+}
+async function analyseDel(vol,page){
+  try{ const db=await adb();
+    return await new Promise((res,rej)=>{
+      const t=db.transaction("t","readwrite");
+      t.objectStore("t").delete(vol+":"+page);
+      t.oncomplete=()=>res(); t.onerror=()=>rej(t.error);
+    });
+  }catch(e){}
+}
+async function analyseAll(){
+  try{ const db=await adb();
+    return await new Promise((res,rej)=>{
+      const t=db.transaction("t","readonly");
+      const q=t.objectStore("t").getAll();
+      q.onsuccess=()=>res(q.result||[]); q.onerror=()=>rej(q.error);
+    });
+  }catch(e){ return []; }
+}
+async function analyseClear(){
+  try{ const db=await adb();
+    return await new Promise((res,rej)=>{
+      const t=db.transaction("t","readwrite");
+      t.objectStore("t").clear();
+      t.oncomplete=()=>res(); t.onerror=()=>rej(t.error);
+    });
+  }catch(e){}
+}
+async function analyseStats(){
+  const all=await analyseAll();
+  let bytes=0;
+  all.forEach(a=>{ try{ bytes+=JSON.stringify(a).length; }catch(e){} });
+  return {n:all.length, bytes:bytes};
+}
+
+/* Préférence utilisateur : cache actif par défaut. Le toggle vit dans
+   l'écran d'aide, la valeur est stockée par utilisateur. */
+function aideCachePref(){
+  try{ const v=localStorage.getItem("michi:aideCache:"+(UID||"_"));
+       return v===null ? true : v==="1"; }catch(e){ return true; }
+}
+function aideCachePrefSet(on){
+  try{ localStorage.setItem("michi:aideCache:"+(UID||"_"), on?"1":"0"); }catch(e){}
+}
+
 let aideMsg=[], aideImgB64=null, aideBusy=false;
 
 /* Consigne système : le contexte du niveau de l'apprenant et le format
@@ -7647,6 +7740,26 @@ async function aideAppelUnique(key,msgs,onChunk){
 
 function aideRedessiner(chat){
   chat.innerHTML="";
+  /* Entête source : si ce fil concerne une page PDF, on montre le repère
+     et deux liens — ouvrir la page dans le viewer, ou refaire l'analyse. */
+  if(aideMsg.length && aideMsg[0].source){
+    const src=aideMsg[0].source;
+    const v=(MANUELS||[]).find(x=>x.id===src.vol);
+    const nom=v?v.nom.replace(/\.[^.]+$/,""):"?";
+    const h=el("div","card");
+    h.style.borderColor="var(--ai)";
+    h.style.padding="10px 12px";
+    h.innerHTML='<div style="font-size:0.8125rem;display:flex;align-items:center;gap:12px;flex-wrap:wrap"><b>Page '+esc(String(src.page))+'</b> de « '+esc(nom)+' » <a class="cjlink" data-a="open">本 Ouvrir</a> <a class="cjlink" data-a="refresh" style="color:var(--mut)">Refaire l\'analyse</a></div>';
+    if(v){
+      h.querySelector('[data-a="open"]').onclick=()=>ouvrirManuelVolPage(v.id, pdfPageDe(v, src.page));
+      h.querySelector('[data-a="refresh"]').onclick=async()=>{
+        if(!confirm("Effacer cette analyse et en relancer une nouvelle ?")) return;
+        await analyseDel(v.id, src.page);
+        aideLancePDF(v, src.page, true);
+      };
+    }
+    chat.appendChild(h);
+  }
   aideMsg.forEach(mm=>{
     const c=el("div","card aidebulle "+(mm.role==="user"?"u":"m"));
     if(mm.role==="user"){
@@ -7687,6 +7800,12 @@ function aideChampSuivi(chat){
         (n,tot,ms,motif)=>{
           bulle.innerHTML='<div style="color:var(--mut);font-style:italic">Gemini est saturé — nouvelle tentative '+n+'/'+tot+' dans '+Math.round(ms/1000)+' s…<br><span style="font-size:0.75rem">'+esc(motif)+'</span></div>';
         });
+      /* Suite d'un fil PDF : on met à jour le cache pour conserver aussi
+         les questions de suivi et leurs réponses. */
+      if(aideCachePref() && aideMsg[0] && aideMsg[0].source){
+        const src=aideMsg[0].source;
+        analysePut(src.vol, src.page, aideMsg);
+      }
     } catch(e){
       aideMsg.pop(); aideMsg.pop();
       aideErreur(e.message);
@@ -7707,13 +7826,100 @@ function aideEffaceErreur(){
   e.style.display="none"; e.innerHTML="";
 }
 
+/* Lance l'analyse d'une page du PDF importé, en s'appuyant sur le cache
+   quand il est actif. Écrase le fil courant : chaque page a sa propre
+   conversation. Peut être appelée depuis le bouton de l'écran d'aide comme
+   depuis un postMessage du viewer PDF (bouton 解 dans la barre du viewer). */
+async function aideLancePDF(v, imp, forceRefresh){
+  if(aideBusy) return;
+  const chat=document.getElementById("aideChat");
+  if(!chat){ /* écran d'aide pas monté : on demande d'y aller d'abord */
+    view="aide"; render();
+    setTimeout(()=>aideLancePDF(v,imp,forceRefresh),300);
+    return;
+  }
+  aideEffaceErreur();
+
+  /* Recherche en cache : si l'entrée existe et que l'utilisateur veut le cache,
+     on restaure le fil sans dépenser de tokens ni d'énergie. */
+  if(!forceRefresh && aideCachePref()){
+    const cached=await analyseGet(v.id, imp);
+    if(cached && cached.msgs && cached.msgs.length){
+      aideMsg=cached.msgs;
+      aideRedessiner(chat);
+      aideChampSuivi(chat);
+      chat.scrollIntoView({behavior:"smooth",block:"start"});
+      return;
+    }
+  }
+
+  /* Nouvelle analyse : on remet le fil à zéro pour cette page. */
+  aideMsg=[];
+  aideRedessiner(chat);
+  aideBusy=true;
+
+  const np=pdfPageDe(v, imp);
+  if(np<1||np>v.pages.length){
+    aideErreur("Page hors du volume (PDF "+np+"/"+v.pages.length+")");
+    aideBusy=false; return;
+  }
+
+  let imgB64;
+  try{ imgB64=await pdfPageImage(v, np, 1600); }
+  catch(e){ aideErreur("Impossible de rendre la page : "+e.message); aideBusy=false; return; }
+
+  const question="Analyse cette page du manuel Minna no Nihongo I — c'est la page "+imp+" imprimée dans le livre. Elle est envoyée en image telle que je la vois.";
+  aideMsg.push({role:"user", parts:[{text:question},{inlineData:{mimeType:"image/jpeg",data:imgB64}}],
+    affiche:"Page "+imp+" (imprimée) de « "+v.nom.replace(/\.[^.]+$/,"")+" »",
+    source:{vol:v.id, page:imp}});
+  const rep={role:"model", parts:[{text:""}]};
+  aideMsg.push(rep);
+  aideRedessiner(chat);
+  const bulle=chat.querySelector(".aidebulle.m:last-child .aidebody");
+
+  let ok=false;
+  try{
+    await aideAppel(aideKey(), aideMsg,
+      ch=>{ rep.parts[0].text+=ch; bulle.innerHTML=aideRendu(rep.parts[0].text); },
+      (n,tot,ms,motif)=>{
+        bulle.innerHTML='<div style="color:var(--mut);font-style:italic">Gemini est saturé — nouvelle tentative '+n+'/'+tot+' dans '+Math.round(ms/1000)+' s…<br><span style="font-size:0.75rem">'+esc(motif)+'</span></div>';
+      });
+    ok=true;
+    if(aideCachePref()) analysePut(v.id, imp, aideMsg);
+  }catch(e){
+    aideMsg.pop(); aideMsg.pop();
+    aideErreur(e.message);
+    aideRedessiner(chat);
+  }
+  aideBusy=false;
+  if(ok) aideChampSuivi(chat);
+}
+
+/* Écouteur postMessage venant du viewer PDF : bouton 解 dans la barre.
+   Le viewer envoie {type:"michi:analyze", vol, page}, on bascule sur l'aide
+   et on lance l'analyse (avec cache si dispo). */
+if(!window.__michiAideMsgListener){
+  window.__michiAideMsgListener=true;
+  window.addEventListener("message",e=>{
+    const d=e.data;
+    if(!d||typeof d!=="object"||!d.type) return;
+    if(d.type==="michi:analyze" && d.vol && d.page){
+      if(view!=="aide"){ view="aide"; render(); }
+      setTimeout(()=>{
+        const v=(MANUELS||[]).find(x=>x.id===d.vol);
+        if(v) aideLancePDF(v, d.page);
+      }, 300);
+    }
+  });
+}
+
 VIEWS.aide=m=>{
   head(m,"解説","Photographiez une page, obtenez l'explication");
   const key=aideKey();
 
   const av=el("div","note");
   av.style.borderLeft="3px solid var(--ai)";
-  av.innerHTML='<b>Comment ça marche —</b> Une photo de la page part directement de votre appareil vers l\'API Google Gemini, avec votre clé personnelle. Michi ne conserve ni l\'image, ni la conversation ; tout disparaît en quittant l\'écran. Seule la clé est enregistrée localement pour ne pas avoir à la re-saisir. Les <a href="https://ai.google.dev/gemini-api/terms" target="_blank" style="color:var(--ai)">conditions de Google Gemini</a> s\'appliquent aux données transmises.';
+  av.innerHTML='<b>Comment ça marche —</b> L\'image ou la page part directement de votre appareil vers l\'API Google Gemini, avec votre clé personnelle. Les photos ne sont jamais conservées. Les analyses de pages du PDF importé sont conservées localement quand le cache est actif (voir ci-dessous), pour vous éviter de dépenser de l\'énergie IA sur une même page revisitée. Seule la clé est enregistrée localement pour ne pas avoir à la re-saisir. Les <a href="https://ai.google.dev/gemini-api/terms" target="_blank" style="color:var(--ai)">conditions de Google Gemini</a> s\'appliquent aux données transmises.';
   m.appendChild(av);
 
   /* Écran de configuration : d'abord si la clé manque, sinon repliable. */
@@ -7763,6 +7969,35 @@ VIEWS.aide=m=>{
   }
 
   if(!key) return;
+
+  /* Carte de gestion du cache d'analyses : toggle activé/désactivé, statistiques,
+     bouton pour tout vider. Choix explicite mémoire locale ↔ énergie IA. */
+  const cache=el("div","card");
+  const on=aideCachePref();
+  cache.innerHTML='<h3>Cache des analyses <span class="tag" style="border-color:'+(on?"var(--take)":"var(--mut)")+';color:'+(on?"var(--take)":"var(--mut)")+'">'+(on?"activé":"désactivé")+'</span></h3>'+
+    '<div style="font-size:0.8125rem;color:var(--mut);line-height:1.55;margin-top:6px">'+
+      'Quand il est actif, chaque analyse d\'une page du PDF importé est conservée sur cet appareil (~250 Ko par page, image comprise). En revenant sur une page déjà décryptée, l\'analyse s\'affiche instantanément, sans nouvel appel Gemini. Économise énergie IA, données mobiles et attente. Les photos ne sont jamais conservées.</div>'+
+    '<div style="margin-top:10px" id="aideCacheStats">…</div>'+
+    '<div class="ctrl" style="margin-top:10px" id="aideCacheCtrl"></div>';
+  m.appendChild(cache);
+  (async()=>{
+    const st=await analyseStats();
+    const kb=Math.round(st.bytes/1024);
+    const mb=kb>=1024?(kb/1024).toFixed(1)+" Mo":kb+" Ko";
+    document.getElementById("aideCacheStats").innerHTML='<span style="font-size:0.8125rem">Cache actuel : <b>'+st.n+' analyse'+(st.n>1?"s":"")+'</b> · '+mb+'</span>';
+    const ctrl=document.getElementById("aideCacheCtrl");
+    const tog=el("button","btn"+(on?" p":""), on?"Désactiver le cache":"Activer le cache");
+    tog.onclick=()=>{ aideCachePrefSet(!on); render(); };
+    ctrl.appendChild(tog);
+    if(st.n){
+      const cl=el("button","btn","Vider ("+st.n+")");
+      cl.onclick=async()=>{
+        if(!confirm("Effacer les "+st.n+" analyses en cache ? Chaque page devra être réanalysée à la prochaine consultation.")) return;
+        await analyseClear(); render(); toast("Cache vidé");
+      };
+      ctrl.appendChild(cl);
+    }
+  })();
 
   /* Sélection d'une image + question éventuelle. */
   const bar=el("div","card");
@@ -7819,47 +8054,17 @@ VIEWS.aide=m=>{
     m.appendChild(cp);
 
     goP.onclick=async()=>{
-      if(aideBusy) return;
       const v=volsTexte.find(x=>x.id===selV.value);
       const imp=+numP.value;
       if(!v||!imp||imp<1){ toast("Numéro de page invalide"); return; }
-      const np=pdfPageDe(v,imp);
-      if(np<1||np>v.pages.length){ toast("Page hors du volume (PDF "+np+"/"+v.pages.length+")"); return; }
-      aideBusy=true; goP.disabled=true; goP.textContent="Rendu de la page…";
-      aideEffaceErreur();
-      /* On rend la page à 1600 px maximum : lisible sur du Minna et raisonnable
-         en tokens image côté Gemini. La vision multimodale lit le japonais
-         imprimé sans peine, et voit maintenant les illustrations. */
-      let imgB64;
-      try{ imgB64=await pdfPageImage(v, np, 1600); }
-      catch(e){ aideErreur("Impossible de rendre la page : "+e.message); aideBusy=false; goP.disabled=false; goP.textContent="解析 · Analyser cette page"; return; }
-      goP.textContent="Analyse en cours…";
-      const question="Analyse cette page du manuel Minna no Nihongo I — c'est la page "+imp+" imprimée dans le livre. Elle est envoyée en image telle que je la vois.";
-      aideMsg.push({role:"user", parts:[{text:question},{inlineData:{mimeType:"image/jpeg",data:imgB64}}], affiche:"Page "+imp+" (imprimée) de « "+v.nom.replace(/\.[^.]+$/,"")+" »"});
-      const rep={role:"model", parts:[{text:""}]}; aideMsg.push(rep);
-      aideRedessiner(chat);
-      const bulle=chat.lastElementChild.querySelector(".aidebody");
-      let ok=false;
-      try{
-        await aideAppel(key,aideMsg,
-          ch=>{ rep.parts[0].text+=ch; bulle.innerHTML=aideRendu(rep.parts[0].text); },
-          (n,tot,ms,motif)=>{
-            bulle.innerHTML='<div style="color:var(--mut);font-style:italic">Gemini est saturé — nouvelle tentative '+n+'/'+tot+' dans '+Math.round(ms/1000)+' s…<br><span style="font-size:0.75rem">'+esc(motif)+'</span></div>';
-          });
-        ok=true;
-      } catch(e){
-        aideMsg.pop(); aideMsg.pop();
-        aideErreur(e.message);
-        aideRedessiner(chat);
-      }
+      goP.disabled=true; goP.textContent="Analyse en cours…";
+      await aideLancePDF(v, imp);
       goP.disabled=false; goP.textContent="解析 · Analyser cette page";
-      aideBusy=false;
-      if(ok||aideMsg.some(mm=>mm.role==="model"&&mm.parts[0].text)) aideChampSuivi(chat);
     };
   }
 
   const erreurZone=el("div"); erreurZone.id="aideErr"; erreurZone.style.display="none"; m.appendChild(erreurZone);
-  const chat=el("div"); m.appendChild(chat);
+  const chat=el("div"); chat.id="aideChat"; m.appendChild(chat);
 
   inp.onchange=async ()=>{
     const f=inp.files&&inp.files[0]; if(!f) return;
