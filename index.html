@@ -6936,6 +6936,28 @@ function pdfDetecteDecalage(pages){
 function pdfPageDe(v,imprime){ return imprime + ((v&&v.offset)?v.offset-1:0); }
 function pdfPageVers(v,pdfPage){ return v&&v.offset ? pdfPage-v.offset+1 : pdfPage; }
 
+/* Rend une page d'un PDF sur une canvas et renvoie du JPEG base64.
+   Sert à envoyer à Gemini l'image exacte de la page, illustrations comprises,
+   plutôt que le seul texte extrait. maxDim borne le grand côté. */
+async function pdfPageImage(v, pageNum, maxDim){
+  const lib=await pdfLib();
+  const doc=await lib.getDocument({data:await v.f.arrayBuffer()}).promise;
+  try{
+    const p=await doc.getPage(pageNum);
+    const v1=p.getViewport({scale:1});
+    const scale=Math.min(maxDim/v1.width, maxDim/v1.height, 4);
+    const view=p.getViewport({scale});
+    const cv=document.createElement("canvas");
+    cv.width=view.width; cv.height=view.height;
+    const ctx=cv.getContext("2d",{alpha:false});
+    ctx.fillStyle="#fff"; ctx.fillRect(0,0,view.width,view.height);
+    await p.render({canvasContext:ctx,viewport:view}).promise;
+    p.cleanup();
+    const url=cv.toDataURL("image/jpeg",0.85);
+    return url.split(",")[1];
+  } finally { doc.destroy(); }
+}
+
 /* Renvoie { volumeId, page } pour la première occurrence d'un mot dans les
    volumes importés qui ont un index. Sert aux fiches de mot. */
 function pdfChercheMot(cle){
@@ -7586,10 +7608,13 @@ async function aideAppelUnique(key,msgs,onChunk){
      "low" a produit des réponses vides sur nos tests. */
   const mdl=aideModel();
   const gc={maxOutputTokens: 8192};
-  /* Sur les Gemini 3.x on veut au contraire du raisonnement pour analyser
-     correctement les illustrations et la mise en page — pas la coupure.
-     Sur les 2.5, on garde la coupure du thinking et la température basse. */
+  /* Détecter si la requête porte une image (analyse photo) ou seulement
+     du texte (analyse d'une page PDF déjà extraite). Sur les 3.x, le
+     raisonnement par défaut est "high" — utile pour interpréter une
+     illustration, gaspillé sur du texte brut. On ajuste finement. */
+  const avecImage=envoi.some(m=>m.parts&&m.parts.some(pt=>pt.inlineData||pt.inline_data));
   if(/gemini-2\.5/.test(mdl)){ gc.thinkingConfig={thinkingBudget:0}; gc.temperature=0.4; }
+  else if(/gemini-[3-9]/.test(mdl) && !avecImage){ gc.thinkingConfig={thinkingLevel:"low"}; }
   const body={
     contents: envoi.map(m=>({role:m.role, parts:m.parts})),
     systemInstruction:{parts:[{text:aideSysteme()}]},
@@ -7779,7 +7804,7 @@ VIEWS.aide=m=>{
   if(volsTexte.length){
     const cp=el("div","card");
     cp.appendChild(el("h3",null,"Ou une page de votre manuel importé"));
-    cp.appendChild(el("div","note","Envoie directement le texte de la page à Gemini, sans photo. Plus rapide et plus précis quand le PDF a été extrait."));
+    cp.appendChild(el("div","note","Envoie la page rendue depuis le PDF à Gemini — illustrations comprises, sans avoir à photographier. Meilleur rendu que la photo (pas de flou ni d'éclairage) et énoncés illustrés bien pris en compte."));
     const row=el("div","ctrl"); row.style.marginTop="8px"; row.style.flexWrap="wrap";
     const selV=document.createElement("select"); selV.className="search"; selV.style.flex="2";
     volsTexte.forEach(v=>{
@@ -7800,12 +7825,17 @@ VIEWS.aide=m=>{
       if(!v||!imp||imp<1){ toast("Numéro de page invalide"); return; }
       const np=pdfPageDe(v,imp);
       if(np<1||np>v.pages.length){ toast("Page hors du volume (PDF "+np+"/"+v.pages.length+")"); return; }
-      const texte=v.pages[np-1]||"";
-      if(!texte.trim()){ toast("Cette page ne contient pas de texte extrait"); return; }
-      aideBusy=true; goP.disabled=true; goP.textContent="Analyse en cours…";
+      aideBusy=true; goP.disabled=true; goP.textContent="Rendu de la page…";
       aideEffaceErreur();
-      const question="Analyse la page suivante du manuel (page "+imp+" imprimée dans le livre, texte brut extrait du PDF) :\n\n"+texte.slice(0,10000);
-      aideMsg.push({role:"user", parts:[{text:question}], affiche:"Page "+imp+" (imprimée) de « "+v.nom.replace(/\.[^.]+$/,"")+" »"});
+      /* On rend la page à 1600 px maximum : lisible sur du Minna et raisonnable
+         en tokens image côté Gemini. La vision multimodale lit le japonais
+         imprimé sans peine, et voit maintenant les illustrations. */
+      let imgB64;
+      try{ imgB64=await pdfPageImage(v, np, 1600); }
+      catch(e){ aideErreur("Impossible de rendre la page : "+e.message); aideBusy=false; goP.disabled=false; goP.textContent="解析 · Analyser cette page"; return; }
+      goP.textContent="Analyse en cours…";
+      const question="Analyse cette page du manuel Minna no Nihongo I — c'est la page "+imp+" imprimée dans le livre. Elle est envoyée en image telle que je la vois.";
+      aideMsg.push({role:"user", parts:[{text:question},{inlineData:{mimeType:"image/jpeg",data:imgB64}}], affiche:"Page "+imp+" (imprimée) de « "+v.nom.replace(/\.[^.]+$/,"")+" »"});
       const rep={role:"model", parts:[{text:""}]}; aideMsg.push(rep);
       aideRedessiner(chat);
       const bulle=chat.lastElementChild.querySelector(".aidebody");
