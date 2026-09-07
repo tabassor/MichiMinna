@@ -7723,7 +7723,7 @@ async function aideAppelUnique(key,msgs,onChunk){
      Sur 3.x, on laisse le défaut Google (thinkingLevel implicite) : imposer
      "low" a produit des réponses vides sur nos tests. */
   const mdl=aideModel();
-  const gc={maxOutputTokens: 8192};
+  const gc={maxOutputTokens: 32768};  /* 32k : marge large pour les pages chargées d'exercices avec propositions + justifications. Gemini 3.x supporte jusqu'à 64k en sortie, on reste très en dessous mais on ne coupe plus au milieu d'une page. */
   /* Détecter si la requête porte une image (analyse photo) ou seulement
      du texte (analyse d'une page PDF déjà extraite). Sur les 3.x, le
      raisonnement par défaut est "high" — utile pour interpréter une
