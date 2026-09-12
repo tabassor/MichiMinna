@@ -311,6 +311,45 @@ button.stat{font:inherit;width:100%}
 .replitete:hover{color:var(--ai)}
 .replitete i{font-style:normal;font-size:0.625rem;letter-spacing:0}
 .replitete b{font-weight:700;letter-spacing:.04em}
+/* ---- Orbites : profondeur réelle, cibles immobiles ----
+   Les satellites sont posés sur une ellipse (l'orbite vue de trois-quarts).
+   Le bas de l'ellipse est devant le centre, le haut derrière : l'échelle,
+   l'opacité et le z-index suivent cette profondeur. Les positions ne
+   bougent pas, donc les boutons restent faciles à viser. */
+.roue{perspective:760px;perspective-origin:50% 44%}
+.roue-c,.eq-c{z-index:2}
+/* Arrivée en orbite : chaque satellite quitte le centre, décrit un arc
+   en profondeur et se pose à sa place. Une seule fois, à l'ouverture. */
+.orb{animation:poseOrbite .78s cubic-bezier(.22,.86,.3,1) backwards}
+@keyframes poseOrbite{
+  0%  {opacity:0;transform:translate(-50%,-50%) scale(.34) translateZ(-70px)}
+  55% {opacity:1}
+  100%{opacity:1;transform:translate(-50%,-50%) scale(var(--ech,1)) translateZ(0)}
+}
+/* Au repos, l'échelle de profondeur est conservée */
+.orb{transform:translate(-50%,-50%) scale(var(--ech,1))}
+.orb:active{transform:translate(-50%,-50%) scale(calc(var(--ech,1) * .9))}
+/* Ombre plus marquée pour ce qui est devant, plus diffuse pour ce qui est loin */
+.orb .rv-d,.orb .eq-d{transition:box-shadow .3s ease,filter .3s ease}
+/* Parallaxe doux au défilement : la perspective réagit au geste */
+@media(hover:hover){
+  .roue:hover{perspective-origin:50% 40%}
+}
+/* ---- 記録 : orbite continue, la roue n'étant pas cliquable ---- */
+/* Le rayon suit la largeur de la roue pour ne pas déborder sur petit écran. */
+.eq-roue{transform-style:preserve-3d;--orb-r:min(111px,31.8vw)}
+/* La rotation est inclinée d'un quart pour que l'orbite se lise comme une
+   ellipse. La contre-rotation garde chaque disque face au lecteur. Le tri
+   devant/derrière est fait par le navigateur grâce à preserve-3d. */
+.eq-orb{position:absolute;left:50%;top:50%;transform-style:preserve-3d;
+  animation:tourne 38s linear infinite;
+  animation-delay:calc(var(--i) * -7.6s)}
+@keyframes tourne{
+  from{transform:translate(-50%,-50%) rotateX(-64deg) rotateZ(0deg)
+        translateX(var(--orb-r)) rotateZ(0deg) rotateX(64deg)}
+  to  {transform:translate(-50%,-50%) rotateX(-64deg) rotateZ(360deg)
+        translateX(var(--orb-r)) rotateZ(-360deg) rotateX(64deg)}
+}
 /* ---- 記録 Roue de l'équilibre des cinq voies ---- */
 .eq-roue{width:min(300px,86vw);margin:4px auto 2px}
 .eq-c{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
@@ -457,7 +496,7 @@ button.stat{font:inherit;width:100%}
 .roue-in::before{content:"";position:absolute;left:13%;top:13%;width:74%;height:74%;
   border-radius:50%;border:1px dashed color-mix(in srgb,var(--line) 80%,transparent);
   opacity:.55;pointer-events:none}
-.roue-c{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+.roue-c{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;
   width:29%;aspect-ratio:1;border-radius:50%;border:1px solid var(--line);
   background:radial-gradient(circle at 38% 32%,color-mix(in srgb,var(--surf) 97%,#fff),var(--surf));
   display:flex;flex-direction:column;align-items:center;
@@ -541,6 +580,25 @@ button.stat{font:inherit;width:100%}
 .vchip.on{border-color:var(--vc);color:var(--vc);background:color-mix(in srgb,var(--vc) 9%,transparent);font-weight:600}
 .vchip.sm{font-family:var(--disp);font-size:0.8125rem;padding:3px 8px}
 .vchip.raz{font-family:var(--ui);font-size:0.6875rem;opacity:.75}
+/* Liste des formes verbales à travailler : kanji, sens en clair, leçon */
+.formesbox{margin-top:9px;padding-top:9px;border-top:1px dashed var(--line)}
+.formeslist{display:flex;flex-direction:column;gap:2px;margin-top:6px}
+.formerow{display:flex;align-items:center;gap:9px;width:100%;text-align:left;
+  padding:7px 9px;border-radius:var(--r-sm);border:1px solid transparent;
+  background:none;cursor:pointer;font-family:var(--ui);
+  transition:background .16s ease,border-color .16s ease}
+.formerow.on{border-color:color-mix(in srgb,var(--vc) 34%,var(--line));
+  background:color-mix(in srgb,var(--vc) 7%,transparent)}
+.formerow:active{transform:scale(.99)}
+.fm-ck{width:17px;height:17px;flex:0 0 auto;border-radius:5px;display:grid;place-items:center;
+  border:1px solid var(--line);font-size:0.6875rem;color:var(--vc);line-height:1;
+  background:var(--surf)}
+.formerow.on .fm-ck{border-color:var(--vc);background:color-mix(in srgb,var(--vc) 16%,var(--surf));font-weight:700}
+.fm-j{font-family:var(--disp);font-size:0.9375rem;color:var(--vc);flex:0 0 auto;min-width:58px;line-height:1.2}
+.formerow:not(.on) .fm-j{color:var(--mut)}
+.fm-f{flex:1;min-width:0;font-size:0.7812rem;color:var(--tx);line-height:1.35}
+.formerow:not(.on) .fm-f{color:var(--mut)}
+.fm-l{flex:0 0 auto;font-size:0.625rem;color:var(--dim);letter-spacing:.04em}
 .vportee{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;padding-top:9px;border-top:1px dashed var(--line)}
 .vchip.pt.on{border-color:var(--ai);color:var(--ai);background:color-mix(in srgb,var(--ai) 10%,transparent)}
 .vgo{display:flex;gap:8px;margin-top:11px}
@@ -889,6 +947,8 @@ main.nav-fwd>*{animation-name:slideIn}
 .crow:active{background:var(--surf2)}
 @media (prefers-reduced-motion:reduce){
   main.anim>*,.tiles .tile,.qbox,.sheetbox,.opt.ok,.opt.no,.roue-v,.voie.ouverte,.ronds .rondwrap{animation:none!important}
+  .orb{animation:none!important;opacity:1!important}
+  .eq-orb{animation:none!important}
   .an-fg,.eq-fg{transition:none!important}
   .roue-c.on::after,.chemin-c.pret::after{animation:none!important;opacity:0}
 }
@@ -4099,11 +4159,10 @@ VIEWS.progres=m=>{
   ER.appendChild(ectr);
   D.elements.forEach((e,i)=>{
     const b=bes[e.id]||1, o=acq[e.id]||0, pc=Math.min(100,Math.round(o/b*100));
-    const ang=(-90 + i*72) * Math.PI/180;
-    const w=el("div","eq-v");
+    /* Cette roue n'est qu'informative : elle peut tourner sans gêner personne. */
+    const w=el("div","eq-v eq-orb");
     w.style.setProperty("--vc",e.c);
-    w.style.left=(50 + 37*Math.cos(ang))+"%";
-    w.style.top =(50 + 37*Math.sin(ang))+"%";
+    w.style.setProperty("--i",i);
     w.title=e.n+" — "+o+" sur "+b;
     w.innerHTML=`<span class="eq-d">
         <svg viewBox="0 0 60 60" aria-hidden="true"><circle class="eq-bg" cx="30" cy="30" r="26"/>
@@ -9221,11 +9280,23 @@ const VOIES=[
 
 /* Les formes verbales que l'on peut cibler une à une dans la voie du feu.
    Le chapitre indiqué est celui où le manuel introduit la forme. */
-const FORMES_CIBLE=[["て","forme て",14],["ない","forme ない",17],["辞書","dictionnaire",18],
-  ["た","forme た",19],["たら","conditionnel たら",25],["可能","potentiel",27],
-  ["意向","volitif",31],["命令","impératif",33],["禁止","prohibitif",33],
-  ["ば","conditionnel ば",35],["受身","passif",37],["使役","causatif",48],
-  ["使役受身","causatif-passif",48]];
+/* Les formes que l'on peut cibler une à une dans la voie du feu. Le libellé
+   dit à quoi sert la forme, pas seulement son nom : « forme て » n'apprend
+   rien à côté du kanji て. */
+const FORMES_CIBLE=[
+  ["て","enchaîner, demander poliment",14],
+  ["ない","négatif neutre",17],
+  ["辞書","forme du dictionnaire",18],
+  ["た","passé neutre",19],
+  ["たら","si, quand (large)",25],
+  ["可能","pouvoir faire",27],
+  ["意向","allons ~, je vais ~",31],
+  ["命令","ordre direct",33],
+  ["禁止","interdiction",33],
+  ["ば","si (hypothèse générale)",35],
+  ["受身","passif, subir l'action",37],
+  ["使役","faire ou laisser faire",48],
+  ["使役受身","être forcé de faire",48]];
 
 /* Portée d'une catégorie : « vu » s'arrête au chapitre atteint, « tout »
    balaie les cinquante leçons, un nombre cible une leçon précise. */
@@ -9674,21 +9745,40 @@ VIEWS.shugyo=m=>{
         const maxL = pt==="tout" ? 50 : (pt==="vu" ? S.ch : pt);
         const acc=FORMES_CIBLE.filter(f=>f[2]<=maxL);
         if(acc.length){
-          const fg=el("div","vsous vformes");
-          fg.appendChild(el("span","vlab","Formes :"));
-          acc.forEach(([k,lab])=>{
-            const on=ff.length?ff.includes(k):true;
-            const b=el("button","vchip sm"+(on?" on":""),k);
-            b.title=lab;
-            b.onclick=()=>{ formeToggle(k); render(); };
-            fg.appendChild(b);
-          });
-          if(ff.length){
-            const rz=el("button","vchip sm raz","toutes");
+          /* Les formes en liste, avec leur sens en clair : en pastilles de
+             kanji seuls, il fallait connaître 意向 ou 受身 pour savoir ce
+             qu'on cochait, et l'infobulle est hors de portée au doigt. */
+          const fbox=el("div","formesbox");
+          const ouvert=!!S.formesOuvert;
+          const tete=el("button","replitete");
+          tete.innerHTML=`<span>Formes travaillées<b style="color:var(--ai)"> · ${
+            ff.length? ff.length+" sur "+acc.length : "toutes"}</b></span><i>${ouvert?"▲":"▾"}</i>`;
+          tete.onclick=()=>{ S.formesOuvert=ouvert?0:1; save(); render(); };
+          fbox.appendChild(tete);
+          if(ouvert){
+            const ul=el("div","formeslist");
+            acc.forEach(([k,lab,lec])=>{
+              const on=ff.length?ff.includes(k):true;
+              const li=el("button","formerow"+(on?" on":""));
+              li.innerHTML=`<span class="fm-ck">${on?"✓":""}</span>
+                <span class="fm-j jpx">${esc(k)}</span>
+                <span class="fm-f">${esc(lab)}</span>
+                <span class="fm-l">L${lec}</span>`;
+              li.onclick=()=>{ formeToggle(k); render(); };
+              ul.appendChild(li);
+            });
+            fbox.appendChild(ul);
+            const ctl=el("div","ctrl"); ctl.style.marginTop="8px";
+            const rz=el("button","btn","Toutes");
+            rz.style.fontSize="12.5px"; rz.style.padding="6px 12px";
             rz.onclick=()=>{ S.formesCible=[]; save(); render(); };
-            fg.appendChild(rz);
+            const rn=el("button","btn","Aucune");
+            rn.style.fontSize="12.5px"; rn.style.padding="6px 12px";
+            rn.onclick=()=>{ S.formesCible=acc.map(x=>x[0]).slice(0,1); save(); render(); };
+            ctl.appendChild(rz); ctl.appendChild(rn);
+            fbox.appendChild(ctl);
           }
-          c.appendChild(fg);
+          c.appendChild(fbox);
         }
       }
 
