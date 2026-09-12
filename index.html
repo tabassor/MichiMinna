@@ -123,6 +123,37 @@ button.stat{font:inherit;width:100%}
 .note b{color:var(--tx)}
 /* Fiches de conjugaison : mise en page dédiée pour distinguer les règles
    de chaque groupe et rendre le tableau des cas facilement scannable. */
+/* ---- 修 Entraînement : la revue et les cinq voies ---- */
+.revcard{display:flex;align-items:center;gap:14px;background:var(--surf);border:1px solid var(--line);
+  border-radius:var(--r);padding:14px 16px;margin-bottom:14px}
+.revcard.on{border-color:var(--shu);background:color-mix(in srgb,var(--shu) 7%,var(--surf));cursor:pointer}
+.revcard.on:active{transform:scale(.99)}
+.revk{font-family:var(--disp);font-size:2.125rem;line-height:1;color:var(--dim);flex:0 0 auto;width:46px;text-align:center}
+.revcard.on .revk{color:var(--shu)}
+.revtxt{flex:1;min-width:0}
+.revt{font-size:1rem;font-weight:600;color:var(--tx)}
+.revcard.on .revt{color:var(--shu)}
+.revs{font-size:0.7812rem;color:var(--mut);margin-top:3px;line-height:1.45}
+.voie{border:1px solid var(--line);border-left:3px solid var(--vc);border-radius:var(--r);
+  background:var(--surf);padding:13px 15px;margin-bottom:11px}
+.vhead{display:flex;align-items:center;gap:12px}
+.vk{font-family:var(--disp);font-size:1.875rem;line-height:1;color:var(--vc);flex:0 0 auto;width:38px;text-align:center}
+.vmeta{flex:1;min-width:0}
+.vn{font-size:0.9688rem;font-weight:600;color:var(--tx)}
+.vc{font-size:0.75rem;color:var(--mut);margin-top:2px}
+.vsous{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.vformes{align-items:center;padding-top:4px;border-top:1px dashed var(--line);margin-top:9px}
+.vlab{font-size:0.7188rem;color:var(--dim);margin-right:2px}
+.vchip{font-size:0.75rem;padding:4px 9px;border-radius:99px;border:1px solid var(--line);
+  background:none;color:var(--mut);cursor:pointer;font-family:var(--ui);line-height:1.5}
+.vchip u{text-decoration:none;opacity:.6;font-size:0.6562rem;margin-left:3px}
+.vchip.on{border-color:var(--vc);color:var(--vc);background:color-mix(in srgb,var(--vc) 9%,transparent);font-weight:600}
+.vchip.sm{font-family:var(--disp);font-size:0.8125rem;padding:3px 8px}
+.vchip.raz{font-family:var(--ui);font-size:0.6875rem;opacity:.75}
+.vportee{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;padding-top:9px;border-top:1px dashed var(--line)}
+.vchip.pt.on{border-color:var(--ai);color:var(--ai);background:color-mix(in srgb,var(--ai) 10%,transparent)}
+.vgo{display:flex;gap:8px;margin-top:11px}
+.vgo .btn{flex:1;padding:9px 12px;font-size:0.875rem}
 .aidebulle.u{border-left:3px solid var(--mut)}
 .aidebulle.m{border-left:3px solid var(--ai)}
 .aiderole{font-size:0.7812rem;color:var(--mut);margin-bottom:6px;font-weight:600}
@@ -7405,6 +7436,42 @@ async function aAll(){ try{ const db=await adb();
 async function aDel(id){ const db=await adb();
   return new Promise(res=>{const t=db.transaction("t","readwrite");t.objectStore("t").delete(id);t.oncomplete=()=>res();}); }
 
+/* Rapatrie les pistes audio qui ont atterri dans la base des analyses à cause
+   d'une collision de noms (adb() défini deux fois). On reconnaît une piste à
+   son champ « id » et à son blob ; les analyses, elles, ont un champ « k ».
+   La fonction ne fait rien s'il n'y a rien à récupérer. */
+async function recupereAudioEgare(){
+  let egarees=[];
+  try{
+    const db=await anadb();
+    egarees=await new Promise((res,rej)=>{
+      const t=db.transaction("t","readonly");
+      const q=t.objectStore("t").getAll();
+      q.onsuccess=()=>res(q.result||[]); q.onerror=()=>rej(q.error);
+    });
+  }catch(e){ return; }
+  const pistes=egarees.filter(x=>x&&x.id&&x.f&&!x.k);
+  if(!pistes.length) return;
+  let n=0;
+  for(const rec of pistes){
+    try{ await aPut(rec); n++; }catch(e){}
+  }
+  /* On retire de la base des analyses ce qui n'y avait pas sa place. */
+  try{
+    const db=await anadb();
+    await new Promise(res=>{
+      const t=db.transaction("t","readwrite");
+      const st=t.objectStore("t");
+      pistes.forEach(rec=>{ try{ st.delete(rec.id); }catch(e){} });
+      t.oncomplete=()=>res(); t.onerror=()=>res();
+    });
+  }catch(e){}
+  if(n){
+    audCache=null;
+    setTimeout(()=>{ toast(n+" piste"+(n>1?"s":"")+" audio récupérée"+(n>1?"s":"")); render(); },1200);
+  }
+}
+
 /* nombre de pistes par leçon, d'après les pages officielles 3A */
 const TRK1=[4,4,3,5,4,3,4,4,3,4,4,3,3,4,3,4,3,3,3,3,3,3,4,3,3];      /* leçons 1 à 25, 87 pistes */
 const TRK2=[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3];      /* leçons 26 à 50, 75 pistes */
@@ -7523,7 +7590,10 @@ const AIDE_URL = k => "https://generativelanguage.googleapis.com/v1beta/models/"
    stocke le fil complet (question initiale avec l'image, réponse, tout suivi).
    L'image est conservée pour que les questions de suivi aient encore le
    contexte visuel de Gemini. Coût typique : ~250 Ko par page. */
-function adb(){
+/* Base du cache d'analyses. Nommée anadb() et non adb() : ce dernier nom est
+   déjà pris par la base audio (michi-audio), et une seconde déclaration
+   l'écraserait silencieusement — l'audio écrirait alors dans la mauvaise base. */
+function anadb(){
   return new Promise((res,rej)=>{
     const r=indexedDB.open("michi-analyses",1);
     r.onupgradeneeded=()=>{ if(!r.result.objectStoreNames.contains("t")) r.result.createObjectStore("t",{keyPath:"k"}); };
@@ -7531,7 +7601,7 @@ function adb(){
   });
 }
 async function analysePut(vol,page,msgs){
-  try{ const db=await adb();
+  try{ const db=await anadb();
     return await new Promise((res,rej)=>{
       const t=db.transaction("t","readwrite");
       t.objectStore("t").put({k:vol+":"+page, vol:vol, page:page, at:Date.now(), msgs:msgs});
@@ -7540,7 +7610,7 @@ async function analysePut(vol,page,msgs){
   }catch(e){}
 }
 async function analyseGet(vol,page){
-  try{ const db=await adb();
+  try{ const db=await anadb();
     return await new Promise((res,rej)=>{
       const t=db.transaction("t","readonly");
       const q=t.objectStore("t").get(vol+":"+page);
@@ -7549,7 +7619,7 @@ async function analyseGet(vol,page){
   }catch(e){ return null; }
 }
 async function analyseDel(vol,page){
-  try{ const db=await adb();
+  try{ const db=await anadb();
     return await new Promise((res,rej)=>{
       const t=db.transaction("t","readwrite");
       t.objectStore("t").delete(vol+":"+page);
@@ -7558,7 +7628,7 @@ async function analyseDel(vol,page){
   }catch(e){}
 }
 async function analyseAll(){
-  try{ const db=await adb();
+  try{ const db=await anadb();
     return await new Promise((res,rej)=>{
       const t=db.transaction("t","readonly");
       const q=t.objectStore("t").getAll();
@@ -7567,7 +7637,7 @@ async function analyseAll(){
   }catch(e){ return []; }
 }
 async function analyseClear(){
-  try{ const db=await adb();
+  try{ const db=await anadb();
     return await new Promise((res,rej)=>{
       const t=db.transaction("t","readwrite");
       t.objectStore("t").clear();
@@ -8437,6 +8507,97 @@ VIEWS.audio=m=>{
 
 /* ================= 修業の道 ================= */
 const SIZE=12;
+const SIZE_RAPIDE=5;
+
+/* ---- Les cinq voies de l'entraînement ----
+   Même découpage, mêmes couleurs et mêmes kanji que l'arbre 道 : l'élève
+   retrouve d'un écran à l'autre les mêmes repères. Chaque voie regroupe les
+   types de questions qui relèvent de son domaine.
+   « portee » donne la valeur par défaut du sélecteur : les verbes et les
+   adjectifs se conjuguent par règle, sans qu'il soit nécessaire d'avoir
+   rencontré le mot — leur voie s'ouvre donc sur toute la base. */
+const VOIES=[
+  {id:"moku", j:"木", nom:"Vocabulaire",        coul:"#6FBF73", portee:"vu",
+   sous:[["voc","Mots"],["cnt","Compteurs"],["ant","Contraires"]]},
+  {id:"ka",   j:"火", nom:"Verbes et adjectifs", coul:"#E2593F", portee:"tout",
+   sous:[["conj","Conjugaison"],["adj","Adjectifs"]]},
+  {id:"do",   j:"土", nom:"Grammaire",          coul:"#C08A4A", portee:"vu",
+   sous:[["part","Particules"],["adv","Adverbes"],["expr","Expressions"],
+         ["gram","Points de grammaire"],["trou","Textes à trous"],["batir","Phrases à bâtir"]]},
+  {id:"kin",  j:"金", nom:"Kanji",              coul:"#B3C6DB", portee:"vu",
+   sous:[["kan","Sens"],["kanr","Lectures"],["rad","Radicaux"],["draw","Tracé"]]},
+  {id:"sui",  j:"水", nom:"Écoute et lecture",  coul:"#4FA8D8", portee:"vu",
+   sous:[["dic","Dictée"],["lect","Lecture suivie"]]}
+];
+
+/* Les formes verbales que l'on peut cibler une à une dans la voie du feu.
+   Le chapitre indiqué est celui où le manuel introduit la forme. */
+const FORMES_CIBLE=[["て","forme て",14],["ない","forme ない",17],["辞書","dictionnaire",18],
+  ["た","forme た",19],["たら","conditionnel たら",25],["可能","potentiel",27],
+  ["意向","volitif",31],["命令","impératif",33],["禁止","prohibitif",33],
+  ["ば","conditionnel ば",35],["受身","passif",37],["使役","causatif",48],
+  ["使役受身","causatif-passif",48]];
+
+/* Portée d'une catégorie : « vu » s'arrête au chapitre atteint, « tout »
+   balaie les cinquante leçons, un nombre cible une leçon précise. */
+function porteeDe(vid){
+  const v=VOIES.find(x=>x.id===vid);
+  const d=(S.portee||{})[vid];
+  return d!==undefined ? d : (v?v.portee:"vu");
+}
+function porteeSet(vid,val){ S.portee=S.portee||{}; S.portee[vid]=val; save(); }
+
+/* Le vivier correspondant à une portée donnée. */
+function poolPortee(pt){
+  if(pt==="tout") return poolComplet();
+  if(typeof pt==="number") return poolComplet().filter(q=>q.l===pt);
+  return buildPool();
+}
+
+/* Sous-types actuellement cochés pour une voie ; vide = toute la voie. */
+function sousActifs(vid){
+  const v=VOIES.find(x=>x.id===vid); if(!v) return [];
+  const sel=(S.sousType||{})[vid]||[];
+  return sel.length?sel:v.sous.map(x=>x[0]);
+}
+function sousToggle(vid,k){
+  S.sousType=S.sousType||{};
+  const cur=(S.sousType[vid]||[]).slice();
+  const i=cur.indexOf(k);
+  if(i<0) cur.push(k); else cur.splice(i,1);
+  S.sousType[vid]=cur; save();
+}
+
+/* Formes verbales cochées ; vide = toutes celles qui sont accessibles. */
+function formesActives(){
+  const sel=(S.formesCible||[]);
+  return sel.length?sel:null;
+}
+function formeToggle(f){
+  const cur=(S.formesCible||[]).slice();
+  const i=cur.indexOf(f);
+  if(i<0) cur.push(f); else cur.splice(i,1);
+  S.formesCible=cur; save();
+}
+
+/* Questions disponibles pour une voie, portée et filtres compris. */
+function questionsVoie(vid){
+  const types=new Set(sousActifs(vid));
+  let list=poolPortee(porteeDe(vid)).filter(q=>types.has(q.type));
+  /* Dans la voie du feu, on peut n'garder qu'une ou deux formes verbales. */
+  if(vid==="ka"){
+    const ff=formesActives();
+    if(ff){
+      const set=new Set(ff);
+      list=list.filter(q=>{
+        if(q.type!=="conj") return true;
+        return set.has(String(q.key).split(":").pop());
+      });
+    }
+  }
+  return list;
+}
+
 let sess=null, poolCache=null, poolCh=null;
 function opts(correct,pool){
   const o=[correct], p=shuffle(pool.filter(x=>x&&x!==correct));
@@ -8642,6 +8803,21 @@ function startSession(mode){
       go("shugyo",null,false); return;
     }
   }
+  /* Séance lancée depuis une voie : on respecte la portée choisie et les
+     sous-types cochés. rapide=true réduit la série à cinq questions. */
+  if(mode&&mode.indexOf("voie:")===0){
+    const parts=mode.split(":");
+    const vid=parts[1], rapide=parts[2]==="rapide";
+    const list=questionsVoie(vid);
+    if(!list.length){ alert("Aucune question pour cette sélection."); return; }
+    const n=rapide?SIZE_RAPIDE:SIZE;
+    /* En portée « acquis » on suit les échéances ; sur toute la base ou une
+       leçon isolée, on tire au hasard : c'est un entraînement, pas une revue. */
+    const pt=porteeDe(vid);
+    const qs=(pt==="vu")?pickSRS(list,n):shuffle(list).slice(0,n);
+    sess={qs:shuffle(qs),i:0,res:[],mode:mode,ans:[],shown:{},typed:{}};
+    go("shugyo",null,false); return;
+  }
   if(mode==="cible"){
     /* on ne tire que dans les chapitres choisis, et l'on ignore les échéances :
        c'est un entraînement, pas une révision. */
@@ -8695,44 +8871,129 @@ VIEWS.shugyo=m=>{
   if(!sess){
     head(m,"修業の道","Le chemin de la pratique");
     const pool=buildPool(), due=dueNow();
-    const c=el("div","card");
-    c.appendChild(el("h3",null,"Que voulez-vous travailler ?"));
-    const fresh=freshCount(pool);
     const bl=bilanRevue(pool);
-    c.appendChild(el("div",null,`<span style="font-size:0.8125rem;color:var(--mut)">${
-      bl.faux? "<b style=\"color:var(--shu)\">"+bl.faux+" erreur"+(bl.faux>1?"s":"")+" à corriger</b> · " : ""
-    }${bl.dues} révision${bl.dues>1?"s":""} échue${bl.dues>1?"s":""} · ${fresh} jamais posée${fresh>1?"s":""} · ${pool.length} au total.</span>`));
-    if(due){
-      const rb=el("button","btn r w","Reprendre les "+due+" question"+(due>1?"s":""));
-      rb.style.marginTop="10px";
-      rb.onclick=()=>startSession("due");
-      c.appendChild(rb);
-    }
-    if(S.kana){
-      const bd=el("button","btn w","道場  S'exercer aux kana, sans enjeu");
-      bd.style.marginTop="10px";
-      bd.onclick=()=>{ dojoNouveau(); go("dojo"); };
-      c.appendChild(bd);
-    }
-    const bo=el("button","btn w","音読  Répéter à voix haute");
-    bo.style.marginTop="10px";
-    bo.onclick=()=>go("oral");
-    c.appendChild(bo);
-    const bc=el("button","btn w","稽古  Cibler des chapitres précis");
-    bc.style.marginTop="10px";
-    bc.onclick=()=>go("cible");
-    c.appendChild(bc);
-    const g=el("div","opts");
-    [["mix","Séance mixte — tout est possible"]].concat(S.kana?[["kana","Hiragana et katakana"]]:[]).concat([["conj","Conjugaison des verbes"],["adj","Formes des adjectifs"],
-     ["part","Particules"],["adv","Adverbes et connecteurs"],["voc","Vocabulaire"],
-     ["kanji","Kanji : sens, lecture, tracé"],["rad","Radicaux"]])
-    .concat(ttsAvailable()?[["dictee","Dictée — écouter et écrire"]]:[])
-    .forEach(([k,l])=>{
-      const b=el("button","opt",l);b.style.fontFamily="var(--ui)";b.style.fontSize="15px";
-      b.onclick=()=>startSession(k);g.appendChild(b);
+
+    /* ---- 復 La revue : ce que la mémoire réclame aujourd'hui ---- */
+    const rev=el("div","revcard");
+    rev.innerHTML=`<div class="revk">復</div>
+      <div class="revtxt">
+        <div class="revt">${due?("Reprendre "+due+" question"+(due>1?"s":"")):"Rien à revoir"}</div>
+        <div class="revs">${
+          bl.faux? '<b style="color:var(--shu)">'+bl.faux+" erreur"+(bl.faux>1?"s":"")+" à corriger</b> · " : ""
+        }${bl.dues} échue${bl.dues>1?"s":""} · ${freshCount(pool)} jamais posée${freshCount(pool)>1?"s":""}</div>
+      </div>`;
+    if(due){ rev.classList.add("on"); rev.onclick=()=>startSession("due"); }
+    m.appendChild(rev);
+
+    /* ---- Les cinq voies ---- */
+    VOIES.forEach(v=>{
+      const dispo=questionsVoie(v.id);
+      const c=el("div","voie");
+      c.style.setProperty("--vc",v.coul);
+      const pt=porteeDe(v.id);
+      const ptLab = pt==="tout" ? "toute la base" : (pt==="vu" ? "jusqu'à L"+S.ch : "leçon "+pt);
+      c.innerHTML=`<div class="vhead">
+          <div class="vk">${v.j}</div>
+          <div class="vmeta"><div class="vn">${esc(v.nom)}</div>
+            <div class="vc">${dispo.length} question${dispo.length>1?"s":""} · ${ptLab}</div></div>
+        </div>`;
+
+      /* sous-types, en petit, tous visibles */
+      const sel=(S.sousType||{})[v.id]||[];
+      const sg=el("div","vsous");
+      v.sous.forEach(([k,lab])=>{
+        const n=poolPortee(pt).filter(q=>q.type===k).length;
+        const on=sel.length?sel.includes(k):true;
+        const b=el("button","vchip"+(on?" on":""),lab+(n?' <u>'+n+'</u>':""));
+        b.onclick=()=>{ sousToggle(v.id,k); render(); };
+        sg.appendChild(b);
+      });
+      c.appendChild(sg);
+
+      /* formes verbales ciblables, propres à la voie du feu */
+      if(v.id==="ka"){
+        const ff=(S.formesCible||[]);
+        const maxL = pt==="tout" ? 50 : (pt==="vu" ? S.ch : pt);
+        const acc=FORMES_CIBLE.filter(f=>f[2]<=maxL);
+        if(acc.length){
+          const fg=el("div","vsous vformes");
+          const tt=el("span","vlab","Formes :");
+          fg.appendChild(tt);
+          acc.forEach(([k,lab])=>{
+            const on=ff.length?ff.includes(k):true;
+            const b=el("button","vchip sm"+(on?" on":""),k);
+            b.title=lab;
+            b.onclick=()=>{ formeToggle(k); render(); };
+            fg.appendChild(b);
+          });
+          if(ff.length){
+            const rz=el("button","vchip sm raz","toutes");
+            rz.onclick=()=>{ S.formesCible=[]; save(); render(); };
+            fg.appendChild(rz);
+          }
+          c.appendChild(fg);
+        }
+      }
+
+      /* portée : acquis / toute la base / une leçon */
+      const pg=el("div","vportee");
+      const mk=(val,lab)=>{
+        const on = (val==="leçon") ? (typeof pt==="number") : (pt===val);
+        const b=el("button","vchip pt"+(on?" on":""),lab);
+        b.onclick=()=>{
+          if(val==="leçon"){
+            const rep=prompt("Quelle leçon ? (1 à 50)", String(typeof pt==="number"?pt:S.ch));
+            if(rep===null) return;
+            const n=Math.max(1,Math.min(50,parseInt(rep,10)||S.ch));
+            porteeSet(v.id,n);
+          } else porteeSet(v.id,val);
+          render();
+        };
+        return b;
+      };
+      pg.appendChild(mk("vu","Acquis"));
+      pg.appendChild(mk("tout","Toute la base"));
+      pg.appendChild(mk("leçon", typeof pt==="number" ? ("Leçon "+pt) : "Une leçon…"));
+      c.appendChild(pg);
+
+      /* lancer */
+      const cc=el("div","vgo");
+      const g1=el("button","btn p","Commencer");
+      g1.disabled=!dispo.length;
+      g1.onclick=()=>startSession("voie:"+v.id);
+      const g2=el("button","btn","⚡ 5 questions");
+      g2.disabled=!dispo.length;
+      g2.onclick=()=>startSession("voie:"+v.id+":rapide");
+      cc.appendChild(g1); cc.appendChild(g2);
+      c.appendChild(cc);
+      m.appendChild(c);
     });
-    c.appendChild(g);m.appendChild(c);
-    m.appendChild(el("div","note","Une réponse fausse revient deux questions plus loin dans la même série, puis dès le lendemain. Une réponse juste s'espace : 1 jour, puis 2, 4, 8, 16, 32, 64."));
+
+    /* ---- Ce qui ne rentre pas dans les cinq voies ---- */
+    const autres=el("div","card");
+    autres.appendChild(el("div","sec","Autres façons de travailler"));
+    const ag=el("div","vsous");
+    const mixb=el("button","vchip on","Séance mixte");
+    mixb.onclick=()=>startSession("mix");
+    ag.appendChild(mixb);
+    if(S.kana){
+      const kb=el("button","vchip on","道場 Kana");
+      kb.onclick=()=>{ dojoNouveau(); go("dojo"); };
+      ag.appendChild(kb);
+      const kb2=el("button","vchip on","Série kana");
+      kb2.onclick=()=>startSession("kana");
+      ag.appendChild(kb2);
+    }
+    const ob=el("button","vchip on","音読 Voix haute");
+    ob.onclick=()=>go("oral");
+    ag.appendChild(ob);
+    const cb=el("button","vchip on","稽古 Plusieurs chapitres");
+    cb.onclick=()=>go("cible");
+    ag.appendChild(cb);
+    autres.appendChild(ag);
+    m.appendChild(autres);
+
+    m.appendChild(el("div","note","Une réponse fausse revient deux questions plus loin dans la même série, puis dès le lendemain. Une réponse juste s'espace : 1 jour, puis 2, 4, 8, 16, 32, 64. En portée « acquis », la séance suit ces échéances ; sur toute la base ou une leçon isolée, elle tire au hasard."));
     return;
   }
   if(sess.i>=sess.qs.length){
@@ -8933,7 +9194,7 @@ function batirChallenge(m,q){
   const done=sess.res[k]!=null;
   const box=el("div","qbox");
   box.innerHTML=`<div class="qhead">${esc(q.head)} · ${sess.i+1}/${sess.qs.length}</div>
-    <div class="qtext" style="font-size:1.05rem;font-family:var(--ui)">${esc(q.q)}</div>
+    <div class="qtext" style="font-size:1.05rem;font-family:var(--ui)">${jpn(q.q)}</div>
     <div class="qsub">${esc(q.sub||"Remettez les blocs dans l'ordre.")}</div>`;
   m.appendChild(box);
 
@@ -8992,7 +9253,7 @@ function batirSaisie(m,q){
   const k=sess.i, done=sess.res[k]!=null;
   const box=el("div","qbox");
   box.innerHTML=`<div class="qhead">${esc(q.head)} · ${sess.i+1}/${sess.qs.length}</div>
-    <div class="qtext" style="font-size:1.05rem;font-family:var(--ui)">${esc(q.q)}</div>
+    <div class="qtext" style="font-size:1.05rem;font-family:var(--ui)">${jpn(q.q)}</div>
     <div class="qsub">${esc(q.sub||"Écrivez la phrase en japonais.")}</div>`;
   m.appendChild(box);
   const c=el("div","card");
@@ -9276,6 +9537,10 @@ async function askPersist(){
     /* le module 手控え a été retiré : on efface ses traces locales */
     try{ indexedDB.deleteDatabase("michi-perso"); }catch(e){}
     if(S.persoAudio){ delete S.persoAudio; save(); }
+    /* Récupération : une collision de noms de fonction a fait écrire l'audio
+       importé dans la base des analyses. Les enregistrements y sont intacts
+       (ils portent un champ « id » et un blob), on les rapatrie. */
+    try{ recupereAudioEgare(); }catch(e){}
     tickDay(); view="home"; render();
   } else if(USERS.length){ switchUser(USERS[0].id); }
   else { view="welcome"; render(); }
