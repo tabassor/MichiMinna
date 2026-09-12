@@ -257,6 +257,24 @@ button.stat{font:inherit;width:100%}
 .rs-n{font-size:0.5938rem;color:var(--dim);line-height:1}
 .rsel.on .rs-n{color:var(--ai);font-weight:700}
 .rsel.fait .rs-n{color:var(--take)}
+/* Centre prêt pour l'épreuve : il s'anime doucement pour appeler le geste */
+.chemin-c.pret{cursor:pointer}
+.chemin-c.pret .ch-cn b{color:var(--yama);
+  text-shadow:0 1px 3px color-mix(in srgb,var(--yama) 45%,transparent)}
+.chemin-c.pret::after{content:"";position:absolute;inset:-12px;border-radius:50%;
+  border:1.5px solid var(--yama);opacity:0;animation:pouls 3.2s ease-out infinite;
+  pointer-events:none}
+.pret-l{font-size:0.5312rem!important;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--yama)!important;font-weight:700!important;line-height:1.3!important}
+.chemin-c:disabled{cursor:default}
+/* En-tête de section repliable */
+.replitete{display:flex;align-items:center;justify-content:space-between;width:100%;
+  background:none;border:0;padding:2px 0;cursor:pointer;font-family:var(--ui);
+  font-size:0.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+  transition:color .18s ease}
+.replitete:hover{color:var(--ai)}
+.replitete i{font-style:normal;font-size:0.625rem;letter-spacing:0}
+.replitete b{font-weight:700;letter-spacing:.04em}
 /* ---- 記録 Roue de l'équilibre des cinq voies ---- */
 .eq-roue{width:min(300px,86vw);margin:4px auto 2px}
 .eq-c{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
@@ -825,7 +843,7 @@ main.nav-fwd>*{animation-name:slideIn}
 @media (prefers-reduced-motion:reduce){
   main.anim>*,.tiles .tile,.qbox,.sheetbox,.opt.ok,.opt.no,.roue-v,.voie.ouverte,.ronds .rondwrap{animation:none!important}
   .an-fg,.eq-fg{transition:none!important}
-  .roue-c.on::after{animation:none!important;opacity:0}
+  .roue-c.on::after,.chemin-c.pret::after{animation:none!important;opacity:0}
 }
 
 
@@ -2657,11 +2675,12 @@ VIEWS.home=m=>{
     const need=bes0[e.id]||0, ont=acq0[e.id]||0;
     const pcf=need?Math.min(100,Math.round(ont/need*100)):100;
     const ang=(-90 + i*72) * Math.PI/180;
-    const w=el("div","eq-v chemin-v");
+    /* Chaque voie ouvre directement sa branche sur le chemin. */
+    const w=el("button","eq-v chemin-v");
     w.style.setProperty("--vc",e.c);
     w.style.left=(50 + 37*Math.cos(ang))+"%";
     w.style.top =(50 + 37*Math.sin(ang))+"%";
-    w.title=e.n+" — "+ont+" sur "+need;
+    w.title=e.n+" — "+ont+" sur "+need+" · ouvrir cette voie";
     if(!need) w.style.opacity=".45";
     w.innerHTML=`<span class="eq-d">
         <svg viewBox="0 0 60 60" aria-hidden="true"><circle class="eq-bg" cx="30" cy="30" r="26"/>
@@ -2669,6 +2688,7 @@ VIEWS.home=m=>{
             stroke-dashoffset="${163-163*pcf/100}"/></svg>
         <span class="eq-k">${esc(e.j)}</span></span>
       <span class="eq-n">${ont}${need?'<u>/'+need+'</u>':""}</span>`;
+    w.onclick=ev=>{ ev.stopPropagation(); arbreRang=TS.rang; arbreVoie=e.id; go("arbre"); };
     CR.appendChild(w);
   });
   cr.appendChild(CR);
@@ -2681,16 +2701,15 @@ VIEWS.home=m=>{
     nx.length? nx.length+" nœud"+(nx.length>1?"s":"")+" ouvert"+(nx.length>1?"s":"")+" à ce rang"
              : "Tous les nœuds sont acquis — l'épreuve de rang vous attend."));
 
-  const g2=el("div","ctrl"); g2.style.marginTop="12px";
+  /* Plus de bouton carré : la pastille centrale mène au chemin, chaque voie
+     à sa branche. Un seul geste reste utile — tirer un nœud au hasard. */
   if(nx.length){
-    const b3=el("button","btn p pvgo","Reprendre le chemin");
+    const g2=el("div","ctrl"); g2.style.marginTop="12px";
+    const b3=el("button","btn pvgo","Un nœud au hasard");
     b3.onclick=e=>{ e.stopPropagation(); go("noeud",nx[Math.floor(Math.random()*nx.length)].id); };
     g2.appendChild(b3);
+    pv.appendChild(g2);
   }
-  const b4=el("button","btn pvgo",nx.length?"Voir le chemin":"Passer l'épreuve");
-  b4.onclick=e=>{ e.stopPropagation(); go("arbre"); };
-  g2.appendChild(b4);
-  pv.appendChild(g2);
   m.appendChild(pv);
 
   /* ---- chapitre en cours : une ligne discrète, réglable d'un tap ---- */
@@ -5528,9 +5547,14 @@ VIEWS.arbre=m=>{
   if(arbreRang===null) arbreRang=T.rang;
   head(m,"道","Le chemin, du seuil à la maîtrise");
 
-  /* bandeau du rang courant : le rang au centre, ses cinq exigences autour */
+  /* bandeau du rang courant : le rang au centre, ses cinq exigences autour.
+     Une fois le cadran complet, ce centre devient le bouton de l'épreuve. */
   const R=RANG(T.rang);
   const bes=besoinRang(T.rang), acq=fragAcquis(T.rang);
+  const manque0=fragManquants(T.rang);
+  const reste0=noeudsDuRang(T.rang).filter(n=>!estFait(n.id)).length;
+  const pret0=!manque0.length&&!reste0;
+  const estMaitre0=!!R.maitre;
   const c=el("div","card");
   c.style.borderColor="color-mix(in srgb,var(--ai) 34%,var(--line))";
   const rt=el("div","rang-tete");
@@ -5541,13 +5565,24 @@ VIEWS.arbre=m=>{
 
   const rr=el("div","roue");
   const RR=el("div","roue-in chemin-roue");
-  const rctr=el("div","eq-c chemin-c");
+  const rctr=el("button","eq-c chemin-c"+(pret0?" pret":""));
   const nR=[...R.j].length;
   rctr.innerHTML=cadranRangs(T.rang, progRang(T.rang))+
-    `<span class="ch-cn">
-      <b class="jpx" style="font-size:${nR<=1?21:nR===2?15:11.5}px${nR>1?";letter-spacing:-.04em":""}">${esc(R.j)}</b>
-      <i>${progRang(T.rang)}<u>%</u></i></span>`;
-  rctr.title="Rang "+(T.rang+1)+" sur "+D.rangs.length+" — "+progRang(T.rang)+" % franchi";
+    (pret0
+      ? `<span class="ch-cn"><b class="jpx" style="font-size:1.4375rem">試</b>
+          <i class="pret-l">${estMaitre0?"épreuve<br>de maître":"passer<br>l'épreuve"}</i></span>`
+      : `<span class="ch-cn">
+          <b class="jpx" style="font-size:${nR<=1?21:nR===2?15:11.5}px${nR>1?";letter-spacing:-.04em":""}">${esc(R.j)}</b>
+          <i>${progRang(T.rang)}<u>%</u></i></span>`);
+  if(pret0){
+    rctr.title=(estMaitre0?"Épreuve de maître · N"+R.maitre:"Test de rang")+" — tout est réuni";
+    rctr.onclick=()=>lancerTest(T.rang);
+  } else {
+    rctr.title="Rang "+(T.rang+1)+" sur "+D.rangs.length+" — "+progRang(T.rang)+" % franchi"
+      +(reste0?" · "+reste0+" nœud"+(reste0>1?"s":"")+" à terminer":"")
+      +(manque0.length?" · il manque "+manque0.map(x=>(x.faut-x.ont)+" "+x.e.j).join(", "):"");
+    rctr.disabled=true;
+  }
   RR.appendChild(rctr);
   D.elements.forEach((e,i)=>{
     const need=bes[e.id]||0, ont=acq[e.id]||0;
@@ -5575,21 +5610,17 @@ VIEWS.arbre=m=>{
   /* test de rang */
   const manque=fragManquants(T.rang);
   const reste=noeudsDuRang(T.rang).filter(n=>!estFait(n.id)).length;
+  /* La pastille centrale porte désormais le lancement de l'épreuve : cette
+     carte n'en rappelle que les règles et ce qui reste à réunir. */
   const tb=el("div","card");
-  const pret=!manque.length&&!reste;
-  const estMaitre=!!R.maitre;
+  const pret=pret0, estMaitre=estMaitre0;
   tb.innerHTML=`<h3>${estMaitre?"Épreuve de maître · N"+R.maitre:"Test de rang"}</h3>
-    <div style="font-size:0.8438rem;color:var(--mut)">${
+    <div style="font-size:0.8438rem;color:var(--mut);line-height:1.55">${
       pret?(R.maitre
-        ? "<b>Trente questions</b> tirées de tout le rang, <b>90 %</b> pour la franchir. C'est elle qui ouvre le niveau JLPT N"+R.jlpt+"."
-        : "Vingt questions tirées de tout le rang. 85 % pour passer.")
+        ? "<b>Trente questions</b> tirées de tout le rang, <b>90 %</b> pour la franchir. C'est elle qui ouvre le niveau JLPT N"+R.jlpt+". Touchez 試 au centre de la roue."
+        : "Vingt questions tirées de tout le rang, 85 % pour passer. Touchez 試 au centre de la roue.")
         :(reste?reste+" nœud"+(reste>1?"s":"")+" à terminer"+(manque.length?", et ":".")
               :"")+(manque.length?"il vous manque "+manque.map(x=>x.faut-x.ont+" "+x.e.j).join(", ")+".":"")}</div>`;
-  const tc=el("div","ctrl"); tc.style.marginTop="10px";
-  const bt=el("button","btn"+(pret?" p":""),pret?"Passer l'épreuve":"Épreuve verrouillée");
-  bt.disabled=!pret; if(!pret) bt.style.opacity=".55";
-  bt.onclick=()=>lancerTest(T.rang);
-  tc.appendChild(bt); tb.appendChild(tc);
   if(T.tests[T.rang]) tb.appendChild(el("div","note","Déjà réussi à "+T.tests[T.rang].s+" %."));
   m.appendChild(tb);
 
@@ -5599,8 +5630,17 @@ VIEWS.arbre=m=>{
   m.appendChild(bcarte);
 
   /* repérage par chapitre du manuel */
+  /* Repli : ce sélecteur de cinquante puces ne sert qu'à l'occasion et
+     occupait un écran entier. Il s'ouvre d'un tap, et reste ouvert si un
+     chapitre est activement repéré. */
+  const chOuvert = S.arbreChOuvert || !!arbreCh;
   const chb=el("div","card");
-  chb.appendChild(el("div","sec","Repérer un chapitre"));
+  const chTete=el("button","replitete");
+  chTete.innerHTML=`<span>Repérer un chapitre${arbreCh?' <b style="color:var(--ai)">· '+arbreCh+'</b>':""}</span><i>${chOuvert?"▲":"▾"}</i>`;
+  chTete.onclick=()=>{ S.arbreChOuvert=chOuvert?0:1; save(); render(); };
+  chb.appendChild(chTete);
+  if(!chOuvert){ m.appendChild(chb); }
+  else {
   chb.appendChild(el("div",null,'<span style="font-size:0.8125rem;color:var(--mut)">Vous suivez un manuel de la série Minna no Nihongo ? Choisissez un chapitre : les nœuds qui le couvrent sont mis en évidence, où qu\'ils se trouvent dans l\'arbre.</span>'));
   const chr2=el("div","filters"); chr2.style.marginTop="10px";
   const c0=el("button","chip"+(arbreCh?"":" on"),"Aucun");
@@ -5629,6 +5669,7 @@ VIEWS.arbre=m=>{
   rec.style.display=arbreCh?"block":"none";
   chb.appendChild(rec);
   m.appendChild(chb);
+  }
 
   /* sélecteur de rang : l'arbre entier est visible */
   const f=el("div","rangsel");
