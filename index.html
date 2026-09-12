@@ -1099,18 +1099,23 @@ const VGRP={v1:{ja:"五段",fr:"godan",note:"La finale du dictionnaire varie sel
 /* Petit encadré résumé pour une entrée verbale du manuel :
    forme du dictionnaire, groupe, et trois formes de base pour amorcer le travail. */
 function verbeResume(w){
-  const f=forms(w); if(!f) return null;
   const gi=VGRP[w.c]; if(!gi) return null;
-  const pick=k=>((f.kanji&&f.kanji[k])||f[k]);
+  /* On s'appuie sur conjTable(w,false) : elle produit toutes les formes du
+     VSPEC accessibles au chapitre courant. Ainsi ~ます, ~ました, ~ています,
+     ~たい et le reste apparaissent dès qu'ils ont été introduits, plus rien
+     n'est oublié — et un débutant à L5 ne voit pas encore la forme du
+     dictionnaire, ce qui serait déroutant. */
+  const rows=conjTable(w,false);
+  if(!rows||!rows.length) return null;
   const c=el("div","card");
   c.style.borderColor="var(--ai)";
   c.innerHTML=`<h3>Formes du verbe <span class="tag" style="border-color:var(--ai);color:var(--ai)">${gi.ja} · ${gi.fr}</span></h3>`;
   const g=el("div","conj");
-  const add=(lab,key,val)=>{ g.innerHTML+=`<span><a class="cjlink" data-cj="${esc(key)}">${lab}</a></span><b>${jp(val)}</b>`; };
-  add("辞書 dictionnaire","辞書", pick("辞書"));
-  add("ない négatif","ない", pick("ない"));
-  add("て forme て","て", pick("て"));
-  add("た passé","た", pick("た"));
+  rows.forEach(r=>{
+    const rk=r.k?(CONJ_REF_KEY[r.k]||r.k):null;
+    const lab=rk?`<a class="cjlink" data-cj="${esc(rk)}">${esc(r.lab)}</a>`:esc(r.lab);
+    g.innerHTML+=`<span>${lab}</span><b>${jp(r.val)}</b>`;
+  });
   c.appendChild(g);
   c.appendChild(el("div","note",gi.note));
   /* liens vers les fiches de conjugaison */
@@ -9227,6 +9232,44 @@ async function askPersist(){
   askPersist();
   setTimeout(()=>{ try{ buildLex(); }catch(e){} },1200);   /* index des mots, en tâche de fond */
   await loadUsers();
+
+  /* Mode démonstration : URL ?demo=N seede un utilisateur pré-configuré au
+     chapitre N (par défaut 15). Utile pour montrer l'app à quelqu'un sans
+     avoir à revalider tous les niveaux préalables. Ré-appeler ?demo=N
+     réinitialise la démo — pratique entre deux présentations. */
+  try {
+    const demoUrl = new URL(location.href);
+    const demoParam = demoUrl.searchParams.get("demo");
+    if(demoParam !== null){
+      const N = Math.max(1, Math.min(50, parseInt(demoParam,10) || 15));
+      const demoId = "u:demo";
+      /* État seed : le chapitre est fixé à N+1 pour que tstate() marque
+         automatiquement tous les nœuds des chapitres ≤ N comme acquis via
+         la conversion niveau→arbre. Un peu de vécu (XP, série, objectif du
+         jour partiellement rempli) pour que la démo respire l'usage réel. */
+      const seed = Object.assign(NEW(), {
+        ch: Math.min(50, N + 1),
+        kana: 1,
+        xp: N * 15,
+        streak: Math.min(N, 12),
+        day: today(),
+        done: 14,
+        goal: 20,
+        guide: 1
+      });
+      await sSet("michi:u:" + demoId, JSON.stringify(seed));
+      const idx = USERS.findIndex(u => u.id === demoId);
+      const nom = "Démo (L" + N + ")";
+      if(idx < 0) USERS.push({id: demoId, n: nom});
+      else USERS[idx].n = nom;
+      UID = demoId;
+      await saveUsers();
+      /* On nettoie l'URL pour éviter de reseed à chaque refresh. */
+      demoUrl.searchParams.delete("demo");
+      try { history.replaceState({}, "", demoUrl.pathname + (demoUrl.search ? demoUrl.search : "") + (demoUrl.hash || "")); } catch(e){}
+    }
+  } catch(e){ /* URL malformée ou storage refusé — on laisse le flow normal */ }
+
   if(UID&&USERS.some(u=>u.id===UID)){
     const raw=await sGet("michi:u:"+UID);
     S=Object.assign(NEW(),raw?JSON.parse(raw):{});
