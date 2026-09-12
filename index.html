@@ -138,11 +138,43 @@ button.stat{font:inherit;width:100%}
 .an-txt b{font-size:1.3125rem;font-weight:700;color:var(--tx)}
 .an-txt u{text-decoration:none;font-size:0.625rem;color:var(--dim);margin-top:1px}
 /* Pastille ronde portant un kanji : sert aux cartes du chemin, du dojo, etc. */
-.rond-k{width:54px;height:54px;flex:0 0 auto;border-radius:50%;display:grid;place-items:center;
-  font-family:var(--disp);font-size:1.375rem;line-height:1;color:var(--vc);
-  border:1.5px solid var(--vc);
+.rond-k{flex:0 0 auto;border-radius:50%;display:grid;place-items:center;
+  font-family:var(--disp);line-height:1;color:var(--vc);
+  border:1.5px solid var(--vc);box-sizing:border-box;
   background:radial-gradient(circle at 36% 30%,color-mix(in srgb,var(--vc) 16%,transparent),color-mix(in srgb,var(--vc) 7%,transparent));
-  box-shadow:0 1px 4px color-mix(in srgb,var(--vc) 14%,transparent)}
+  box-shadow:0 1px 4px color-mix(in srgb,var(--vc) 14%,transparent);
+  transition:background .25s ease,box-shadow .3s ease}
+/* Plusieurs signes : on resserre l'interlettrage pour rester dans le cercle. */
+.rond-k.multi{letter-spacing:-.04em;padding:0 2px;text-align:center}
+/* ---- Rubriques en badges ronds, à la manière de la roue ---- */
+.ronds{display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));
+  gap:14px 8px;margin:4px 0 18px;justify-items:center}
+.ronds.rep{margin:8px 0 14px}
+.rondwrap{position:relative;display:flex;justify-content:center}
+.rondbtn{background:none;border:0;padding:0;cursor:pointer;display:flex;
+  flex-direction:column;align-items:center;gap:6px;width:100%;
+  transition:transform .18s cubic-bezier(.34,1.4,.5,1)}
+.rondbtn:active{transform:scale(.92)}
+.rondbtn:hover .rond-k{background:radial-gradient(circle at 36% 30%,color-mix(in srgb,var(--vc) 26%,transparent),color-mix(in srgb,var(--vc) 12%,transparent));
+  box-shadow:0 2px 11px color-mix(in srgb,var(--vc) 26%,transparent)}
+.rb-n{font-size:0.6875rem;color:var(--mut);line-height:1.3;text-align:center;max-width:86px}
+.rondbtn:hover .rb-n{color:var(--ai)}
+/* Étoile d'épinglage, dans le répertoire */
+.rb-star{position:absolute;top:-2px;right:2px;width:22px;height:22px;border-radius:50%;
+  border:1px solid var(--line);background:var(--surf);color:var(--dim);
+  font-size:0.6875rem;line-height:1;cursor:pointer;padding:0;display:grid;place-items:center;
+  transition:color .18s ease,border-color .18s ease,transform .14s ease}
+.rb-star:active{transform:scale(.88)}
+.rb-star.on{color:var(--yama);border-color:color-mix(in srgb,var(--yama) 55%,var(--line))}
+/* Arrivée en cascade, comme les voies de la roue */
+.ronds .rondbtn,.ronds .rondwrap{animation:poseRond .42s cubic-bezier(.22,.9,.28,1) backwards}
+.ronds>*:nth-child(2){animation-delay:.03s}
+.ronds>*:nth-child(3){animation-delay:.06s}
+.ronds>*:nth-child(4){animation-delay:.09s}
+.ronds>*:nth-child(5){animation-delay:.12s}
+.ronds>*:nth-child(6){animation-delay:.15s}
+.ronds>*:nth-child(n+7){animation-delay:.18s}
+@keyframes poseRond{from{opacity:0;transform:scale(.74)}to{opacity:1;transform:scale(1)}}
 /* Bandeau « Reprendre » : un geste, une destination. */
 .reprise{display:flex;align-items:center;gap:13px;width:100%;text-align:left;
   background:var(--surf);border:1px solid var(--line);border-radius:99px;
@@ -618,7 +650,7 @@ main.nav-fwd>*{animation-name:slideIn}
 .crow{transition:background .15s ease}
 .crow:active{background:var(--surf2)}
 @media (prefers-reduced-motion:reduce){
-  main.anim>*,.tiles .tile,.qbox,.sheetbox,.opt.ok,.opt.no,.roue-v,.voie.ouverte{animation:none!important}
+  main.anim>*,.tiles .tile,.qbox,.sheetbox,.opt.ok,.opt.no,.roue-v,.voie.ouverte,.ronds .rondbtn,.ronds .rondwrap{animation:none!important}
   .an-fg{transition:none!important}
   .roue-c.on::after{animation:none!important;opacity:0}
 }
@@ -1816,6 +1848,50 @@ function toast(txt){
   t.textContent=txt; t.className="on";
   clearTimeout(t._h); t._h=setTimeout(()=>{ t.className=""; },2200);
 }
+/* Toutes les rubriques de l'application, avec leur kanji et leur groupe.
+   Sert à la fois aux favoris de l'accueil et au répertoire complet. */
+const RUBRIQUES=[
+  ["lecons","課","Leçons","Étudier"],
+  ["fiches","要点","Fiches","Étudier"],
+  ["pieges","落とし穴","Pièges et oral","Étudier"],
+  ["culture","文化","Culture","Étudier"],
+  ["audio","音声","Audio","Étudier"],
+  ["manuel","本冊","Votre manuel","Étudier"],
+  ["aide","解説","Aide au manuel","Étudier"],
+  ["arbre","道","Le chemin","S'entraîner"],
+  ["shugyo","修","Entraîner","S'entraîner"],
+  ["minna","練習","Exercices","S'entraîner"],
+  ["lecture","読解","Compréhension","S'entraîner"],
+  ["jlpt","JLPT","Préparation JLPT","S'entraîner"],
+  ["phrase","作文","Construire","S'entraîner"],
+  ["conjug","活用","Conjugueur","S'entraîner"],
+  ["oral","音読","Voix haute","S'entraîner"],
+  ["progres","記録","Progression","S'entraîner"],
+  ["dico","辞書","Dictionnaire","Chercher"],
+  ["jmdict","大辞典","Dictionnaire étendu","Chercher"],
+  ["kanji","漢字","Kanji et tracé","Chercher"],
+  ["rads","部首","Radicaux","Chercher"],
+  ["gram","助詞","Particules","Chercher"],
+  ["expr","表現","Expressions","Chercher"],
+  ["cnt","助数詞","Compteurs","Chercher"],
+  ["adv","副詞","Adverbes","Chercher"],
+  ["kana","仮名","Kana","Chercher"]
+];
+const RUBIDX={}; RUBRIQUES.forEach(r=>RUBIDX[r[0]]=r);
+const FAVS_DEF=["lecons","fiches","minna","aide","dico","manuel"];
+function favs(){
+  const f=S.favs;
+  if(!Array.isArray(f)) return FAVS_DEF.slice();
+  return f.filter(x=>RUBIDX[x]);
+}
+function favToggle(id){
+  const cur=favs();
+  const i=cur.indexOf(id);
+  if(i<0){ if(cur.length>=8){ toast("Huit favoris au maximum"); return; } cur.push(id); }
+  else cur.splice(i,1);
+  S.favs=cur; save();
+}
+
 /* Vues qui valent la peine d'être reprises : on retient la dernière visitée
    pour proposer d'y revenir depuis l'accueil. */
 const REPRENDRE={lecon:["課","Leçon"],noeud:["道","Nœud"],minna:["練習","Exercices"],
@@ -2297,13 +2373,14 @@ VIEWS.home=m=>{
     const st=kStage(), sc=kStageScore();
     const dj=el("div","card dojohome");
     dj.innerHTML=`<div class="l" style="display:flex;gap:14px;align-items:center">
-        <span class="rond-k" style="--vc:var(--ai)">道場</span>
+        <span class="rk-slot" data-k="道場" data-c="var(--ai)"></span>
         <div style="flex:1;min-width:0">
           <span class="eyebrow">Étape ${st} sur ${KPATH.length} · ${kUnlocked().length} kana ouverts</span>
           <b style="display:block;font-size:1rem">${esc(KPATH[st-1].t)}</b>
           <span style="font-size:0.7812rem;color:var(--mut)">S'exercer sans enjeu avant de tenter les nœuds.</span>
         </div></div>
       <div class="hero-bar" style="margin-top:10px"><i style="width:${sc.pc}%"></i></div>`;
+    remplitRonds(dj);
     const cd=el("div","ctrl"); cd.style.marginTop="12px";
     const d1=el("button","btn p","Aller au dojo");
     d1.onclick=()=>{ dojoNouveau(); go("dojo"); };
@@ -2319,12 +2396,13 @@ VIEWS.home=m=>{
   if(chNoeuds.length && !chReste && S.ch<50 && S.chVu!==S.ch){
     const fin=el("div","card chfini");
     fin.innerHTML=`<div class="l" style="display:flex;gap:14px;align-items:center">
-        <span class="rond-k" style="--vc:var(--take)">終</span>
+        <span class="rk-slot" data-k="終" data-c="var(--take)"></span>
         <div style="flex:1;min-width:0">
           <span class="eyebrow" style="color:var(--take)">Chapitre ${S.ch} terminé</span>
           <b style="display:block;font-size:1rem">Les ${chNoeuds.length} nœuds sont acquis</b>
           <span style="font-size:0.7812rem;color:var(--mut)">Le chapitre ${S.ch+1} vous attend.</span>
         </div></div>`;
+    remplitRonds(fin);
     const cf=el("div","ctrl"); cf.style.marginTop="12px";
     const bf1=el("button","btn p","Passer au chapitre "+(S.ch+1));
     bf1.onclick=()=>{ S.ch=S.ch+1; S.chVu=null; poolCache=null; save(); render();
@@ -2341,7 +2419,7 @@ VIEWS.home=m=>{
   const pv=el("div","card voie-home");
   pv.style.borderColor="color-mix(in srgb,var(--ai) 40%,var(--line))";
   pv.innerHTML=`<div class="l" style="display:flex;gap:14px;align-items:center">
-      <span class="rond-k" style="--vc:var(--ai)">${esc(RG.j)}</span>
+      <span class="rk-slot" data-k="${esc(RG.j)}" data-c="var(--ai)"></span>
       <div style="flex:1;min-width:0">
         <span class="eyebrow">Rang ${TS.rang+1} sur ${D.rangs.length}${RG.jlpt?" · JLPT N"+RG.jlpt:""}</span>
         <b style="display:block;font-size:1rem">${esc(RG.n)}</b>
@@ -2349,6 +2427,7 @@ VIEWS.home=m=>{
           nx.length?nx.length+" nœud"+(nx.length>1?"s":"")+" ouvert"+(nx.length>1?"s":""):"tout est fait, passez l'épreuve"}</span>
       </div><span class="ngo" style="color:var(--dim);font-size:1.1875rem">›</span></div>
     <div class="fragline"></div>`;
+  remplitRonds(pv);
   const ech=el("div","echelle");
   D.rangs.forEach((R2,i)=>{
     const et=el("span","ech"+(i<TS.rang?" passe":(i===TS.rang?" ici":"")));
@@ -2390,58 +2469,71 @@ VIEWS.home=m=>{
   chl.onclick=()=>ouvreReglageChapitre();
   m.appendChild(chl);
 
-  /* ---- les rubriques : six essentielles, le reste replié ---- */
-  const tile=(v,j,fr,sub)=>{
-    const b=el("button","tile",
-      `<span class="jp">${j}</span><span><span class="fr">${fr}</span>${sub?'<br><span class="sub">'+sub+"</span>":""}</span>`);
-    b.onclick=()=>go(v); return b;
-  };
-  const g1=el("div","tiles");
-  [["lecons","課","Leçons",S.ch+" chapitres"],
-   ["fiches","要点","Fiches",D.fiches.filter(f=>f.l<=S.ch).length+" points"],
-   ["minna","練習","Exercices",D.minna.filter(x=>x.l<=S.ch).length+" séries"],
-   ["audio","音声","Audio",""],
-   ["manuel","本冊","Votre manuel",""],
-   ["aide","解説","Aide au manuel",""]
-  ].forEach(a=>g1.appendChild(tile(a[0],a[1],a[2],a[3])));
-  m.appendChild(g1);
-
-  /* le reste, sous un repli : on ne l'ouvre que si on cherche quelque chose */
-  const plus=el("button","plusline"+(S.homePlus?" on":""));
-  plus.innerHTML=`<span>${S.homePlus?"Masquer":"Tout voir"}</span><i>${S.homePlus?"▲":"▼"}</i>`;
-  plus.onclick=()=>{ S.homePlus=S.homePlus?0:1; save(); render(); };
-  m.appendChild(plus);
-
-  if(S.homePlus){
-    const groupe=(titre,items)=>{
-      m.appendChild(el("div","sec",titre));
-      const g=el("div","tiles");
-      items.forEach(a=>g.appendChild(tile(a[0],a[1],a[2],a[3])));
-      m.appendChild(g);
-    };
-    groupe("Étudier",[
-      ["pieges","落とし穴","Pièges et oral",""],
-      ["culture","文化","Contexte culturel",""]]);
-    groupe("S'entraîner",[
-      ["arbre","道","Le chemin",""],
-      ["lecture","読解","Compréhension",""],
-      ["jlpt","JLPT","Préparation",""],
-      ["phrase","作文","Construire",""],
-      ["conjug","活用","Conjugueur",""],
-      ["progres","記録","Progression",""]]);
-    groupe("Chercher",[
-      ["dico","辞書","Dictionnaire",""],
-      ["jmdict","大辞典","Dictionnaire étendu",""],
-      ["kanji","漢字","Kanji et tracé",""],
-      ["rads","部首","Radicaux",""],
-      ["gram","助詞","Particules",""],
-      ["expr","表現","Expressions",""],
-      ["cnt","助数詞","Compteurs",""],
-      ["adv","副詞","Adverbes",""]]);
+  /* ---- les favoris, en badges ronds ---- */
+  const fv=favs();
+  if(fv.length){
+    const gr=el("div","ronds");
+    fv.forEach(id=>{
+      const r=RUBIDX[id]; if(!r) return;
+      const b=el("button","rondbtn");
+      b.appendChild(rondK(r[1],"var(--ai)",56));
+      b.appendChild(el("span","rb-n",esc(r[2])));
+      b.onclick=()=>go(r[0]);
+      gr.appendChild(b);
+    });
+    m.appendChild(gr);
+  } else {
+    m.appendChild(el("div","roue-aide","Aucun favori — ouvrez le répertoire pour en choisir."));
   }
+
+  /* ---- accès au répertoire complet ---- */
+  const plus=el("button","plusline");
+  plus.innerHTML='<span>Toutes les rubriques</span><i>▾</i>';
+  plus.onclick=()=>ouvreRepertoire();
+  m.appendChild(plus);
 
   m.appendChild(el("div","note","Votre progression reste sur cet appareil. Pensez à l'exporter de temps en temps depuis votre profil."));
 };
+
+/* Répertoire de toutes les rubriques, en feuille modale. Chaque badge peut
+   être épinglé à l'accueil d'un tap sur son étoile : l'utilisateur compose
+   lui-même les six à huit accès qui lui servent tous les jours. */
+function ouvreRepertoire(){
+  const back=document.createElement("div"); back.className="sheet";
+  const box=el("div","sheetbox");
+  const maj=()=>{
+    const fv=favs();
+    box.innerHTML=`<div class="sheethead">
+        <div><div class="jpx" style="font-size:1.375rem;line-height:1.2;color:var(--ai)">目録</div>
+          <div style="font-size:0.8125rem;color:var(--mut);margin-top:2px">Touchez l'étoile pour épingler à l'accueil · ${fv.length}/8</div></div>
+        <button class="ico" id="rpX">✕</button></div>`;
+    const groupes=[...new Set(RUBRIQUES.map(r=>r[3]))];
+    groupes.forEach(g=>{
+      box.appendChild(el("div","sec",g));
+      const gr=el("div","ronds rep");
+      RUBRIQUES.filter(r=>r[3]===g).forEach(r=>{
+        const on=fv.includes(r[0]);
+        const w=el("div","rondwrap");
+        const b=el("button","rondbtn");
+        b.appendChild(rondK(r[1],"var(--ai)",52));
+        b.appendChild(el("span","rb-n",esc(r[2])));
+        b.onclick=()=>{ back.remove(); go(r[0]); };
+        w.appendChild(b);
+        const st=el("button","rb-star"+(on?" on":""),on?"★":"☆");
+        st.title=on?"Retirer des favoris":"Épingler à l'accueil";
+        st.onclick=e=>{ e.stopPropagation(); favToggle(r[0]); maj(); };
+        w.appendChild(st);
+        gr.appendChild(w);
+      });
+      box.appendChild(gr);
+    });
+    $("#rpX",box).onclick=()=>{ back.remove(); render(); };
+  };
+  maj();
+  back.appendChild(box);
+  document.body.appendChild(back);
+  back.onclick=e=>{ if(e.target===back){ back.remove(); render(); } };
+}
 
 /* Réglage du chapitre en cours, en feuille modale : c'est un état lourd de
    conséquences, il mérite un geste délibéré plutôt qu'un curseur qu'on
@@ -2478,6 +2570,25 @@ function ouvreReglageChapitre(){
   document.body.appendChild(back);
   back.onclick=e=>{ if(e.target===back){ back.remove(); render(); } };
 }
+/* Pastille ronde portant un ou plusieurs kanji. La fonte s'adapte au nombre
+   de signes : à taille fixe, 修行者 ou 師範代 débordaient du cercle. */
+function remplitRonds(racine){
+  racine.querySelectorAll(".rk-slot").forEach(sl=>{
+    sl.replaceWith(rondK(sl.dataset.k, sl.dataset.c, +sl.dataset.d||54));
+  });
+}
+function rondK(txt,coul,taille){
+  const n=[...String(txt)].length;
+  const d=taille||54;
+  const fs = n<=1 ? d*0.44 : n===2 ? d*0.30 : n===3 ? d*0.225 : d*0.18;
+  const sp=el("span","rond-k"+(n>1?" multi":""));
+  sp.style.setProperty("--vc",coul||"var(--ai)");
+  sp.style.width=d+"px"; sp.style.height=d+"px";
+  sp.style.fontSize=fs.toFixed(1)+"px";
+  sp.textContent=txt;
+  return sp;
+}
+
 /* fait monter un nombre jusqu'à sa valeur, pour donner du mouvement aux compteurs */
 function compte(el2,fin,ms){
   if(matchMedia("(prefers-reduced-motion:reduce)").matches||fin<=0){ el2.textContent=fin; return; }
