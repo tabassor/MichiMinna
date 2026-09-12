@@ -126,6 +126,73 @@ button.stat{font:inherit;width:100%}
 /* ---- 修 Entraînement : la roue des cinq voies ----
    Disposition radiale plutôt qu'une pile de cartes : les cinq phases
    rayonnent autour de la revue, dans l'ordre du cycle d'engendrement. */
+/* ---- 家 Accueil : formes rondes, dans le vocabulaire de la roue ---- */
+/* Jauge annulaire de l'objectif du jour, en remplacement de la cellule carrée. */
+.anneau{position:relative;width:72px;height:72px;flex:0 0 auto}
+.anneau svg{width:100%;height:100%;transform:rotate(-90deg)}
+.an-bg{fill:none;stroke:var(--surf2);stroke-width:6}
+.an-fg{fill:none;stroke:var(--ai);stroke-width:6;stroke-linecap:round;
+  transition:stroke-dashoffset .75s cubic-bezier(.22,.9,.28,1)}
+.an-txt{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:0;line-height:1}
+.an-txt b{font-size:1.3125rem;font-weight:700;color:var(--tx)}
+.an-txt u{text-decoration:none;font-size:0.625rem;color:var(--dim);margin-top:1px}
+/* Pastille ronde portant un kanji : sert aux cartes du chemin, du dojo, etc. */
+.rond-k{width:54px;height:54px;flex:0 0 auto;border-radius:50%;display:grid;place-items:center;
+  font-family:var(--disp);font-size:1.375rem;line-height:1;color:var(--vc);
+  border:1.5px solid var(--vc);
+  background:radial-gradient(circle at 36% 30%,color-mix(in srgb,var(--vc) 16%,transparent),color-mix(in srgb,var(--vc) 7%,transparent));
+  box-shadow:0 1px 4px color-mix(in srgb,var(--vc) 14%,transparent)}
+/* Bandeau « Reprendre » : un geste, une destination. */
+.reprise{display:flex;align-items:center;gap:13px;width:100%;text-align:left;
+  background:var(--surf);border:1px solid var(--line);border-radius:99px;
+  padding:9px 16px 9px 9px;margin-bottom:12px;cursor:pointer;
+  box-shadow:0 1px 3px rgba(0,0,0,.04);
+  transition:transform .14s ease,border-color .18s ease,box-shadow .22s ease}
+.reprise:active{transform:scale(.985)}
+.reprise:hover{border-color:color-mix(in srgb,var(--ai) 45%,var(--line));
+  box-shadow:0 2px 10px color-mix(in srgb,var(--ai) 14%,transparent)}
+.rp-d{width:42px;height:42px;flex:0 0 auto;border-radius:50%;display:grid;place-items:center;
+  border:1.5px solid var(--ai);
+  background:radial-gradient(circle at 36% 30%,color-mix(in srgb,var(--ai) 15%,transparent),color-mix(in srgb,var(--ai) 6%,transparent))}
+.rp-k{font-family:var(--disp);font-size:1.125rem;line-height:1;color:var(--ai)}
+.rp-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.rp-t b{font-size:0.875rem;font-weight:600;color:var(--tx)}
+.rp-t i{font-style:normal;font-size:0.75rem;color:var(--mut);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.rp-go{color:var(--dim);font-size:1.1875rem;flex:0 0 auto}
+/* Ligne du chapitre : discrète, mais toujours accessible d'un tap. */
+.chline{display:flex;align-items:center;gap:13px;width:100%;text-align:left;
+  background:none;border:1px solid var(--line);border-radius:99px;
+  padding:7px 16px 7px 7px;margin-bottom:16px;cursor:pointer;
+  transition:border-color .18s ease,background .18s ease}
+.chline:active{transform:scale(.985)}
+.chline:hover{border-color:color-mix(in srgb,var(--ai) 40%,var(--line));background:var(--surf)}
+.ch-d{width:38px;height:38px;flex:0 0 auto;border-radius:50%;display:flex;
+  flex-direction:column;align-items:center;justify-content:center;line-height:1;
+  background:var(--surf2);border:1px solid var(--line)}
+.ch-d b{font-size:0.9375rem;font-weight:700;color:var(--tx)}
+.ch-d i{font-family:var(--disp);font-style:normal;font-size:0.5312rem;color:var(--dim)}
+.ch-t{flex:1;min-width:0;font-size:0.8438rem;color:var(--tx);display:flex;flex-direction:column;gap:1px}
+.ch-t i{font-style:normal;font-size:0.7188rem;color:var(--mut)}
+.ch-go{font-size:0.7188rem;color:var(--ai);flex:0 0 auto}
+/* Réglage du chapitre en feuille modale */
+.chdial{display:flex;align-items:center;gap:18px;margin-top:16px}
+.ch-rond{position:relative;width:96px;height:96px;flex:0 0 auto}
+.ch-rond svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ch-n{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;line-height:1}
+.ch-n b{font-size:1.75rem;font-weight:700;color:var(--tx)}
+.ch-n u{text-decoration:none;font-size:0.6875rem;color:var(--dim);margin-top:2px}
+.ch-inf{flex:1;min-width:0;font-size:0.8438rem;color:var(--tx);line-height:1.6}
+/* Repli des rubriques secondaires */
+.plusline{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;
+  background:none;border:1px dashed var(--line);border-radius:99px;
+  padding:9px;margin-bottom:16px;cursor:pointer;
+  font-size:0.8125rem;color:var(--mut);font-family:var(--ui);
+  transition:border-color .18s ease,color .18s ease}
+.plusline:hover,.plusline.on{border-color:color-mix(in srgb,var(--ai) 40%,var(--line));color:var(--ai)}
+.plusline i{font-style:normal;font-size:0.625rem}
 .roue{display:flex;justify-content:center;margin:6px 0 2px}
 .roue-in{position:relative;width:min(340px,92vw);aspect-ratio:1}
 /* Le cycle d'engendrement, tracé en filigrane : cinq segments reliant les
@@ -552,6 +619,7 @@ main.nav-fwd>*{animation-name:slideIn}
 .crow:active{background:var(--surf2)}
 @media (prefers-reduced-motion:reduce){
   main.anim>*,.tiles .tile,.qbox,.sheetbox,.opt.ok,.opt.no,.roue-v,.voie.ouverte{animation:none!important}
+  .an-fg{transition:none!important}
   .roue-c.on::after{animation:none!important;opacity:0}
 }
 
@@ -1748,8 +1816,21 @@ function toast(txt){
   t.textContent=txt; t.className="on";
   clearTimeout(t._h); t._h=setTimeout(()=>{ t.className=""; },2200);
 }
+/* Vues qui valent la peine d'être reprises : on retient la dernière visitée
+   pour proposer d'y revenir depuis l'accueil. */
+const REPRENDRE={lecon:["課","Leçon"],noeud:["道","Nœud"],minna:["練習","Exercices"],
+  lecture:["読解","Lecture"],aide:["解説","Aide au manuel"],manuel:["本冊","Votre manuel"],
+  audio:["音声","Audio"],fiches:["要点","Fiches"],jlpt:["JLPT","Préparation JLPT"],
+  kanji:["漢字","Kanji"],conjug:["活用","Conjugueur"],phrase:["作文","Construire"],
+  pieges:["落とし穴","Pièges"],culture:["文化","Culture"]};
+function noteReprise(v,p){
+  if(!REPRENDRE[v]) return;
+  S.reprise={v:v,p:(p===undefined?null:p),t:Date.now()};
+  save();
+}
 function go(v,p,push){
   navDir="fwd";
+  noteReprise(v,p);
   if(view==="oral"&&v!=="oral") oraStop();
   /* la position de lecture est retenue avec la vue quittée */
   if(view) posVue[view+"|"+param]=window.scrollY;
@@ -2162,9 +2243,10 @@ VIEWS.home=m=>{
       <span class="eyebrow">${S.streak||0} jour${(S.streak||0)>1?"s":""} d'affilée</span>
     </div>
     <div class="hero-mid">
-      <div class="cellule" aria-hidden="true">
-        <i class="cell-fill" style="height:0%"></i>
-        <b>${S.done||0}</b><u>/ ${S.goal}</u>
+      <div class="anneau" aria-hidden="true">
+        <svg viewBox="0 0 72 72"><circle class="an-bg" cx="36" cy="36" r="31"/>
+          <circle class="an-fg" cx="36" cy="36" r="31" stroke-dasharray="195" stroke-dashoffset="195"/></svg>
+        <span class="an-txt"><b>${S.done||0}</b><u>/ ${S.goal}</u></span>
       </div>
       <div class="hero-txt">
         <h1>${pc>=100?"Objectif atteint":"Séance du jour"}</h1>
@@ -2177,12 +2259,11 @@ VIEWS.home=m=>{
                 : "Tirage pondéré par vos hésitations passées.")}</p>
       </div>
     </div>
-    <div class="hero-bar"><i style="width:0%"></i></div>
     <div class="hero-act"></div>`;
-  const nb=$(".cellule b",hero); if(nb) compte(nb,S.done||0,700);
+  const nb=$(".anneau b",hero); if(nb) compte(nb,S.done||0,700);
   requestAnimationFrame(()=>{
-    const bar=$(".hero-bar i",hero); if(bar) bar.style.width=pc+"%";
-    const cf=$(".cell-fill",hero); if(cf) cf.style.height=pc+"%";
+    const fg=$(".an-fg",hero);
+    if(fg) fg.style.strokeDashoffset=String(195-195*pc/100);
   });
   const act=$(".hero-act",hero);
   const b1=el("button","btn p","Commencer");
@@ -2196,12 +2277,27 @@ VIEWS.home=m=>{
   }
   m.appendChild(hero);
 
-  /* ---- grand débutant : le dojo passe devant tout le reste ---- */
+  /* ---- reprendre où l'on s'était arrêté ---- */
+  const rp=S.reprise;
+  if(rp && REPRENDRE[rp.v] && !(rp.v===view&&rp.p===param)){
+    const [rj,rn]=REPRENDRE[rp.v];
+    let detail=rn;
+    if(rp.v==="lecon"&&rp.p) detail="Leçon "+rp.p;
+    if(rp.v==="noeud"&&rp.p&&NIDX[rp.p]) detail=NIDX[rp.p].t||rn;
+    const r=el("button","reprise");
+    r.innerHTML=`<span class="rp-d"><span class="rp-k">${rj}</span></span>
+      <span class="rp-t"><b>Reprendre</b><i>${esc(detail)}</i></span>
+      <span class="rp-go">›</span>`;
+    r.onclick=()=>go(rp.v,rp.p);
+    m.appendChild(r);
+  }
+
+  /* ---- grand débutant : le dojo, une seule carte ---- */
   if(S.kana){
     const st=kStage(), sc=kStageScore();
     const dj=el("div","card dojohome");
     dj.innerHTML=`<div class="l" style="display:flex;gap:14px;align-items:center">
-        <span class="jpx" style="font-size:1.875rem;color:var(--ai);min-width:54px;text-align:center">道場</span>
+        <span class="rond-k" style="--vc:var(--ai)">道場</span>
         <div style="flex:1;min-width:0">
           <span class="eyebrow">Étape ${st} sur ${KPATH.length} · ${kUnlocked().length} kana ouverts</span>
           <b style="display:block;font-size:1rem">${esc(KPATH[st-1].t)}</b>
@@ -2223,19 +2319,19 @@ VIEWS.home=m=>{
   if(chNoeuds.length && !chReste && S.ch<50 && S.chVu!==S.ch){
     const fin=el("div","card chfini");
     fin.innerHTML=`<div class="l" style="display:flex;gap:14px;align-items:center">
-        <span class="jpx" style="font-size:1.875rem;color:var(--take);min-width:52px;text-align:center">終</span>
+        <span class="rond-k" style="--vc:var(--take)">終</span>
         <div style="flex:1;min-width:0">
           <span class="eyebrow" style="color:var(--take)">Chapitre ${S.ch} terminé</span>
           <b style="display:block;font-size:1rem">Les ${chNoeuds.length} nœuds sont acquis</b>
           <span style="font-size:0.7812rem;color:var(--mut)">Le chapitre ${S.ch+1} vous attend.</span>
         </div></div>`;
     const cf=el("div","ctrl"); cf.style.marginTop="12px";
-    const b1=el("button","btn p","Passer au chapitre "+(S.ch+1));
-    b1.onclick=()=>{ S.ch=S.ch+1; S.chVu=null; poolCache=null; save(); render();
+    const bf1=el("button","btn p","Passer au chapitre "+(S.ch+1));
+    bf1.onclick=()=>{ S.ch=S.ch+1; S.chVu=null; poolCache=null; save(); render();
                      toast("Chapitre "+S.ch+" ouvert"); };
-    const b2=el("button","btn","Rester ici");
-    b2.onclick=()=>{ S.chVu=S.ch; save(); render(); };
-    cf.appendChild(b1); cf.appendChild(b2); fin.appendChild(cf);
+    const bf2=el("button","btn","Rester ici");
+    bf2.onclick=()=>{ S.chVu=S.ch; save(); render(); };
+    cf.appendChild(bf1); cf.appendChild(bf2); fin.appendChild(cf);
     m.appendChild(fin);
   }
 
@@ -2245,7 +2341,7 @@ VIEWS.home=m=>{
   const pv=el("div","card voie-home");
   pv.style.borderColor="color-mix(in srgb,var(--ai) 40%,var(--line))";
   pv.innerHTML=`<div class="l" style="display:flex;gap:14px;align-items:center">
-      <span class="jpx" style="font-size:1.875rem;color:var(--ai);min-width:56px;text-align:center">${esc(RG.j)}</span>
+      <span class="rond-k" style="--vc:var(--ai)">${esc(RG.j)}</span>
       <div style="flex:1;min-width:0">
         <span class="eyebrow">Rang ${TS.rang+1} sur ${D.rangs.length}${RG.jlpt?" · JLPT N"+RG.jlpt:""}</span>
         <b style="display:block;font-size:1rem">${esc(RG.n)}</b>
@@ -2253,7 +2349,6 @@ VIEWS.home=m=>{
           nx.length?nx.length+" nœud"+(nx.length>1?"s":"")+" ouvert"+(nx.length>1?"s":""):"tout est fait, passez l'épreuve"}</span>
       </div><span class="ngo" style="color:var(--dim);font-size:1.1875rem">›</span></div>
     <div class="fragline"></div>`;
-  /* échelle des huit rangs, à la manière des jauges d'éléments */
   const ech=el("div","echelle");
   D.rangs.forEach((R2,i)=>{
     const et=el("span","ech"+(i<TS.rang?" passe":(i===TS.rang?" ici":"")));
@@ -2272,8 +2367,6 @@ VIEWS.home=m=>{
     const sp=el("span","fchip");
     sp.style.setProperty("--c",e.c);
     sp.title=e.n+" — "+o+" sur "+b2;
-    /* cinq jauges sur une ligne : le pourcentage suffit, le détail est dans l'infobulle
-       et la barre de fond figure la proportion. */
     sp.innerHTML=`<b class="fbar" style="width:${pcf}%"></b><i class="jpx">${esc(e.j)}</i>`+
       `<span>${b2?pcf+"%":o}</span>`;
     fl.appendChild(sp);
@@ -2289,71 +2382,102 @@ VIEWS.home=m=>{
   }
   m.appendChild(pv);
 
-  /* ---- où en êtes-vous : chapitre courant ---- */
-  const d=el("div","dial");
-  d.innerHTML=`<div class="sq"><div class="fill" style="height:${S.ch/50*100}%"></div><b>${S.ch}</b><i>課</i></div>
-  <div><h2>Chapitre ${S.ch} sur 50</h2><p>${nw} mots et ${nk} kanji ouverts.</p>
-  <div class="step"><button id="mn" aria-label="Chapitre précédent">−</button>
-  <input type="range" min="1" max="50" value="${S.ch}" id="rg" aria-label="Chapitre en cours">
-  <button id="pl" aria-label="Chapitre suivant">+</button></div></div>`;
-  m.appendChild(d);
-  const nc=$(".sq b",d); if(nc) compte(nc,S.ch,600);
-  const set=v=>{S.ch=Math.max(1,Math.min(50,v));save();render();};
-  $("#mn",d).onclick=()=>set(S.ch-1); $("#pl",d).onclick=()=>set(S.ch+1);
-  $("#rg",d).oninput=e=>set(+e.target.value);
+  /* ---- chapitre en cours : une ligne discrète, réglable d'un tap ---- */
+  const chl=el("button","chline");
+  chl.innerHTML=`<span class="ch-d"><b>${S.ch}</b><i>課</i></span>
+    <span class="ch-t">Chapitre ${S.ch} sur 50<i>${nw} mots · ${nk} kanji ouverts</i></span>
+    <span class="ch-go">ajuster</span>`;
+  chl.onclick=()=>ouvreReglageChapitre();
+  m.appendChild(chl);
 
-  if(S.kana){
-    const st=kStage(), sc=kStageScore();
-    const k=el("div","card kanacard");
-    k.innerHTML=`<div class="l"><span class="jpx big">仮名</span>
-      <div><b>Hiragana et katakana</b><span>Étape ${st} sur ${KPATH.length} · ${esc(KPATH[st-1].t)}</span>
-      <div class="hero-bar" style="margin-top:8px"><i style="width:${sc.pc}%"></i></div></div></div>`;
-    k.onclick=()=>go("kana"); m.appendChild(k);
-  }
-
-  /* le rang est déjà présenté plus haut : pas de seconde carte */
-
-  /* ---- les rubriques, en tuiles ---- */
-  const t=el("div","tiles");
+  /* ---- les rubriques : six essentielles, le reste replié ---- */
   const tile=(v,j,fr,sub)=>{
     const b=el("button","tile",
-      `<span class="jp">${j}</span><span><span class="fr">${fr}</span><br><span class="sub">${sub}</span></span>`);
+      `<span class="jp">${j}</span><span><span class="fr">${fr}</span>${sub?'<br><span class="sub">'+sub+"</span>":""}</span>`);
     b.onclick=()=>go(v); return b;
   };
-  const groupe=(titre,items)=>{
-    m.appendChild(el("div","sec",titre));
-    const g=el("div","tiles");
-    items.forEach(a=>g.appendChild(tile(a[0],a[1],a[2],a[3])));
-    m.appendChild(g);
-  };
-  groupe("Étudier",[
-    ["lecons","課","Leçons",S.ch+" chapitres ouverts"],
-    ["fiches","要点","Fiches de grammaire",D.fiches.filter(f=>f.l<=S.ch).length+" points"],
-    ["pieges","落とし穴","Pièges, oral et culture",Object.keys(D.pieges||{}).length+" fiches hors manuel"],
-    ["culture","文化","Contexte culturel",Math.min(S.ch,50)+" notes"],
-    ["audio","音声","Audio du manuel","Vos fichiers, hors ligne"],
-    ["manuel","本冊","Votre manuel","Le PDF que vous possédez"],
-    ["aide","解説","Aide au manuel","Photographiez une page, obtenez l'explication"]]);
-  groupe("S'entraîner",[
-    ["arbre","道","Le chemin","Rang "+(tstate().rang+1)+" sur "+D.rangs.length],
-    ["minna","練習","Exercices",D.minna.filter(x=>x.l<=S.ch).length+" séries et plus"],
-    ["lecture","読解","Compréhension écrite",Object.keys(D.lect||{}).length+" textes avec questions"],
-    ["jlpt","JLPT","Préparation N5 · N4","Kanji, lectures, vocabulaire"],
-    ["phrase","作文","Construire une phrase","Remettre les blocs dans l'ordre"],
-    ["conjug","活用","Conjugueur","Toutes les formes d'un mot"],
-    ["progres","記録","Progression","Courbes, équilibre, points faibles"]]);
-  groupe("Chercher",[
-    ["dico","辞書","Dictionnaire",nw+" mots du manuel"],
-    ["jmdict","大辞典","Dictionnaire étendu","15 338 mots · JMdict"],
-    ["kanji","漢字","Kanji & tracé",nk+" caractères"],
-    ["rads","部首","Radicaux",D.radicaux.filter(r=>r.k.some(c=>KIDX[c]&&KIDX[c].l&&KIDX[c].l<=S.ch)).length+" rencontrés"],
-    ["gram","助詞","Particules",D.particules.filter(p=>p.l<=S.ch).length+" particules"],
-    ["expr","表現","Expressions",D.expressions.filter(e=>e.l<=S.ch).length+" familles"],
-    ["cnt","助数詞","Compteurs",D.compteurs.filter(c=>c.l<=S.ch).length+" compteurs"],
-    ["adv","副詞","Adverbes",D.adverbes.filter(a=>a.l<=S.ch).length+" par fonction"]]);
+  const g1=el("div","tiles");
+  [["lecons","課","Leçons",S.ch+" chapitres"],
+   ["fiches","要点","Fiches",D.fiches.filter(f=>f.l<=S.ch).length+" points"],
+   ["minna","練習","Exercices",D.minna.filter(x=>x.l<=S.ch).length+" séries"],
+   ["audio","音声","Audio",""],
+   ["manuel","本冊","Votre manuel",""],
+   ["aide","解説","Aide au manuel",""]
+  ].forEach(a=>g1.appendChild(tile(a[0],a[1],a[2],a[3])));
+  m.appendChild(g1);
+
+  /* le reste, sous un repli : on ne l'ouvre que si on cherche quelque chose */
+  const plus=el("button","plusline"+(S.homePlus?" on":""));
+  plus.innerHTML=`<span>${S.homePlus?"Masquer":"Tout voir"}</span><i>${S.homePlus?"▲":"▼"}</i>`;
+  plus.onclick=()=>{ S.homePlus=S.homePlus?0:1; save(); render(); };
+  m.appendChild(plus);
+
+  if(S.homePlus){
+    const groupe=(titre,items)=>{
+      m.appendChild(el("div","sec",titre));
+      const g=el("div","tiles");
+      items.forEach(a=>g.appendChild(tile(a[0],a[1],a[2],a[3])));
+      m.appendChild(g);
+    };
+    groupe("Étudier",[
+      ["pieges","落とし穴","Pièges et oral",""],
+      ["culture","文化","Contexte culturel",""]]);
+    groupe("S'entraîner",[
+      ["arbre","道","Le chemin",""],
+      ["lecture","読解","Compréhension",""],
+      ["jlpt","JLPT","Préparation",""],
+      ["phrase","作文","Construire",""],
+      ["conjug","活用","Conjugueur",""],
+      ["progres","記録","Progression",""]]);
+    groupe("Chercher",[
+      ["dico","辞書","Dictionnaire",""],
+      ["jmdict","大辞典","Dictionnaire étendu",""],
+      ["kanji","漢字","Kanji et tracé",""],
+      ["rads","部首","Radicaux",""],
+      ["gram","助詞","Particules",""],
+      ["expr","表現","Expressions",""],
+      ["cnt","助数詞","Compteurs",""],
+      ["adv","副詞","Adverbes",""]]);
+  }
 
   m.appendChild(el("div","note","Votre progression reste sur cet appareil. Pensez à l'exporter de temps en temps depuis votre profil."));
 };
+
+/* Réglage du chapitre en cours, en feuille modale : c'est un état lourd de
+   conséquences, il mérite un geste délibéré plutôt qu'un curseur qu'on
+   effleure par accident en faisant défiler l'accueil. */
+function ouvreReglageChapitre(){
+  const back=document.createElement("div"); back.className="sheet";
+  const box=el("div","sheetbox");
+  const maj=()=>{
+    const nw=words().length, nk=kanjis().length;
+    box.innerHTML=`<div class="sheethead">
+        <div><div class="jpx" style="font-size:1.375rem;line-height:1.2;color:var(--ai)">第${S.ch}課</div>
+          <div style="font-size:0.8125rem;color:var(--mut);margin-top:2px">Chapitre en cours</div></div>
+        <button class="ico" id="chX">✕</button></div>
+      <div class="chdial">
+        <div class="ch-rond"><svg viewBox="0 0 96 96"><circle class="an-bg" cx="48" cy="48" r="42"/>
+          <circle class="an-fg" cx="48" cy="48" r="42" stroke-dasharray="264"
+            stroke-dashoffset="${264-264*S.ch/50}"/></svg>
+          <span class="ch-n"><b>${S.ch}</b><u>/ 50</u></span></div>
+        <div class="ch-inf">${nw} mots et ${nk} kanji ouverts.<br>
+          <span style="color:var(--mut);font-size:0.7812rem">Tout ce qui est au-delà reste verrouillé jusqu'à ce que vous avanciez.</span></div>
+      </div>
+      <div class="step" style="margin-top:16px">
+        <button id="mn" aria-label="Chapitre précédent">−</button>
+        <input type="range" min="1" max="50" value="${S.ch}" id="rg" aria-label="Chapitre en cours">
+        <button id="pl" aria-label="Chapitre suivant">+</button></div>`;
+    $("#chX",box).onclick=()=>back.remove();
+    const set=v=>{ S.ch=Math.max(1,Math.min(50,v)); poolCache=null; save(); maj(); };
+    $("#mn",box).onclick=()=>set(S.ch-1);
+    $("#pl",box).onclick=()=>set(S.ch+1);
+    $("#rg",box).oninput=e=>set(+e.target.value);
+  };
+  maj();
+  back.appendChild(box);
+  document.body.appendChild(back);
+  back.onclick=e=>{ if(e.target===back){ back.remove(); render(); } };
+}
 /* fait monter un nombre jusqu'à sa valeur, pour donner du mouvement aux compteurs */
 function compte(el2,fin,ms){
   if(matchMedia("(prefers-reduced-motion:reduce)").matches||fin<=0){ el2.textContent=fin; return; }
