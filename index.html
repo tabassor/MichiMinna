@@ -123,19 +123,51 @@ button.stat{font:inherit;width:100%}
 .note b{color:var(--tx)}
 /* Fiches de conjugaison : mise en page dédiée pour distinguer les règles
    de chaque groupe et rendre le tableau des cas facilement scannable. */
-/* ---- 修 Entraînement : la revue et les cinq voies ---- */
-.revcard{display:flex;align-items:center;gap:14px;background:var(--surf);border:1px solid var(--line);
-  border-radius:var(--r);padding:14px 16px;margin-bottom:14px}
-.revcard.on{border-color:var(--shu);background:color-mix(in srgb,var(--shu) 7%,var(--surf));cursor:pointer}
-.revcard.on:active{transform:scale(.99)}
-.revk{font-family:var(--disp);font-size:2.125rem;line-height:1;color:var(--dim);flex:0 0 auto;width:46px;text-align:center}
-.revcard.on .revk{color:var(--shu)}
-.revtxt{flex:1;min-width:0}
-.revt{font-size:1rem;font-weight:600;color:var(--tx)}
-.revcard.on .revt{color:var(--shu)}
-.revs{font-size:0.7812rem;color:var(--mut);margin-top:3px;line-height:1.45}
+/* ---- 修 Entraînement : la roue des cinq voies ----
+   Disposition radiale plutôt qu'une pile de cartes : les cinq phases
+   rayonnent autour de la revue, dans l'ordre du cycle d'engendrement. */
+.roue{display:flex;justify-content:center;margin:6px 0 2px}
+.roue-in{position:relative;width:min(340px,92vw);aspect-ratio:1}
+.roue-c{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:29%;aspect-ratio:1;border-radius:50%;border:1px solid var(--line);
+  background:var(--surf);display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:1px;cursor:pointer;padding:0;
+  transition:transform .14s ease,border-color .18s ease,background .18s ease}
+.roue-c.on{border-color:var(--shu);border-width:2px;
+  background:color-mix(in srgb,var(--shu) 9%,var(--surf))}
+.roue-c.on:active{transform:translate(-50%,-50%) scale(.95)}
+.roue-c:disabled{opacity:.55;cursor:default}
+.rc-k{font-family:var(--disp);font-size:1.6875rem;line-height:1;color:var(--dim)}
+.roue-c.on .rc-k{color:var(--shu)}
+.rc-n{font-size:0.7188rem;color:var(--mut);font-weight:600;line-height:1}
+.roue-c.on .rc-n{color:var(--shu)}
+.roue-v{position:absolute;transform:translate(-50%,-50%);width:25%;
+  background:none;border:0;padding:0;cursor:pointer;display:flex;
+  flex-direction:column;align-items:center;gap:3px;
+  transition:transform .14s ease}
+.roue-v:active{transform:translate(-50%,-50%) scale(.93)}
+.rv-d{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;
+  border:1.5px solid var(--vc);background:color-mix(in srgb,var(--vc) 11%,transparent);
+  transition:background .18s ease,box-shadow .18s ease}
+.roue-v.sel .rv-d{background:var(--vc);box-shadow:0 0 0 4px color-mix(in srgb,var(--vc) 22%,transparent)}
+.rv-k{font-family:var(--disp);font-size:1.5625rem;line-height:1;color:var(--vc)}
+.roue-v.sel .rv-k{color:#fff}
+.rv-n{font-size:0.6562rem;color:var(--mut);line-height:1.25;text-align:center;max-width:80px}
+.roue-v.sel .rv-n{color:var(--vc);font-weight:600}
+.rv-c{font-size:0.5938rem;color:var(--dim);line-height:1}
+.roue-v.vide{opacity:.4}
+.roue-bilan{text-align:center;font-size:0.7812rem;color:var(--mut);margin:2px 0 14px;line-height:1.5}
+.roue-aide{text-align:center;font-size:0.7812rem;color:var(--dim);margin:10px 0 16px;
+  padding:14px;border:1px dashed var(--line);border-radius:var(--r)}
 .voie{border:1px solid var(--line);border-left:3px solid var(--vc);border-radius:var(--r);
   background:var(--surf);padding:13px 15px;margin-bottom:11px}
+.voie.ouverte{border-color:var(--vc);box-shadow:0 2px 10px color-mix(in srgb,var(--vc) 13%,transparent)}
+@media(max-width:360px){
+  .roue-in{width:96vw}
+  .rv-d{width:46px;height:46px}
+  .rv-k{font-size:1.375rem}
+  .rv-n{font-size:0.5938rem;max-width:68px}
+}
 .vhead{display:flex;align-items:center;gap:12px}
 .vk{font-family:var(--disp);font-size:1.875rem;line-height:1;color:var(--vc);flex:0 0 auto;width:38px;text-align:center}
 .vmeta{flex:1;min-width:0}
@@ -8872,33 +8904,63 @@ VIEWS.shugyo=m=>{
     head(m,"修業の道","Le chemin de la pratique");
     const pool=buildPool(), due=dueNow();
     const bl=bilanRevue(pool);
+    if(!S.voieSel) S.voieSel=null;
 
-    /* ---- 復 La revue : ce que la mémoire réclame aujourd'hui ---- */
-    const rev=el("div","revcard");
-    rev.innerHTML=`<div class="revk">復</div>
-      <div class="revtxt">
-        <div class="revt">${due?("Reprendre "+due+" question"+(due>1?"s":"")):"Rien à revoir"}</div>
-        <div class="revs">${
-          bl.faux? '<b style="color:var(--shu)">'+bl.faux+" erreur"+(bl.faux>1?"s":"")+" à corriger</b> · " : ""
-        }${bl.dues} échue${bl.dues>1?"s":""} · ${freshCount(pool)} jamais posée${freshCount(pool)>1?"s":""}</div>
-      </div>`;
-    if(due){ rev.classList.add("on"); rev.onclick=()=>startSession("due"); }
-    m.appendChild(rev);
+    /* ---- 五行 : la roue des cinq voies autour de la revue ----
+       Les cinq phases sont disposées en cercle, comme le cycle traditionnel,
+       et non en pile : on saisit d'un coup d'œil l'ensemble du domaine plutôt
+       qu'une liste à parcourir. Le centre porte la revue, qui est le geste
+       quotidien ; les voies rayonnent autour. */
+    const roue=el("div","roue");
+    const R=el("div","roue-in");
 
-    /* ---- Les cinq voies ---- */
-    VOIES.forEach(v=>{
+    /* centre : 復 la revue */
+    const ctr=el("button","roue-c"+(due?" on":""));
+    ctr.innerHTML=`<span class="rc-k">復</span><span class="rc-n">${due?due:"—"}</span>`;
+    ctr.title=due?("Reprendre "+due+" question"+(due>1?"s":"")):"Rien à revoir pour l'instant";
+    if(due) ctr.onclick=()=>startSession("due");
+    else ctr.disabled=true;
+    R.appendChild(ctr);
+
+    /* les cinq voies, réparties sur le cercle — 木 en haut puis dans le sens
+       horaire, l'ordre du cycle d'engendrement 木→火→土→金→水 */
+    VOIES.forEach((v,i)=>{
+      const ang=(-90 + i*72) * Math.PI/180;
+      const dispo=questionsVoie(v.id).length;
+      const b=el("button","roue-v"+(S.voieSel===v.id?" sel":"")+(dispo?"":" vide"));
+      b.style.setProperty("--vc",v.coul);
+      b.style.left=(50 + 37*Math.cos(ang))+"%";
+      b.style.top =(50 + 37*Math.sin(ang))+"%";
+      b.innerHTML=`<span class="rv-d"><span class="rv-k">${v.j}</span></span>
+        <span class="rv-n">${esc(v.nom)}</span>
+        <span class="rv-c">${dispo}</span>`;
+      b.onclick=()=>{ S.voieSel = (S.voieSel===v.id? null : v.id); save(); render(); };
+      R.appendChild(b);
+    });
+    roue.appendChild(R);
+    m.appendChild(roue);
+
+    /* bilan de révision, sous la roue, en une ligne discrète */
+    const bilan=el("div","roue-bilan");
+    bilan.innerHTML = due
+      ? `<b style="color:var(--shu)">${due} à reprendre</b>${bl.faux?' · '+bl.faux+" erreur"+(bl.faux>1?"s":""):""} · ${freshCount(pool)} jamais posée${freshCount(pool)>1?"s":""}`
+      : `Rien à revoir · ${freshCount(pool)} question${freshCount(pool)>1?"s":""} jamais posée${freshCount(pool)>1?"s":""}`;
+    m.appendChild(bilan);
+
+    /* ---- réglages de la voie choisie ---- */
+    if(S.voieSel){
+      const v=VOIES.find(x=>x.id===S.voieSel);
       const dispo=questionsVoie(v.id);
-      const c=el("div","voie");
-      c.style.setProperty("--vc",v.coul);
       const pt=porteeDe(v.id);
       const ptLab = pt==="tout" ? "toute la base" : (pt==="vu" ? "jusqu'à L"+S.ch : "leçon "+pt);
+      const c=el("div","voie ouverte");
+      c.style.setProperty("--vc",v.coul);
       c.innerHTML=`<div class="vhead">
           <div class="vk">${v.j}</div>
           <div class="vmeta"><div class="vn">${esc(v.nom)}</div>
             <div class="vc">${dispo.length} question${dispo.length>1?"s":""} · ${ptLab}</div></div>
         </div>`;
 
-      /* sous-types, en petit, tous visibles */
       const sel=(S.sousType||{})[v.id]||[];
       const sg=el("div","vsous");
       v.sous.forEach(([k,lab])=>{
@@ -8910,15 +8972,13 @@ VIEWS.shugyo=m=>{
       });
       c.appendChild(sg);
 
-      /* formes verbales ciblables, propres à la voie du feu */
       if(v.id==="ka"){
         const ff=(S.formesCible||[]);
         const maxL = pt==="tout" ? 50 : (pt==="vu" ? S.ch : pt);
         const acc=FORMES_CIBLE.filter(f=>f[2]<=maxL);
         if(acc.length){
           const fg=el("div","vsous vformes");
-          const tt=el("span","vlab","Formes :");
-          fg.appendChild(tt);
+          fg.appendChild(el("span","vlab","Formes :"));
           acc.forEach(([k,lab])=>{
             const on=ff.length?ff.includes(k):true;
             const b=el("button","vchip sm"+(on?" on":""),k);
@@ -8935,7 +8995,6 @@ VIEWS.shugyo=m=>{
         }
       }
 
-      /* portée : acquis / toute la base / une leçon */
       const pg=el("div","vportee");
       const mk=(val,lab)=>{
         const on = (val==="leçon") ? (typeof pt==="number") : (pt===val);
@@ -8944,8 +9003,7 @@ VIEWS.shugyo=m=>{
           if(val==="leçon"){
             const rep=prompt("Quelle leçon ? (1 à 50)", String(typeof pt==="number"?pt:S.ch));
             if(rep===null) return;
-            const n=Math.max(1,Math.min(50,parseInt(rep,10)||S.ch));
-            porteeSet(v.id,n);
+            porteeSet(v.id, Math.max(1,Math.min(50,parseInt(rep,10)||S.ch)));
           } else porteeSet(v.id,val);
           render();
         };
@@ -8956,7 +9014,6 @@ VIEWS.shugyo=m=>{
       pg.appendChild(mk("leçon", typeof pt==="number" ? ("Leçon "+pt) : "Une leçon…"));
       c.appendChild(pg);
 
-      /* lancer */
       const cc=el("div","vgo");
       const g1=el("button","btn p","Commencer");
       g1.disabled=!dispo.length;
@@ -8967,9 +9024,11 @@ VIEWS.shugyo=m=>{
       cc.appendChild(g1); cc.appendChild(g2);
       c.appendChild(cc);
       m.appendChild(c);
-    });
+    } else {
+      m.appendChild(el("div","roue-aide","Touchez une voie pour l'ouvrir et régler ce que vous voulez travailler."));
+    }
 
-    /* ---- Ce qui ne rentre pas dans les cinq voies ---- */
+    /* ---- autres façons de travailler ---- */
     const autres=el("div","card");
     autres.appendChild(el("div","sec","Autres façons de travailler"));
     const ag=el("div","vsous");
