@@ -1204,14 +1204,18 @@ html[data-skin="retro"] .opt.no{box-shadow:0 0 12px color-mix(in srgb,var(--shu)
 /* ---- Nœuds du cercle : relief et profondeur ----
    Le cercle est vu de biais (axe vertical comprimé) et chaque nœud est
    dimensionné selon son écart au foyer. --pr vaut 1 au foyer, 0 à l'opposé. */
+/* --pr : 0 en haut de l'ellipse (loin), 1 en bas (près du lecteur).
+   Le relief suit la profondeur ; l'emphase du nœud actif est indépendante,
+   sinon le nœud au foyer, situé en haut, serait le plus effacé. */
 .enso .cv-n{transition:transform .42s cubic-bezier(.22,.9,.28,1),opacity .3s ease;
-  opacity:calc(.60 + .40 * var(--pr,1))}
+  opacity:calc(.74 + .26 * var(--pr,1))}
 .enso .cv-n.actif{opacity:1}
-.enso .cv-num{opacity:calc(.30 + .70 * var(--pr,1))}
-/* Ombre de contact : plus franche près du foyer, diffuse au loin */
+.enso .cv-n.lock{opacity:calc(.42 + .18 * var(--pr,1))}
+.enso .cv-num{opacity:calc(.45 + .55 * var(--pr,1))}
+/* Ombre de contact : franche en bas (près), diffuse en haut (loin) */
 .enso .cv-n .cv-c{
-  filter:drop-shadow(0 calc(1px + 3px * var(--pr,1)) calc(2px + 5px * var(--pr,1))
-    rgba(0,0,0,calc(.06 + .16 * var(--pr,1))))}
+  filter:drop-shadow(0 calc(.5px + 3.5px * var(--pr,1)) calc(1px + 6px * var(--pr,1))
+    rgba(0,0,0,calc(.05 + .18 * var(--pr,1))))}
 /* Le disque du nœud reçoit un dégradé plutôt qu'un aplat */
 .enso .cv-n.open .cv-c,.enso .cv-n.fait .cv-c{
   fill:url(#gradNoeud)}
@@ -3044,7 +3048,10 @@ function roueTournante(conteneur, cle, n, rayon, poser){
     if(!actif) return;
     const d=ev.clientX-x0;
     if(Math.abs(d)>4) bouge=Math.max(bouge,Math.abs(d));
-    roueRot[cle]=r0 + d/(large()*1.15);
+    /* Signe négatif : le satellite de devant est en bas, à l'angle +90°.
+       Le tirer vers la droite doit le conduire vers l'angle 0, donc faire
+       décroître l'angle — sans quoi la roue part à contresens du doigt. */
+    roueRot[cle]=r0 - d/(large()*1.15);
     place();
   });
   const fin=()=>{
@@ -5808,13 +5815,19 @@ VIEWS.arbre=m=>{
   if(arbreRang===null) arbreRang=T.rang;
   head(m,"道","Le chemin, du seuil à la maîtrise");
 
-  /* bandeau du rang courant : le rang au centre, ses cinq exigences autour.
-     Une fois le cadran complet, ce centre devient le bouton de l'épreuve. */
-  const R=RANG(T.rang);
-  const bes=besoinRang(T.rang), acq=fragAcquis(T.rang);
-  const manque0=fragManquants(T.rang);
-  const reste0=noeudsDuRang(T.rang).filter(n=>!estFait(n.id)).length;
-  const pret0=!manque0.length&&!reste0;
+  /* bandeau du rang consulté : le rang au centre, ses cinq exigences autour.
+     On suit arbreRang et non le rang courant : sinon, en revenant sur un
+     rang déjà franchi, la roue affichait la progression du rang en cours
+     et paraissait incomplète alors que tout était validé.
+     L'épreuve, elle, ne se lance que pour le rang où l'on se trouve. */
+  const vueRang = (arbreRang==null?T.rang:arbreRang);
+  const R=RANG(vueRang);
+  const bes=besoinRang(vueRang), acq=fragAcquis(vueRang);
+  const manque0=fragManquants(vueRang);
+  const reste0=noeudsDuRang(vueRang).filter(n=>!estFait(n.id)).length;
+  const estRangCourant = vueRang===T.rang;
+  const pret0=!manque0.length&&!reste0&&estRangCourant;
+  const dejaFranchi=!manque0.length&&!reste0&&!estRangCourant;
   const estMaitre0=!!R.maitre;
   const c=el("div","card");
   c.style.borderColor="color-mix(in srgb,var(--ai) 34%,var(--line))";
@@ -5828,18 +5841,21 @@ VIEWS.arbre=m=>{
   const RR=el("div","roue-in chemin-roue");
   const rctr=el("button","eq-c chemin-c"+(pret0?" pret":""));
   const nR=[...R.j].length;
-  rctr.innerHTML=cadranRangs(T.rang, progRang(T.rang))+
+  rctr.innerHTML=cadranRangs(vueRang, progRang(vueRang))+
     (pret0
       ? `<span class="ch-cn"><b class="jpx" style="font-size:1.4375rem">試</b>
           <i class="pret-l">${estMaitre0?"épreuve<br>de maître":"passer<br>l'épreuve"}</i></span>`
+      : dejaFranchi
+      ? `<span class="ch-cn"><b class="jpx" style="font-size:1.4375rem;color:var(--take)">済</b>
+          <i style="color:var(--take)">franchi</i></span>`
       : `<span class="ch-cn">
           <b class="jpx" style="font-size:${nR<=1?21:nR===2?15:11.5}px${nR>1?";letter-spacing:-.04em":""}">${esc(R.j)}</b>
-          <i>${progRang(T.rang)}<u>%</u></i></span>`);
+          <i>${progRang(vueRang)}<u>%</u></i></span>`);
   if(pret0){
     rctr.title=(estMaitre0?"Épreuve de maître · N"+R.maitre:"Test de rang")+" — tout est réuni";
-    rctr.onclick=()=>lancerTest(T.rang);
+    rctr.onclick=()=>lancerTest(vueRang);
   } else {
-    rctr.title="Rang "+(T.rang+1)+" sur "+D.rangs.length+" — "+progRang(T.rang)+" % franchi"
+    rctr.title="Rang "+(vueRang+1)+" sur "+D.rangs.length+" — "+progRang(vueRang)+" % franchi"
       +(reste0?" · "+reste0+" nœud"+(reste0>1?"s":"")+" à terminer":"")
       +(manque0.length?" · il manque "+manque0.map(x=>(x.faut-x.ont)+" "+x.e.j).join(", "):"");
     rctr.disabled=true;
@@ -5900,7 +5916,7 @@ VIEWS.arbre=m=>{
         : "Vingt questions tirées de tout le rang, 85 % pour passer. Touchez 試 au centre de la roue.")
         :(reste?reste+" nœud"+(reste>1?"s":"")+" à terminer"+(manque.length?", et ":".")
               :"")+(manque.length?"il vous manque "+manque.map(x=>x.faut-x.ont+" "+x.e.j).join(", ")+".":"")}</div>`;
-  if(T.tests[T.rang]) tb.appendChild(el("div","note","Déjà réussi à "+T.tests[T.rang].s+" %."));
+  if(T.tests[vueRang]) tb.appendChild(el("div","note","Déjà réussi à "+T.tests[vueRang].s+" %."));
   m.appendChild(tb);
 
   const bcarte=el("button","btn w","全体図  Voir tout le parcours");
@@ -6166,13 +6182,22 @@ function carteRang(rid,vidSel){
   const W=344, CX=W/2, R=20;
   const n=ns.length;
   const RAYON=Math.max(112,Math.min(138, 30+n*5.2));
-  const H=RAYON*2*0.80+2*R+44;   /* l'ellipse est moins haute que le cercle */
+  const H=RAYON*2*0.74+2*R*1.42+30;   /* l'ellipse est moins haute que le cercle */
   const CY=H/2;
   const pas=360/n;
   /* l'angle s'accumule : on tourne toujours par le plus court chemin,
      et jamais en sens inverse d'un tour complet */
   if(ensoCle!==rid+"|"+vid){ ensoCle=rid+"|"+vid; ensoAngle=-iF*pas; }
   let rot=ensoAngle;
+
+  /* Le cercle est vu de biais : l'axe vertical est comprimé. La profondeur
+     découle de la position sur l'ellipse — le bas est près du lecteur, le
+     haut est loin. Le nœud au foyer garde son emphase propre, séparément. */
+  const ENS_CI=0.74;                       /* compression verticale */
+  const ensProf=(k)=>{                     /* 0 en haut (loin) … 1 en bas (près) */
+    const a=(-90 + k*pas + ensoAngle)*Math.PI/180;
+    return (Math.sin(a)+1)/2;
+  };
 
   const NS="http://www.w3.org/2000/svg";
   const el2=(t,a)=>{ const x=document.createElementNS(NS,t); for(const k in a) x.setAttribute(k,a[k]); return x; };
@@ -6189,14 +6214,24 @@ function carteRang(rid,vidSel){
   svg.appendChild(defs);
 
   const C=2*Math.PI*RAYON;
-  svg.appendChild(el2("ellipse",{cx:CX,cy:CY,rx:RAYON,ry:(RAYON*0.80).toFixed(1),"class":"enso-fond"}));
+  svg.appendChild(el2("ellipse",{cx:CX,cy:CY,rx:RAYON,ry:(RAYON*ENS_CI).toFixed(1),"class":"enso-fond"}));
   const faits=ns.filter(x=>estFait(x.id)).length;
-  /* La jauge d'avancement épouse l'ellipse. Sa longueur est approchée par
-     la formule de Ramanujan, sans quoi le remplissage serait faux. */
-  const rb=RAYON*0.80, hh=Math.pow(RAYON-rb,2)/Math.pow(RAYON+rb,2);
-  const CE=Math.PI*(RAYON+rb)*(1+3*hh/(10+Math.sqrt(4-3*hh)));
-  const trait=el2("ellipse",{cx:CX,cy:CY,rx:RAYON,ry:rb.toFixed(1),"class":"enso-trait",
-    transform:"rotate(-90 "+CX+" "+CY+")"});
+  /* La jauge suit exactement la trajectoire des nœuds. On ne peut pas
+     employer <ellipse> avec rotate(-90) : la rotation échangerait les axes
+     et le tracé ne passerait plus par les nœuds. On construit donc le
+     chemin point par point, en partant du haut et dans le sens horaire,
+     et on mesure sa longueur par sommation — exacte par construction. */
+  const rb=RAYON*ENS_CI;
+  const NPT=240, ptsJ=[];
+  for(let k=0;k<=NPT;k++){
+    const t=(-90 + k*360/NPT)*Math.PI/180;
+    ptsJ.push([CX+RAYON*Math.cos(t), CY+rb*Math.sin(t)]);
+  }
+  let CE=0;
+  for(let k=1;k<ptsJ.length;k++)
+    CE+=Math.hypot(ptsJ[k][0]-ptsJ[k-1][0], ptsJ[k][1]-ptsJ[k-1][1]);
+  const dJ="M"+ptsJ.map(q=>q[0].toFixed(2)+","+q[1].toFixed(2)).join("L");
+  const trait=el2("path",{d:dJ,"class":"enso-trait",fill:"none"});
   trait.style.setProperty("--c",e.c);
   trait.style.strokeDasharray=CE;
   trait.style.strokeDashoffset=CE*(1-faits/n);
@@ -6217,18 +6252,9 @@ function carteRang(rid,vidSel){
   const anneau=el2("g",{"class":"enso-ring",transform:"rotate("+rot+" "+CX+" "+CY+")"});
   svg.appendChild(anneau);
 
-  /* Le cercle est vu légèrement de biais : l'axe vertical est comprimé et
-     chaque nœud est dimensionné selon son écart au foyer. On garde la
-     rotation de groupe existante — seule la géométrie se creuse. */
-  const ENS_CI=0.80;                       /* compression verticale */
-  const ensProf=(k)=>{                     /* 1 au foyer, 0 à l'opposé */
-    let d=Math.abs(((k*pas+ensoAngle)%360+360)%360);
-    if(d>180) d=360-d;
-    return 1-d/180;
-  };
   ns.forEach((nd,i)=>{
     const a=(-90+i*pas)*Math.PI/180;
-    const x=CX+RAYON*Math.cos(a), y=CY+RAYON*Math.sin(a)*ENS_CI;
+    const x=CX+RAYON*Math.cos(a), y=CY+RAYON*ENS_CI*Math.sin(a);
     const fait=estFait(nd.id), op=ouvert(nd), vise=arbreCh&&nd.ch&&nd.ch[0]<=arbreCh&&arbreCh<=nd.ch[1];
     const actif=nd.id===arbreFocus;
     const g=el2("g",{"class":"cv-n"+(fait?" fait":(op?" open":" lock"))+(vise?" vise":"")+
@@ -6239,7 +6265,7 @@ function carteRang(rid,vidSel){
     g.style.setProperty("--c",e.c);
     const pr=ensProf(i);
     g.style.setProperty("--pr",pr.toFixed(3));
-    const r2=actif?R*1.42:R*(0.80+0.20*pr);
+    const r2=(actif?R*1.42:R)*(0.84+0.22*pr);
     if(op&&!fait) g.appendChild(el2("circle",{r:r2+6,"class":"cv-halo"}));
     if(fait) g.appendChild(el2("circle",{r:r2+4.5,"class":"cv-ring"}));
     g.appendChild(el2("circle",{r:r2,"class":"cv-c"}));
@@ -6273,11 +6299,11 @@ function carteRang(rid,vidSel){
     cases.forEach((g2,k)=>{
       g2.setAttribute("transform","translate("+
         (CX+RAYON*Math.cos((-90+k*pas)*Math.PI/180)).toFixed(1)+","+
-        (CY+RAYON*Math.sin((-90+k*pas)*Math.PI/180)*ENS_CI).toFixed(1)+") rotate("+(-ensoAngle)+")");
+        (CY+RAYON*ENS_CI*Math.sin((-90+k*pas)*Math.PI/180)).toFixed(1)+") rotate("+(-ensoAngle)+")");
       g2.classList.toggle("actif",k===i);
       const pr2=ensProf(k);
       g2.style.setProperty("--pr",pr2.toFixed(3));
-      const r3=(k===i)?R*1.42:R*(0.80+0.20*pr2);
+      const r3=(k===i?R*1.42:R)*(0.84+0.22*pr2);
       g2.querySelectorAll("circle").forEach(c2=>{
         if(c2.classList.contains("cv-c")) c2.setAttribute("r",r3);
         else if(c2.classList.contains("cv-halo")) c2.setAttribute("r",r3+6);
@@ -6308,8 +6334,14 @@ function carteRang(rid,vidSel){
       anneau.setAttribute("transform","rotate("+ensoAngle+" "+CX+" "+CY+")");
       cases.forEach((g2,k)=>{
         const a2=(-90+k*pas)*Math.PI/180;
+        /* La compression elliptique doit être appliquée ici aussi : sans
+           elle, les nœuds sautaient sur le cercle pendant le glissement. */
         g2.setAttribute("transform","translate("+(CX+RAYON*Math.cos(a2)).toFixed(1)+","+
-          (CY+RAYON*Math.sin(a2)).toFixed(1)+") rotate("+(-ensoAngle)+")");
+          (CY+RAYON*ENS_CI*Math.sin(a2)).toFixed(1)+") rotate("+(-ensoAngle)+")");
+        const pr3=ensProf(k);
+        g2.style.setProperty("--pr",pr3.toFixed(3));
+        const cc=g2.querySelector(".cv-c");
+        if(cc) cc.setAttribute("r",((g2.classList.contains("actif")?R*1.42:R)*(0.84+0.22*pr3)).toFixed(1));
       });
     };
     cadre.addEventListener("pointerdown",ev=>{
