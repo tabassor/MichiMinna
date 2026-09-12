@@ -2697,9 +2697,10 @@ VIEWS.home=m=>{
   });
   const nb=$(".acc-in b",ctr); if(nb) compte(nb,S.done||0,700);
 
-  /* les favoris, répartis sur le cercle */
+  /* les favoris, répartis sur le cercle. Le tableau vit hors du bloc :
+     la rotation est branchée plus bas et doit encore y accéder. */
+  const sats=[];
   if(fv.length){
-    const sats=[];
     fv.forEach((id,i)=>{
       const r=RUBIDX[id]; if(!r) return;
       const b=el("button","roue-v acc-v orb");
