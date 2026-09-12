@@ -59,7 +59,9 @@ header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:8px;
 .chip{border:1px solid var(--line);background:var(--surf);border-radius:999px;padding:6px 11px;font-size:0.8125rem;color:var(--mut);white-space:nowrap}
 .chip.on{background:var(--ai);border-color:var(--ai);color:var(--on);font-weight:700}
 .chip.sm{padding:5px 9px;font-size:0.75rem}
-.ava{width:34px;height:34px;border-radius:10px;border:1px solid var(--ai);background:var(--surf2);
+.ava{width:34px;height:34px;border-radius:50%;border:1px solid color-mix(in srgb,var(--ai) 45%,var(--line));
+  background:radial-gradient(circle at 34% 28%,#fff,color-mix(in srgb,var(--ai) 12%,var(--surf2)));
+  box-shadow:0 2px 6px rgba(0,0,0,.07),inset 0 1px 0 rgba(255,255,255,.9);
   font-family:var(--disp);font-size:1.0625rem;display:grid;place-items:center;color:var(--ai)}
 .back{display:flex;align-items:center;gap:8px;font-size:0.875rem;color:var(--mut);padding:4px 0}
 ruby{ruby-position:over}
@@ -193,13 +195,48 @@ button.stat{font:inherit;width:100%}
   text-shadow:0 1px 1px rgba(255,255,255,.7)}
 .acc-v .rv-n{font-size:0.625rem;color:var(--mut);max-width:74px;line-height:1.2}
 .acc-v:hover .rv-n{color:var(--ai)}
+/* ---- 記録 Roue de l'équilibre des cinq voies ---- */
+.eq-roue{width:min(300px,86vw);margin:4px auto 2px}
+.eq-c{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:34%;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;
+  background:radial-gradient(circle at 38% 28%,#fff,color-mix(in srgb,var(--surf) 93%,var(--line)));
+  box-shadow:0 4px 14px rgba(0,0,0,.08),0 1px 3px rgba(0,0,0,.04),
+    inset 0 1px 0 rgba(255,255,255,.9),inset 0 -2px 4px rgba(0,0,0,.03)}
+.eq-cn{display:flex;flex-direction:column;align-items:center;line-height:1;gap:1px}
+.eq-cn b{font-size:1.4375rem;font-weight:700;color:var(--tx);text-shadow:0 1px 2px rgba(0,0,0,.06)}
+.eq-cn u{text-decoration:none;font-size:0.625rem;color:var(--dim)}
+.eq-cn i{font-style:normal;font-size:0.5rem;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--mut);margin-top:3px}
+.eq-v{position:absolute;transform:translate(-50%,-50%);width:24%;
+  display:flex;flex-direction:column;align-items:center;gap:3px}
+.eq-d{position:relative;width:56px;height:56px;display:grid;place-items:center}
+.eq-d svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+.eq-bg{fill:none;stroke:color-mix(in srgb,var(--line) 75%,transparent);stroke-width:4}
+.eq-fg{fill:none;stroke:var(--vc);stroke-width:4;stroke-linecap:round;
+  filter:drop-shadow(0 0 2px color-mix(in srgb,var(--vc) 45%,transparent));
+  transition:stroke-dashoffset .8s cubic-bezier(.22,.9,.28,1)}
+.eq-k{position:relative;font-family:var(--disp);font-size:1.375rem;line-height:1;color:var(--vc);
+  text-shadow:0 1px 2px rgba(255,255,255,.8)}
+.eq-n{font-size:0.6875rem;color:var(--mut);font-weight:600;line-height:1}
+/* ---- JLPT : anneau de progression et pastilles de niveau ---- */
+.jl-tete{display:flex;gap:16px;align-items:center}
+.jl-an{width:78px;height:78px}
+.jl-an .an-txt b{font-size:1.375rem}
+.jl-an .an-txt u{font-size:0.6875rem}
+.ronds.niv{grid-template-columns:repeat(2,1fr);max-width:220px;margin:2px auto 14px}
+.rondbtn.sel .rond-k{box-shadow:0 0 0 3px color-mix(in srgb,var(--ai) 20%,transparent),
+  0 4px 12px color-mix(in srgb,var(--ai) 28%,transparent),
+  inset 0 1px 0 rgba(255,255,255,.95)}
+.rondbtn.sel .rb-n{color:var(--ai);font-weight:600}
 /* ---- Rubriques en badges ronds, à la manière de la roue ---- */
 /* Chaque badge occupe une cellule à hauteur fixe : sans cela, un libellé
    sur deux lignes débordait de sa rangée et chevauchait la suivante. */
 .ronds{display:grid;grid-template-columns:repeat(4,1fr);
   gap:6px 4px;margin:4px 0 16px;align-items:start}
 @media(max-width:340px){ .ronds{grid-template-columns:repeat(3,1fr)} }
-.ronds.rep{margin:8px 0 14px}
+/* Dans le répertoire, trois colonnes : les libellés y ont plus de place
+   et l'étoile d'épinglage ne mord pas sur le badge voisin. */
+.ronds.rep{grid-template-columns:repeat(3,1fr);gap:10px 6px;margin:8px 0 14px}
 .rondwrap{position:relative;display:flex;justify-content:center;width:100%}
 .rondbtn{background:none;border:0;padding:4px 0 0;cursor:pointer;display:flex;
   flex-direction:column;align-items:center;gap:5px;width:100%;
@@ -209,9 +246,11 @@ button.stat{font:inherit;width:100%}
 .rondbtn:active{transform:scale(.92)}
 .rondbtn:hover .rond-k{box-shadow:0 5px 14px color-mix(in srgb,var(--vc) 26%,transparent),
   0 1px 3px rgba(0,0,0,.06),inset 0 1px 0 rgba(255,255,255,.95)}
+/* Retour à la ligne normal : -webkit-box empêchait le mot de se couper
+   et le texte était rogné au bord de la cellule. */
 .rb-n{font-size:0.6562rem;color:var(--mut);line-height:1.25;text-align:center;
-  width:100%;padding:0 2px;box-sizing:border-box;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  width:100%;padding:0 1px;box-sizing:border-box;
+  overflow-wrap:break-word;word-break:normal;hyphens:auto}
 .rondbtn:hover .rb-n{color:var(--ai)}
 /* Étoile d'épinglage, dans le répertoire */
 .rb-star{position:absolute;top:-2px;right:2px;width:22px;height:22px;border-radius:50%;
@@ -366,7 +405,11 @@ button.stat{font:inherit;width:100%}
 .vformes{align-items:center;padding-top:4px;border-top:1px dashed var(--line);margin-top:9px}
 .vlab{font-size:0.7188rem;color:var(--dim);margin-right:2px}
 .vchip{font-size:0.75rem;padding:4px 9px;border-radius:99px;border:1px solid var(--line);
-  background:none;color:var(--mut);cursor:pointer;font-family:var(--ui);line-height:1.5}
+  background:linear-gradient(170deg,#fff,var(--surf));color:var(--mut);cursor:pointer;
+  font-family:var(--ui);line-height:1.5;
+  box-shadow:0 1px 2px rgba(0,0,0,.04),inset 0 1px 0 rgba(255,255,255,.8);
+  transition:transform .12s ease,box-shadow .18s ease,border-color .18s ease,color .18s ease}
+.vchip:active{transform:scale(.94)}
 .vchip u{text-decoration:none;opacity:.6;font-size:0.6562rem;margin-left:3px}
 .vchip.on{border-color:var(--vc);color:var(--vc);background:color-mix(in srgb,var(--vc) 9%,transparent);font-weight:600}
 .vchip.sm{font-family:var(--disp);font-size:0.8125rem;padding:3px 8px}
@@ -411,7 +454,12 @@ button.stat{font:inherit;width:100%}
 .word .k em{font-style:normal;color:var(--mut);font-size:0.875rem}
 .word .f{font-size:0.8125rem;color:var(--mut)}
 .word .r{display:flex;gap:6px;align-items:center}
-.ico{width:32px;height:32px;border-radius:8px;border:1px solid var(--line);display:grid;place-items:center;font-size:0.875rem;color:var(--dim)}
+.ico{width:32px;height:32px;border-radius:50%;border:1px solid var(--line);display:grid;
+  place-items:center;font-size:0.875rem;color:var(--dim);
+  background:radial-gradient(circle at 34% 28%,#fff,var(--surf));
+  box-shadow:0 2px 5px rgba(0,0,0,.06),inset 0 1px 0 rgba(255,255,255,.9);
+  transition:transform .14s ease,box-shadow .2s ease}
+.ico:active{transform:scale(.9);box-shadow:0 1px 2px rgba(0,0,0,.06),inset 0 1px 3px rgba(0,0,0,.06)}
 .ico.on{color:var(--yama);border-color:var(--yama)}
 /* le tableau des formes occupe toute la largeur, sous la ligne du mot */
 .conj{flex:0 0 100%;width:100%;box-sizing:border-box;
@@ -422,7 +470,11 @@ button.stat{font:inherit;width:100%}
 .conj span{color:var(--dim);font-size:0.75rem;line-height:1.35}
 .conj b{font-family:var(--disp);font-weight:400;font-size:1rem;line-height:1.5}
 .kgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:8px;margin-bottom:16px}
-.kcell{aspect-ratio:1;border:var(--bw) solid var(--line);border-radius:var(--r-cell);background:var(--surf);display:grid;place-items:center;font-family:var(--disp);font-size:1.75rem;position:relative}
+.kcell{aspect-ratio:1;border:var(--bw) solid var(--line);border-radius:var(--r-cell);
+  background:linear-gradient(160deg,#fff,color-mix(in srgb,var(--surf) 95%,var(--line)));
+  display:grid;place-items:center;font-family:var(--disp);font-size:1.75rem;position:relative;
+  box-shadow:0 2px 5px rgba(0,0,0,.05),inset 0 1px 0 rgba(255,255,255,.85)}
+.kcell:active{box-shadow:0 1px 2px rgba(0,0,0,.06),inset 0 1px 3px rgba(0,0,0,.05)}
 .kcell:active{border-color:var(--ai)}
 .kcell u{position:absolute;top:3px;right:5px;font-size:0.5625rem;color:var(--dim);text-decoration:none}
 .kcell.lk{opacity:.42}
@@ -710,7 +762,7 @@ main.nav-fwd>*{animation-name:slideIn}
 .crow:active{background:var(--surf2)}
 @media (prefers-reduced-motion:reduce){
   main.anim>*,.tiles .tile,.qbox,.sheetbox,.opt.ok,.opt.no,.roue-v,.voie.ouverte,.ronds .rondwrap{animation:none!important}
-  .an-fg{transition:none!important}
+  .an-fg,.eq-fg{transition:none!important}
   .roue-c.on::after{animation:none!important;opacity:0}
 }
 
@@ -855,7 +907,9 @@ main.nav-fwd>*{animation-name:slideIn}
 @keyframes sceau{0%{transform:scale(.4) rotate(-12deg);opacity:0}100%{transform:none;opacity:1}}
 .voie-home{cursor:pointer}
 .echelle{display:flex;gap:4px;margin-top:12px;align-items:flex-end}
-.ech{flex:1;position:relative;height:26px;border-radius:7px;background:var(--surf2);
+.ech{flex:1;position:relative;height:26px;border-radius:99px;
+  background:linear-gradient(170deg,#fff,var(--surf2));
+  box-shadow:0 1px 3px rgba(0,0,0,.05),inset 0 1px 0 rgba(255,255,255,.8);
   border:1px solid var(--line);display:grid;place-items:center;overflow:hidden;opacity:.45}
 .ech i{font-family:var(--disp);font-style:normal;font-size:0.75rem;color:var(--dim);position:relative;z-index:1}
 .ech.passe{opacity:1;background:color-mix(in srgb,var(--ai) 22%,var(--surf2));border-color:color-mix(in srgb,var(--ai) 45%,var(--line))}
@@ -1934,14 +1988,24 @@ const RUBRIQUES=[
   ["expr","表現","Expressions","Chercher"],
   ["cnt","助数詞","Compteurs","Chercher"],
   ["adv","副詞","Adverbes","Chercher"],
-  ["kana","仮名","Kana","Chercher"]
+  ["kana","仮名","Kana","Chercher"],
+  ["dojo","道場","Dojo kana","S'entraîner"]
 ];
 const RUBIDX={}; RUBRIQUES.forEach(r=>RUBIDX[r[0]]=r);
 const FAVS_DEF=["lecons","fiches","minna","aide","dico","manuel"];
+/* Pour un grand débutant, le dojo et le tableau des kana passent devant :
+   c'est là qu'il passe ses premières semaines. */
+const FAVS_DEF_KANA=["dojo","kana","lecons","fiches","minna","dico"];
 function favs(){
   const f=S.favs;
-  if(!Array.isArray(f)) return FAVS_DEF.slice();
+  if(!Array.isArray(f)) return (S.kana?FAVS_DEF_KANA:FAVS_DEF).slice();
   return f.filter(x=>RUBIDX[x]);
+}
+/* Ouvre une rubrique. Le dojo demande qu'une série soit tirée au préalable,
+   sans quoi l'écran s'ouvrirait vide. */
+function vaRubrique(id){
+  if(id==="dojo"){ dojoNouveau(); go("dojo"); return; }
+  go(id);
 }
 function favToggle(id){
   const cur=favs();
@@ -2416,7 +2480,7 @@ VIEWS.home=m=>{
       if(n>1 && k) k.style.letterSpacing="-.04em";
       b.appendChild(d);
       b.appendChild(el("span","rv-n",esc(r[2])));
-      b.onclick=()=>go(r[0]);
+      b.onclick=()=>vaRubrique(r[0]);
       R.appendChild(b);
     });
   }
@@ -2589,7 +2653,7 @@ function ouvreRepertoire(){
         const b=el("button","rondbtn");
         b.appendChild(rondK(r[1],"var(--ai)",54));
         b.appendChild(el("span","rb-n",esc(r[2])));
-        b.onclick=()=>{ back.remove(); go(r[0]); };
+        b.onclick=()=>{ back.remove(); vaRubrique(r[0]); };
         w.appendChild(b);
         const st=el("button","rb-star"+(on?" on":""),on?"★":"☆");
         st.title=on?"Retirer des favoris":"Épingler à l'accueil";
@@ -3841,11 +3905,12 @@ VIEWS.progres=m=>{
     const ck=el("div","card");
     ck.innerHTML=`<div class="sec">仮名 — le syllabaire</div>
       <div class="l" style="display:flex;gap:14px;align-items:center;margin-top:8px">
-        <span class="jpx" style="font-size:1.625rem;color:var(--ai);min-width:46px;text-align:center">${esc(KPATH[st-1].t.slice(0,1))}</span>
+        <span class="rk-slot" data-k="仮名" data-c="var(--ai)" data-d="46"></span>
         <div style="flex:1;min-width:0"><b style="display:block;font-size:0.875rem">${esc(KPATH[st-1].t)}</b>
         <span style="font-size:0.75rem;color:var(--mut)">Étape ${st} sur ${KPATH.length} · ${kUnlocked().length} kana ouverts sur ${D.kana.length}</span></div></div>
       <div class="hero-bar" style="margin-top:10px"><i style="width:${Math.round(st/KPATH.length*100)}%"></i></div>`;
     ck.style.cursor="pointer"; ck.onclick=()=>go("kana");
+    remplitRonds(ck);
     m.appendChild(ck);
   }
 
@@ -3853,17 +3918,34 @@ VIEWS.progres=m=>{
   const T=tstate(), bes=besoinRang(T.rang), acq=fragAcquis(T.rang);
   const c3=el("div","card");
   c3.appendChild(el("div","sec","L'équilibre des cinq voies"));
-  const eq=el("div","eqlist");
-  D.elements.forEach(e=>{
+  /* Les cinq phases en roue, chacune avec sa jauge annulaire : d'un coup
+     d'œil on voit laquelle traîne, ce qu'une liste de barres ne montre pas
+     aussi bien. */
+  const eqr=el("div","roue");
+  const ER=el("div","roue-in eq-roue");
+  const moy=Math.round(D.elements.reduce((a,e)=>
+    a+Math.min(100,(acq[e.id]||0)/(bes[e.id]||1)*100),0)/D.elements.length);
+  const ectr=el("div","eq-c");
+  ectr.innerHTML=`<span class="eq-cn"><b>${moy}</b><u>%</u><i>ensemble</i></span>`;
+  ER.appendChild(ectr);
+  D.elements.forEach((e,i)=>{
     const b=bes[e.id]||1, o=acq[e.id]||0, pc=Math.min(100,Math.round(o/b*100));
-    const r=el("div","eqrow");
-    r.style.setProperty("--c",e.c);
-    r.innerHTML=`<span class="eqj jpx">${esc(e.j)}</span>
-      <span class="eqt"><b>${esc(e.d)}</b><span class="eqbar"><i style="width:${pc}%"></i></span></span>
-      <span class="eqp">${pc} %</span>`;
-    eq.appendChild(r);
+    const ang=(-90 + i*72) * Math.PI/180;
+    const w=el("div","eq-v");
+    w.style.setProperty("--vc",e.c);
+    w.style.left=(50 + 37*Math.cos(ang))+"%";
+    w.style.top =(50 + 37*Math.sin(ang))+"%";
+    w.title=e.n+" — "+o+" sur "+b;
+    w.innerHTML=`<span class="eq-d">
+        <svg viewBox="0 0 60 60" aria-hidden="true"><circle class="eq-bg" cx="30" cy="30" r="26"/>
+          <circle class="eq-fg" cx="30" cy="30" r="26" stroke-dasharray="163"
+            stroke-dashoffset="${163-163*pc/100}"/></svg>
+        <span class="eq-k">${esc(e.j)}</span></span>
+      <span class="eq-n">${pc} %</span>`;
+    ER.appendChild(w);
   });
-  c3.appendChild(eq);
+  eqr.appendChild(ER);
+  c3.appendChild(eqr);
   const faible=D.elements.slice().sort((a,b2)=>
     ((acq[a.id]||0)/(bes[a.id]||1))-((acq[b2.id]||0)/(bes[b2.id]||1)))[0];
   c3.appendChild(el("div","note","La voie la plus en retard est <b>"+esc(faible.j+" "+faible.n)+"</b> — "+esc(faible.d.toLowerCase())+". L'épreuve de rang exige les cinq."));
@@ -4806,23 +4888,43 @@ function jlptPool(niv){
 let jlptNiv=5;
 VIEWS.jlpt=m=>{
   head(m,"JLPT","Préparation aux niveaux N5 et N4");
-  const f=el("div","filters");
-  [[5,"N5 — débutant"],[4,"N4 — élémentaire"]].forEach(([n,lab])=>{
-    const b=el("button","chip"+(jlptNiv===n?" on":""),lab);
-    b.onclick=()=>{jlptNiv=n;render();}; f.appendChild(b);
+  /* Les deux niveaux en pastilles rondes, dans la même veine que l'accueil. */
+  const f=el("div","ronds niv");
+  [[5,"N5","débutant"],[4,"N4","élémentaire"]].forEach(([n,court,lab])=>{
+    const on=jlptNiv===n;
+    const w=el("div","rondwrap");
+    const b=el("button","rondbtn"+(on?" sel":""));
+    const d=rondK(court, on?"var(--ai)":"var(--mut)", 54);
+    b.appendChild(d);
+    b.appendChild(el("span","rb-n",lab));
+    b.onclick=()=>{jlptNiv=n;render();};
+    w.appendChild(b); f.appendChild(w);
   });
   m.appendChild(f);
   const pool=jlptPool(jlptNiv);
   const ks=D.kanji.filter(k=>k.jl===jlptNiv);
   const vus=ks.filter(k=>k.l>0&&k.l<=S.ch).length;
+  const pcj=ks.length?Math.round(vus/ks.length*100):0;
   const c=el("div","card");
-  c.innerHTML=`<h3>Niveau N${jlptNiv}</h3>
-    <div style="font-size:0.875rem;color:var(--mut)">${ks.length} kanji officiels · ${pool.length} questions</div>
-    <div class="bar" style="height:8px;border-radius:99px;background:var(--surf2);overflow:hidden;margin-top:12px">
-      <i style="display:block;height:100%;width:${Math.round(vus/ks.length*100)}%;background:linear-gradient(90deg,var(--ai),var(--take))"></i></div>
-    <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--mut);margin-top:6px">
-      <span>${vus} kanji déjà vus dans votre manuel</span><span>${Math.round(vus/ks.length*100)} %</span></div>`;
-  const cc=el("div","ctrl"); cc.style.marginTop="12px";
+  c.innerHTML=`<div class="jl-tete">
+      <div class="anneau jl-an">
+        <svg viewBox="0 0 72 72"><circle class="an-bg" cx="36" cy="36" r="31"/>
+          <circle class="an-fg" cx="36" cy="36" r="31" stroke-dasharray="195"
+            stroke-dashoffset="195"/></svg>
+        <span class="an-txt"><b>${pcj}</b><u>%</u></span>
+      </div>
+      <div style="flex:1;min-width:0">
+        <h3 style="margin:0">Niveau N${jlptNiv}</h3>
+        <div style="font-size:0.8438rem;color:var(--mut);line-height:1.55;margin-top:4px">
+          ${ks.length} kanji officiels · ${pool.length} questions<br>
+          ${vus} déjà rencontrés dans votre manuel</div>
+      </div></div>`;
+  requestAnimationFrame(()=>{
+    const fg=$(".jl-an .an-fg",c);
+    if(fg) fg.style.strokeDashoffset=String(195-195*pcj/100);
+  });
+  const nbj=$(".jl-an b",c); if(nbj) compte(nbj,pcj,650);
+  const cc=el("div","ctrl"); cc.style.marginTop="14px";
   const go1=el("button","btn p","Quiz N"+jlptNiv);
   go1.onclick=()=>startSession("jlpt"+jlptNiv);
   cc.appendChild(go1); c.appendChild(cc);
@@ -8334,8 +8436,8 @@ async function aideLancePDF(v, imp, forceRefresh){
   aideBusy=true;
 
   const np=pdfPageDe(v, imp);
-  if(np<1||np>v.pages.length){
-    aideErreur("Page hors du volume (PDF "+np+"/"+v.pages.length+")");
+  if(np<1||(v.pages&&np>v.pages.length)){
+    aideErreur("Page hors du volume"+(v.pages?" (PDF "+np+"/"+v.pages.length+")":""));
     aideBusy=false; return;
   }
 
@@ -8532,8 +8634,12 @@ VIEWS.aide=m=>{
      On envoie directement le texte extrait — plus rapide, plus précis
      (pas d'OCR), et gratuit en tokens image. Visible seulement si au
      moins un volume a été extrait. */
-  if(MANUELS===null) chargeManuels();
-  const volsTexte=(MANUELS||[]).filter(v=>v.pages&&v.pages.length);
+  /* Les volumes arrivent d'indexedDB : sans ce re-rendu, la carte restait
+     invisible au premier passage sur l'écran. */
+  if(MANUELS===null){ chargeManuels().then(()=>{ if(view==="aide") render(); }); }
+  /* L'extraction du texte n'est plus nécessaire : on envoie l'image rendue
+     de la page, donc tout volume importé fait l'affaire. */
+  const volsTexte=(MANUELS||[]);
   if(volsTexte.length){
     const cp=el("div","card");
     cp.appendChild(el("h3",null,"Ou une page de votre manuel importé"));
