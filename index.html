@@ -30,6 +30,23 @@
   --r-sm:11px; --r-pill:999px; --r-cell:12px;
   --pad:16px; --shadow:none; --bw:1px;
   --disp-w:700; --tile-jp:26px; --grain:.35;
+  /* Relief des pastilles. Sur fond sombre, un reflet blanc suffit à faire
+     bomber la forme. Sur fond clair, tout est déjà blanc : c'est la teinte
+     de l'accent qui doit porter le volume, sinon la pastille s'évanouit. */
+  --pa-hi:rgba(255,255,255,.16);   /* reflet, haut-gauche */
+  --pa-a:8%;                        /* teinte au sommet du dégradé */
+  --pa-b:22%;                       /* teinte au creux */
+  --pa-bd:42%;                      /* force de la bordure */
+  --pa-om:.28;                      /* opacité de l'ombre portée */
+  --pa-ring:0 0 0 0 transparent;    /* liseré de contact, thèmes clairs */
+}
+:root[data-t="light"]{
+  --pa-hi:rgba(255,255,255,.72);
+  --pa-a:14%;
+  --pa-b:36%;
+  --pa-bd:62%;
+  --pa-om:.18;
+  --pa-ring:inset 0 0 0 1px rgba(255,255,255,.55);
 }
 
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -60,8 +77,11 @@ header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:8px;
 .chip.on{background:var(--ai);border-color:var(--ai);color:var(--on);font-weight:700}
 .chip.sm{padding:5px 9px;font-size:0.75rem}
 .ava{width:34px;height:34px;border-radius:50%;border:1px solid color-mix(in srgb,var(--ai) 45%,var(--line));
-  background:radial-gradient(circle at 34% 28%,#fff,color-mix(in srgb,var(--ai) 12%,var(--surf2)));
-  box-shadow:0 2px 6px rgba(0,0,0,.07),inset 0 1px 0 rgba(255,255,255,.9);
+  background:radial-gradient(circle at 34% 28%,
+    color-mix(in srgb,var(--ai) 6%,var(--surf)),
+    color-mix(in srgb,var(--ai) 20%,var(--surf)));
+  box-shadow:0 2px 6px color-mix(in srgb,var(--ai) 20%,transparent),
+    inset 0 1px 0 var(--pa-hi),var(--pa-ring);
   font-family:var(--disp);font-size:1.0625rem;display:grid;place-items:center;color:var(--ai)}
 .back{display:flex;align-items:center;gap:8px;font-size:0.875rem;color:var(--mut);padding:4px 0}
 ruby{ruby-position:over}
@@ -148,11 +168,15 @@ button.stat{font:inherit;width:100%}
 /* Pastille ronde portant un kanji : sert aux cartes du chemin, du dojo, etc. */
 .rond-k{flex:0 0 auto;border-radius:50%;display:grid;place-items:center;
   font-family:var(--disp);line-height:1;color:var(--vc);
-  border:1px solid color-mix(in srgb,var(--vc) 40%,var(--line));box-sizing:border-box;
-  background:radial-gradient(circle at 34% 26%,#fff,color-mix(in srgb,var(--vc) 14%,var(--surf)));
-  box-shadow:0 3px 9px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.04),
-    inset 0 1px 0 rgba(255,255,255,.95),inset 0 -2px 3px color-mix(in srgb,var(--vc) 8%,transparent);
-  text-shadow:0 1px 1px rgba(255,255,255,.7);
+  border:1px solid color-mix(in srgb,var(--vc) var(--pa-bd),var(--line));box-sizing:border-box;
+  background:radial-gradient(circle at 34% 26%,
+    color-mix(in srgb,var(--vc) var(--pa-a),var(--surf)),
+    color-mix(in srgb,var(--vc) var(--pa-b),var(--surf)));
+  box-shadow:0 3px 9px color-mix(in srgb,var(--vc) calc(var(--pa-om)*100%),transparent),
+    0 1px 2px rgba(0,0,0,.06),
+    inset 0 1px 0 var(--pa-hi),
+    inset 0 -3px 5px color-mix(in srgb,var(--vc) 12%,transparent),
+    var(--pa-ring);
   transition:background .25s ease,box-shadow .3s ease}
 /* Plusieurs signes : on resserre l'interlettrage pour rester dans le cercle. */
 .rond-k.multi{letter-spacing:-.04em;padding:0 2px;text-align:center}
@@ -161,10 +185,13 @@ button.stat{font:inherit;width:100%}
   margin:2px 0 2px}
 .accueil-roue{width:min(330px,90vw)}
 /* Centre : l'objectif du jour en anneau, plus grand et en relief */
-.acc-c{width:39%!important;border:0!important;
-  background:radial-gradient(circle at 38% 28%,#fff,color-mix(in srgb,var(--surf) 92%,var(--line)))!important;
-  box-shadow:0 6px 18px rgba(0,0,0,.09),0 2px 5px rgba(0,0,0,.05),
-    inset 0 1px 0 rgba(255,255,255,.9),inset 0 -2px 4px rgba(0,0,0,.04)!important}
+.acc-c{width:39%!important;border:1px solid color-mix(in srgb,var(--line) 70%,transparent)!important;
+  background:radial-gradient(circle at 38% 28%,
+    color-mix(in srgb,var(--ai) 4%,var(--surf)),
+    color-mix(in srgb,var(--ai) 14%,var(--surf)))!important;
+  box-shadow:0 6px 18px rgba(0,0,0,.10),0 2px 5px rgba(0,0,0,.06),
+    inset 0 1px 0 var(--pa-hi),inset 0 -3px 6px color-mix(in srgb,var(--ai) 9%,transparent),
+    var(--pa-ring)!important}
 .acc-c.due{box-shadow:0 6px 20px color-mix(in srgb,var(--shu) 26%,transparent),
   0 2px 6px rgba(0,0,0,.07),inset 0 1px 0 rgba(255,255,255,.9)!important}
 .acc-c:active{transform:translate(-50%,-50%) scale(.95)}
@@ -185,14 +212,19 @@ button.stat{font:inherit;width:100%}
 /* Favoris rayonnants : disques en relief */
 .acc-v{width:23%!important}
 .acc-v .rv-d{width:50px;height:50px;
-  background:radial-gradient(circle at 34% 26%,#fff,color-mix(in srgb,var(--vc) 13%,var(--surf)))!important;
-  border:1px solid color-mix(in srgb,var(--vc) 42%,var(--line))!important;
-  box-shadow:0 3px 9px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.05),
-    inset 0 1px 0 rgba(255,255,255,.95),inset 0 -2px 3px color-mix(in srgb,var(--vc) 7%,transparent)!important}
-.acc-v:hover .rv-d{box-shadow:0 5px 14px color-mix(in srgb,var(--vc) 26%,transparent),
-  0 1px 3px rgba(0,0,0,.06),inset 0 1px 0 rgba(255,255,255,.95)!important}
+  background:radial-gradient(circle at 34% 26%,
+    color-mix(in srgb,var(--vc) var(--pa-a),var(--surf)),
+    color-mix(in srgb,var(--vc) var(--pa-b),var(--surf)))!important;
+  border:1px solid color-mix(in srgb,var(--vc) var(--pa-bd),var(--line))!important;
+  box-shadow:0 3px 9px color-mix(in srgb,var(--vc) calc(var(--pa-om)*100%),transparent),
+    0 1px 2px rgba(0,0,0,.06),
+    inset 0 1px 0 var(--pa-hi),
+    inset 0 -3px 5px color-mix(in srgb,var(--vc) 12%,transparent),
+    var(--pa-ring)!important}
+.acc-v:hover .rv-d{box-shadow:0 6px 16px color-mix(in srgb,var(--vc) 34%,transparent),
+  0 1px 3px rgba(0,0,0,.08),inset 0 1px 0 var(--pa-hi),var(--pa-ring)!important}
 .acc-v .rv-k{color:var(--vc);font-family:var(--disp);line-height:1;
-  text-shadow:0 1px 1px rgba(255,255,255,.7)}
+  text-shadow:0 1px 1px var(--pa-hi)}
 .acc-v .rv-n{font-size:0.625rem;color:var(--mut);max-width:74px;line-height:1.2}
 .acc-v:hover .rv-n{color:var(--ai)}
 /* ---- 道 Roue du chemin : le rang au centre, les cinq exigences autour ---- */
@@ -213,7 +245,7 @@ button.stat{font:inherit;width:100%}
 .ch-cn{display:flex;flex-direction:column;align-items:center;justify-content:center;
   line-height:1;gap:3px;padding:0 4px;position:relative;z-index:1}
 .ch-cn b{font-family:var(--disp);color:var(--ai);font-weight:400;text-align:center;
-  text-shadow:0 1px 2px rgba(255,255,255,.85)}
+  text-shadow:0 1px 2px var(--pa-hi)}
 .ch-cn i{font-style:normal;font-size:0.6875rem;font-weight:700;color:var(--tx);
   text-align:center;line-height:1}
 .ch-cn i u{text-decoration:none;font-size:0.5312rem;font-weight:400;color:var(--dim)}
@@ -242,15 +274,19 @@ button.stat{font:inherit;width:100%}
 .rsel:active{transform:scale(.9)}
 .rs-d{width:100%;max-width:38px;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;
   border:1px solid var(--line);box-sizing:border-box;
-  background:radial-gradient(circle at 34% 26%,#fff,var(--surf));
-  box-shadow:0 2px 5px rgba(0,0,0,.05),inset 0 1px 0 rgba(255,255,255,.9);
+  background:radial-gradient(circle at 34% 26%,var(--surf),color-mix(in srgb,var(--line) 26%,var(--surf)));
+  box-shadow:0 2px 5px rgba(0,0,0,.06),inset 0 1px 0 var(--pa-hi),var(--pa-ring);
   transition:border-color .18s ease,box-shadow .22s ease,background .22s ease}
 .rs-d i{font-family:var(--disp);font-style:normal;color:var(--dim);line-height:1;text-align:center}
-.rsel.fait .rs-d{border-color:color-mix(in srgb,var(--take) 50%,var(--line));
-  background:radial-gradient(circle at 34% 26%,#fff,color-mix(in srgb,var(--take) 12%,var(--surf)))}
+.rsel.fait .rs-d{border-color:color-mix(in srgb,var(--take) 55%,var(--line));
+  background:radial-gradient(circle at 34% 26%,
+    color-mix(in srgb,var(--take) 7%,var(--surf)),
+    color-mix(in srgb,var(--take) 24%,var(--surf)))}
 .rsel.fait .rs-d i{color:var(--take)}
 .rsel.on .rs-d{border-color:var(--ai);border-width:1.5px;
-  background:radial-gradient(circle at 34% 26%,#fff,color-mix(in srgb,var(--ai) 16%,var(--surf)));
+  background:radial-gradient(circle at 34% 26%,
+    color-mix(in srgb,var(--ai) 8%,var(--surf)),
+    color-mix(in srgb,var(--ai) 28%,var(--surf)));
   box-shadow:0 0 0 3px color-mix(in srgb,var(--ai) 16%,transparent),
     0 3px 10px color-mix(in srgb,var(--ai) 24%,transparent),inset 0 1px 0 rgba(255,255,255,.95)}
 .rsel.on .rs-d i{color:var(--ai)}
@@ -279,9 +315,13 @@ button.stat{font:inherit;width:100%}
 .eq-roue{width:min(300px,86vw);margin:4px auto 2px}
 .eq-c{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   width:34%;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;
-  background:radial-gradient(circle at 38% 28%,#fff,color-mix(in srgb,var(--surf) 93%,var(--line)));
-  box-shadow:0 4px 14px rgba(0,0,0,.08),0 1px 3px rgba(0,0,0,.04),
-    inset 0 1px 0 rgba(255,255,255,.9),inset 0 -2px 4px rgba(0,0,0,.03)}
+  border:1px solid color-mix(in srgb,var(--line) 70%,transparent);box-sizing:border-box;
+  background:radial-gradient(circle at 38% 28%,
+    color-mix(in srgb,var(--ai) 4%,var(--surf)),
+    color-mix(in srgb,var(--ai) 13%,var(--surf)));
+  box-shadow:0 4px 14px rgba(0,0,0,.09),0 1px 3px rgba(0,0,0,.05),
+    inset 0 1px 0 var(--pa-hi),inset 0 -3px 6px color-mix(in srgb,var(--ai) 8%,transparent),
+    var(--pa-ring)}
 .eq-cn{display:flex;flex-direction:column;align-items:center;line-height:1;gap:1px}
 .eq-cn b{font-size:1.4375rem;font-weight:700;color:var(--tx);text-shadow:0 1px 2px rgba(0,0,0,.06)}
 .eq-cn u{text-decoration:none;font-size:0.625rem;color:var(--dim)}
@@ -296,7 +336,7 @@ button.stat{font:inherit;width:100%}
   filter:drop-shadow(0 0 2px color-mix(in srgb,var(--vc) 45%,transparent));
   transition:stroke-dashoffset .8s cubic-bezier(.22,.9,.28,1)}
 .eq-k{position:relative;font-family:var(--disp);font-size:1.375rem;line-height:1;color:var(--vc);
-  text-shadow:0 1px 2px rgba(255,255,255,.8)}
+  text-shadow:0 1px 2px var(--pa-hi)}
 .eq-n{font-size:0.6875rem;color:var(--mut);font-weight:600;line-height:1}
 /* ---- JLPT : anneau de progression et pastilles de niveau ---- */
 .jl-tete{display:flex;gap:16px;align-items:center}
@@ -324,8 +364,12 @@ button.stat{font:inherit;width:100%}
   font-family:var(--ui);
   transition:transform .18s cubic-bezier(.34,1.4,.5,1)}
 .rondbtn:active{transform:scale(.92)}
-.rondbtn:hover .rond-k{box-shadow:0 5px 14px color-mix(in srgb,var(--vc) 26%,transparent),
-  0 1px 3px rgba(0,0,0,.06),inset 0 1px 0 rgba(255,255,255,.95)}
+.rondbtn:hover .rond-k{
+  background:radial-gradient(circle at 34% 26%,
+    color-mix(in srgb,var(--vc) calc(var(--pa-a) + 6%),var(--surf)),
+    color-mix(in srgb,var(--vc) calc(var(--pa-b) + 10%),var(--surf)));
+  box-shadow:0 6px 16px color-mix(in srgb,var(--vc) 34%,transparent),
+    0 1px 3px rgba(0,0,0,.08),inset 0 1px 0 var(--pa-hi),var(--pa-ring)}
 /* Retour à la ligne normal : -webkit-box empêchait le mot de se couper
    et le texte était rogné au bord de la cellule. */
 .rb-n{font-size:0.6562rem;color:var(--mut);line-height:1.25;text-align:center;
@@ -360,10 +404,13 @@ button.stat{font:inherit;width:100%}
   box-shadow:0 2px 10px color-mix(in srgb,var(--ai) 14%,transparent)}
 .rp-d{width:42px;height:42px;flex:0 0 auto;border-radius:50%;display:grid;place-items:center;
   border:1px solid color-mix(in srgb,var(--ai) 40%,var(--line));box-sizing:border-box;
-  background:radial-gradient(circle at 34% 26%,#fff,color-mix(in srgb,var(--ai) 14%,var(--surf)));
-  box-shadow:0 2px 7px rgba(0,0,0,.07),inset 0 1px 0 rgba(255,255,255,.95)}
+  background:radial-gradient(circle at 34% 26%,
+    color-mix(in srgb,var(--ai) var(--pa-a),var(--surf)),
+    color-mix(in srgb,var(--ai) var(--pa-b),var(--surf)));
+  box-shadow:0 2px 7px color-mix(in srgb,var(--ai) 22%,transparent),
+    inset 0 1px 0 var(--pa-hi),var(--pa-ring)}
 .rp-k{font-family:var(--disp);line-height:1;color:var(--ai);text-align:center;
-  text-shadow:0 1px 1px rgba(255,255,255,.7)}
+  text-shadow:0 1px 1px var(--pa-hi)}
 .rp-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
 .rp-t b{font-size:0.875rem;font-weight:600;color:var(--tx)}
 .rp-t i{font-style:normal;font-size:0.75rem;color:var(--mut);overflow:hidden;
@@ -378,9 +425,9 @@ button.stat{font:inherit;width:100%}
 .chline:hover{border-color:color-mix(in srgb,var(--ai) 40%,var(--line));background:var(--surf)}
 .ch-d{width:38px;height:38px;flex:0 0 auto;border-radius:50%;display:flex;
   flex-direction:column;align-items:center;justify-content:center;line-height:1;
-  background:radial-gradient(circle at 34% 26%,#fff,var(--surf2));
+  background:radial-gradient(circle at 34% 26%,var(--surf),var(--surf2));
   border:1px solid var(--line);box-sizing:border-box;
-  box-shadow:0 2px 6px rgba(0,0,0,.06),inset 0 1px 0 rgba(255,255,255,.9)}
+  box-shadow:0 2px 6px rgba(0,0,0,.07),inset 0 1px 0 var(--pa-hi),var(--pa-ring)}
 .ch-d b{font-size:0.9375rem;font-weight:700;color:var(--tx)}
 .ch-d i{font-family:var(--disp);font-style:normal;font-size:0.5312rem;color:var(--dim)}
 .ch-t{flex:1;min-width:0;font-size:0.8438rem;color:var(--tx);display:flex;flex-direction:column;gap:1px}
@@ -485,9 +532,9 @@ button.stat{font:inherit;width:100%}
 .vformes{align-items:center;padding-top:4px;border-top:1px dashed var(--line);margin-top:9px}
 .vlab{font-size:0.7188rem;color:var(--dim);margin-right:2px}
 .vchip{font-size:0.75rem;padding:4px 9px;border-radius:99px;border:1px solid var(--line);
-  background:linear-gradient(170deg,#fff,var(--surf));color:var(--mut);cursor:pointer;
-  font-family:var(--ui);line-height:1.5;
-  box-shadow:0 1px 2px rgba(0,0,0,.04),inset 0 1px 0 rgba(255,255,255,.8);
+  background:linear-gradient(170deg,var(--surf),color-mix(in srgb,var(--line) 22%,var(--surf)));
+  color:var(--mut);cursor:pointer;font-family:var(--ui);line-height:1.5;
+  box-shadow:0 1px 2px rgba(0,0,0,.05),inset 0 1px 0 var(--pa-hi);
   transition:transform .12s ease,box-shadow .18s ease,border-color .18s ease,color .18s ease}
 .vchip:active{transform:scale(.94)}
 .vchip u{text-decoration:none;opacity:.6;font-size:0.6562rem;margin-left:3px}
@@ -536,8 +583,8 @@ button.stat{font:inherit;width:100%}
 .word .r{display:flex;gap:6px;align-items:center}
 .ico{width:32px;height:32px;border-radius:50%;border:1px solid var(--line);display:grid;
   place-items:center;font-size:0.875rem;color:var(--dim);
-  background:radial-gradient(circle at 34% 28%,#fff,var(--surf));
-  box-shadow:0 2px 5px rgba(0,0,0,.06),inset 0 1px 0 rgba(255,255,255,.9);
+  background:radial-gradient(circle at 34% 28%,var(--surf),color-mix(in srgb,var(--line) 26%,var(--surf)));
+  box-shadow:0 2px 5px rgba(0,0,0,.07),inset 0 1px 0 var(--pa-hi),var(--pa-ring);
   transition:transform .14s ease,box-shadow .2s ease}
 .ico:active{transform:scale(.9);box-shadow:0 1px 2px rgba(0,0,0,.06),inset 0 1px 3px rgba(0,0,0,.06)}
 .ico.on{color:var(--yama);border-color:var(--yama)}
@@ -551,9 +598,9 @@ button.stat{font:inherit;width:100%}
 .conj b{font-family:var(--disp);font-weight:400;font-size:1rem;line-height:1.5}
 .kgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:8px;margin-bottom:16px}
 .kcell{aspect-ratio:1;border:var(--bw) solid var(--line);border-radius:var(--r-cell);
-  background:linear-gradient(160deg,#fff,color-mix(in srgb,var(--surf) 95%,var(--line)));
+  background:linear-gradient(160deg,var(--surf),color-mix(in srgb,var(--line) 30%,var(--surf)));
   display:grid;place-items:center;font-family:var(--disp);font-size:1.75rem;position:relative;
-  box-shadow:0 2px 5px rgba(0,0,0,.05),inset 0 1px 0 rgba(255,255,255,.85)}
+  box-shadow:0 2px 5px rgba(0,0,0,.06),inset 0 1px 0 var(--pa-hi),var(--pa-ring)}
 .kcell:active{box-shadow:0 1px 2px rgba(0,0,0,.06),inset 0 1px 3px rgba(0,0,0,.05)}
 .kcell:active{border-color:var(--ai)}
 .kcell u{position:absolute;top:3px;right:5px;font-size:0.5625rem;color:var(--dim);text-decoration:none}
@@ -988,8 +1035,8 @@ main.nav-fwd>*{animation-name:slideIn}
 .voie-home{cursor:pointer}
 .echelle{display:flex;gap:4px;margin-top:12px;align-items:flex-end}
 .ech{flex:1;position:relative;height:26px;border-radius:99px;
-  background:linear-gradient(170deg,#fff,var(--surf2));
-  box-shadow:0 1px 3px rgba(0,0,0,.05),inset 0 1px 0 rgba(255,255,255,.8);
+  background:linear-gradient(170deg,var(--surf),var(--surf2));
+  box-shadow:0 1px 3px rgba(0,0,0,.06),inset 0 1px 0 var(--pa-hi);
   border:1px solid var(--line);display:grid;place-items:center;overflow:hidden;opacity:.45}
 .ech i{font-family:var(--disp);font-style:normal;font-size:0.75rem;color:var(--dim);position:relative;z-index:1}
 .ech.passe{opacity:1;background:color-mix(in srgb,var(--ai) 22%,var(--surf2));border-color:color-mix(in srgb,var(--ai) 45%,var(--line))}
