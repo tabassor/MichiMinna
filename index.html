@@ -195,6 +195,54 @@ button.stat{font:inherit;width:100%}
   text-shadow:0 1px 1px rgba(255,255,255,.7)}
 .acc-v .rv-n{font-size:0.625rem;color:var(--mut);max-width:74px;line-height:1.2}
 .acc-v:hover .rv-n{color:var(--ai)}
+/* ---- 道 Roue du chemin : le rang au centre, les cinq exigences autour ---- */
+.chemin-tete{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px}
+.chemin-roue{width:min(288px,84vw);margin:0 auto}
+.chemin-c{width:37%!important;border:0;cursor:pointer;padding:0;
+  transition:transform .16s cubic-bezier(.34,1.4,.5,1),box-shadow .25s ease}
+.chemin-c:active{transform:translate(-50%,-50%) scale(.95)}
+.ch-cn{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  line-height:1;gap:4px;padding:0 6px}
+.ch-cn b{font-family:var(--disp);color:var(--ai);font-weight:400;text-align:center;
+  text-shadow:0 1px 2px rgba(255,255,255,.85)}
+.ch-cn i{font-style:normal;font-size:0.5312rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--mut);text-align:center;line-height:1.2;max-width:78px}
+.chemin-v .eq-d{width:52px;height:52px}
+.chemin-v .eq-k{font-size:1.25rem}
+.chemin-v .eq-n{font-size:0.6562rem}
+.chemin-v .eq-n u{text-decoration:none;color:var(--dim);font-weight:400}
+.eq-l{display:block;font-size:0.5625rem;color:var(--dim);letter-spacing:.03em;line-height:1.2;
+  text-align:center;max-width:68px}
+.chemin-etat{text-align:center;font-size:0.7812rem;color:var(--mut);margin-top:10px;line-height:1.5}
+/* Titre du rang dans la vue 道 */
+.rang-tete{text-align:center;margin-bottom:2px}
+.rang-n{font-family:var(--tit);font-size:1.4375rem;font-weight:400;margin:3px 0 0}
+.rang-n em{font-style:normal;font-size:0.8438rem;color:var(--dim);font-family:var(--ui)}
+.rang-d{font-size:0.7812rem;color:var(--mut);margin:5px 0 0;line-height:1.5}
+/* Sélecteur de rang en pastilles rondes */
+.rangsel{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;margin-bottom:14px}
+@media(max-width:340px){ .rangsel{grid-template-columns:repeat(4,1fr);gap:8px 5px} }
+.rsel{background:none;border:0;padding:0;cursor:pointer;display:flex;
+  flex-direction:column;align-items:center;gap:3px;
+  transition:transform .14s cubic-bezier(.34,1.4,.5,1)}
+.rsel:active{transform:scale(.9)}
+.rs-d{width:100%;max-width:38px;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;
+  border:1px solid var(--line);box-sizing:border-box;
+  background:radial-gradient(circle at 34% 26%,#fff,var(--surf));
+  box-shadow:0 2px 5px rgba(0,0,0,.05),inset 0 1px 0 rgba(255,255,255,.9);
+  transition:border-color .18s ease,box-shadow .22s ease,background .22s ease}
+.rs-d i{font-family:var(--disp);font-style:normal;color:var(--dim);line-height:1;text-align:center}
+.rsel.fait .rs-d{border-color:color-mix(in srgb,var(--take) 50%,var(--line));
+  background:radial-gradient(circle at 34% 26%,#fff,color-mix(in srgb,var(--take) 12%,var(--surf)))}
+.rsel.fait .rs-d i{color:var(--take)}
+.rsel.on .rs-d{border-color:var(--ai);border-width:1.5px;
+  background:radial-gradient(circle at 34% 26%,#fff,color-mix(in srgb,var(--ai) 16%,var(--surf)));
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--ai) 16%,transparent),
+    0 3px 10px color-mix(in srgb,var(--ai) 24%,transparent),inset 0 1px 0 rgba(255,255,255,.95)}
+.rsel.on .rs-d i{color:var(--ai)}
+.rs-n{font-size:0.5938rem;color:var(--dim);line-height:1}
+.rsel.on .rs-n{color:var(--ai);font-weight:700}
+.rsel.fait .rs-n{color:var(--take)}
 /* ---- 記録 Roue de l'équilibre des cinq voies ---- */
 .eq-roue{width:min(300px,86vw);margin:4px auto 2px}
 .eq-c{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
@@ -2566,52 +2614,75 @@ VIEWS.home=m=>{
     m.appendChild(fin);
   }
 
-  /* ---- le chemin : rang, fragments, prochain nœud ---- */
+  /* ---- le chemin : le rang au centre, les cinq voies autour ----
+     Même roue que partout ailleurs. Le rang occupe le centre, les
+     fragments de chaque élément rayonnent avec leur jauge annulaire. */
   const TS=tstate(), RG=RANG(TS.rang);
   const nx=D.arbre.filter(n=>n.rang===TS.rang&&ouvert(n)&&!estFait(n.id));
+  const bes0=besoinRang(TS.rang), acq0=fragAcquis(TS.rang);
   const pv=el("div","card voie-home");
-  pv.style.borderColor="color-mix(in srgb,var(--ai) 40%,var(--line))";
-  pv.innerHTML=`<div class="l" style="display:flex;gap:14px;align-items:center">
-      <span class="rk-slot" data-k="${esc(RG.j)}" data-c="var(--ai)"></span>
-      <div style="flex:1;min-width:0">
-        <span class="eyebrow">Rang ${TS.rang+1} sur ${D.rangs.length}${RG.jlpt?" · JLPT N"+RG.jlpt:""}</span>
-        <b style="display:block;font-size:1rem">${esc(RG.n)}</b>
-        <span style="font-size:0.7812rem;color:var(--mut)">${progRang(TS.rang)} % du rang · ${
-          nx.length?nx.length+" nœud"+(nx.length>1?"s":"")+" ouvert"+(nx.length>1?"s":""):"tout est fait, passez l'épreuve"}</span>
-      </div><span class="ngo" style="color:var(--dim);font-size:1.1875rem">›</span></div>
-    <div class="fragline"></div>`;
-  remplitRonds(pv);
+  pv.style.borderColor="color-mix(in srgb,var(--ai) 34%,var(--line))";
+
+  const enT=el("div","chemin-tete");
+  enT.innerHTML=`<span class="eyebrow">Rang ${TS.rang+1} sur ${D.rangs.length}${RG.jlpt?" · JLPT N"+RG.jlpt:""}</span>
+    <span class="eyebrow">${progRang(TS.rang)} % du rang</span>`;
+  pv.appendChild(enT);
+
+  const cr=el("div","roue");
+  const CR=el("div","roue-in chemin-roue");
+  const cctr=el("button","eq-c chemin-c");
+  const nrg=[...RG.j].length;
+  cctr.innerHTML=`<span class="ch-cn">
+      <b class="jpx" style="font-size:${nrg<=1?26:nrg===2?18:14}px${nrg>1?";letter-spacing:-.04em":""}">${esc(RG.j)}</b>
+      <i>${esc(RG.n)}</i></span>`;
+  cctr.onclick=()=>go("arbre");
+  CR.appendChild(cctr);
+  D.elements.forEach((e,i)=>{
+    const need=bes0[e.id]||0, ont=acq0[e.id]||0;
+    const pcf=need?Math.min(100,Math.round(ont/need*100)):100;
+    const ang=(-90 + i*72) * Math.PI/180;
+    const w=el("div","eq-v chemin-v");
+    w.style.setProperty("--vc",e.c);
+    w.style.left=(50 + 37*Math.cos(ang))+"%";
+    w.style.top =(50 + 37*Math.sin(ang))+"%";
+    w.title=e.n+" — "+ont+" sur "+need;
+    if(!need) w.style.opacity=".45";
+    w.innerHTML=`<span class="eq-d">
+        <svg viewBox="0 0 60 60" aria-hidden="true"><circle class="eq-bg" cx="30" cy="30" r="26"/>
+          <circle class="eq-fg" cx="30" cy="30" r="26" stroke-dasharray="163"
+            stroke-dashoffset="${163-163*pcf/100}"/></svg>
+        <span class="eq-k">${esc(e.j)}</span></span>
+      <span class="eq-n">${ont}${need?'<u>/'+need+'</u>':""}</span>`;
+    CR.appendChild(w);
+  });
+  cr.appendChild(CR);
+  pv.appendChild(cr);
+
+  /* l'échelle des huit rangs, en pastilles */
   const ech=el("div","echelle");
   D.rangs.forEach((R2,i)=>{
     const et=el("span","ech"+(i<TS.rang?" passe":(i===TS.rang?" ici":"")));
-    et.innerHTML=`<i class="jpx">${esc(R2.j)}</i>`;
+    et.innerHTML=`<i class="jpx">${esc([...R2.j][0])}</i>`;
     et.title=R2.j+" "+R2.n+(R2.jlpt?" · N"+R2.jlpt:"");
-    if(i===TS.rang){
-      const f=el("u"); f.style.width=progRang(TS.rang)+"%"; et.appendChild(f);
-    }
+    if(i===TS.rang){ const f=el("u"); f.style.width=progRang(TS.rang)+"%"; et.appendChild(f); }
     ech.appendChild(et);
   });
-  pv.querySelector(".l").insertAdjacentElement("afterend",ech);
-  const fl=$(".fragline",pv);
-  D.elements.forEach(e=>{
-    const b2=besoinRang(TS.rang)[e.id]||0, o=fragAcquis(TS.rang)[e.id]||0;
-    const pcf=b2?Math.min(100,Math.round(o/b2*100)):100;
-    const sp=el("span","fchip");
-    sp.style.setProperty("--c",e.c);
-    sp.title=e.n+" — "+o+" sur "+b2;
-    sp.innerHTML=`<b class="fbar" style="width:${pcf}%"></b><i class="jpx">${esc(e.j)}</i>`+
-      `<span>${b2?pcf+"%":o}</span>`;
-    fl.appendChild(sp);
-  });
-  pv.onclick=e=>{ if(!e.target.closest(".pvgo")) go("arbre"); };
+  pv.appendChild(ech);
+
+  pv.appendChild(el("div","chemin-etat",
+    nx.length? nx.length+" nœud"+(nx.length>1?"s":"")+" ouvert"+(nx.length>1?"s":"")+" à ce rang"
+             : "Tous les nœuds sont acquis — l'épreuve de rang vous attend."));
+
+  const g2=el("div","ctrl"); g2.style.marginTop="12px";
   if(nx.length){
-    const g2=el("div","ctrl"); g2.style.marginTop="12px";
     const b3=el("button","btn p pvgo","Reprendre le chemin");
     b3.onclick=e=>{ e.stopPropagation(); go("noeud",nx[Math.floor(Math.random()*nx.length)].id); };
-    const b4=el("button","btn pvgo","Voir les "+nx.length+" nœuds ouverts");
-    b4.onclick=e=>{ e.stopPropagation(); go("arbre"); };
-    g2.appendChild(b3); g2.appendChild(b4); pv.appendChild(g2);
+    g2.appendChild(b3);
   }
+  const b4=el("button","btn pvgo",nx.length?"Voir le chemin":"Passer l'épreuve");
+  b4.onclick=e=>{ e.stopPropagation(); go("arbre"); };
+  g2.appendChild(b4);
+  pv.appendChild(g2);
   m.appendChild(pv);
 
   /* ---- chapitre en cours : une ligne discrète, réglable d'un tap ---- */
@@ -5425,30 +5496,47 @@ VIEWS.arbre=m=>{
   if(arbreRang===null) arbreRang=T.rang;
   head(m,"道","Le chemin, du seuil à la maîtrise");
 
-  /* bandeau du rang courant */
+  /* bandeau du rang courant : le rang au centre, ses cinq exigences autour */
   const R=RANG(T.rang);
-  const c=el("div","rangcard");
-  c.innerHTML=`<div class="rk-mark"><b class="jpx">${esc(R.j)}</b></div>
-    <div class="rk-txt">
-      <span class="eyebrow">Rang ${T.rang+1} sur ${D.rangs.length}${R.jlpt?" · JLPT N"+R.jlpt:""}</span>
-      <h2>${esc(R.n)} <em>${esc(R.r)}</em></h2>
-      <p>${esc(R.d)}</p>
-    </div>`;
-  m.appendChild(c);
-
-  /* les cinq éléments et leurs fragments */
-  const fr=el("div","frags");
   const bes=besoinRang(T.rang), acq=fragAcquis(T.rang);
-  D.elements.forEach(e=>{
-    const need=bes[e.id]||0;
-    const ont=acq[e.id]||0;
+  const c=el("div","card");
+  c.style.borderColor="color-mix(in srgb,var(--ai) 34%,var(--line))";
+  const rt=el("div","rang-tete");
+  rt.innerHTML=`<span class="eyebrow">Rang ${T.rang+1} sur ${D.rangs.length}${R.jlpt?" · JLPT N"+R.jlpt:""}</span>
+    <h2 class="rang-n">${esc(R.n)} <em>${esc(R.r)}</em></h2>
+    <p class="rang-d">${esc(R.d)}</p>`;
+  c.appendChild(rt);
+
+  const rr=el("div","roue");
+  const RR=el("div","roue-in chemin-roue");
+  const rctr=el("div","eq-c chemin-c");
+  const nR=[...R.j].length;
+  rctr.innerHTML=`<span class="ch-cn">
+      <b class="jpx" style="font-size:${nR<=1?27:nR===2?19:14.5}px${nR>1?";letter-spacing:-.04em":""}">${esc(R.j)}</b>
+      <i>${progRang(T.rang)} %</i></span>`;
+  RR.appendChild(rctr);
+  D.elements.forEach((e,i)=>{
+    const need=bes[e.id]||0, ont=acq[e.id]||0;
     const pc=need?Math.min(100,Math.round(ont/need*100)):100;
-    const d=el("div","frag");
-    d.innerHTML=`<div class="fr-ring" style="--c:${e.c};--p:${pc};${need?"":"opacity:.4"}"><b class="jpx">${esc(e.j)}</b></div>
-      <span class="fr-n">${ont}${need?`<u>/${need}</u>`:""}</span><span class="fr-l">${esc(e.n)}</span>`;
-    d.title=e.d; fr.appendChild(d);
+    const ang=(-90 + i*72) * Math.PI/180;
+    const w=el("div","eq-v chemin-v");
+    w.style.setProperty("--vc",e.c);
+    w.style.left=(50 + 37*Math.cos(ang))+"%";
+    w.style.top =(50 + 37*Math.sin(ang))+"%";
+    w.title=e.n+" — "+e.d;
+    if(!need) w.style.opacity=".45";
+    w.innerHTML=`<span class="eq-d">
+        <svg viewBox="0 0 60 60" aria-hidden="true"><circle class="eq-bg" cx="30" cy="30" r="26"/>
+          <circle class="eq-fg" cx="30" cy="30" r="26" stroke-dasharray="163"
+            stroke-dashoffset="${163-163*pc/100}"/></svg>
+        <span class="eq-k">${esc(e.j)}</span></span>
+      <span class="eq-n">${ont}${need?'<u>/'+need+'</u>':""}</span>
+      <span class="eq-l">${esc(e.n)}</span>`;
+    RR.appendChild(w);
   });
-  m.appendChild(fr);
+  rr.appendChild(RR);
+  c.appendChild(rr);
+  m.appendChild(c);
 
   /* test de rang */
   const manque=fragManquants(T.rang);
@@ -5509,13 +5597,15 @@ VIEWS.arbre=m=>{
   m.appendChild(chb);
 
   /* sélecteur de rang : l'arbre entier est visible */
-  const f=el("div","filters");
+  const f=el("div","rangsel");
   D.rangs.forEach(r=>{
     const ouvertR=r.id<=T.rang, fait=progRang(r.id)===100;
-    const b=el("button","chip"+(arbreRang===r.id?" on":""));
-    b.innerHTML=`<span class="jpx">${esc(r.j)}</span> ${fait?"✓":""}`;
-    b.style.opacity=ouvertR?"1":".5";
-    b.title=r.n;
+    const b=el("button","rsel"+(arbreRang===r.id?" on":"")+(fait?" fait":""));
+    const nj=[...r.j].length;
+    b.innerHTML=`<span class="rs-d"><i class="jpx" style="font-size:${nj<=1?18:nj===2?12.5:10}px${nj>1?";letter-spacing:-.04em":""}">${esc(r.j)}</i></span>
+      <span class="rs-n">${fait?"✓":(r.id+1)}</span>`;
+    b.style.opacity=ouvertR?"1":".45";
+    b.title=r.n+(r.jlpt?" · N"+r.jlpt:"");
     b.onclick=()=>{
       const y=window.scrollY;
       arbreRang=r.id;
