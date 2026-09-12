@@ -128,30 +128,57 @@ button.stat{font:inherit;width:100%}
    rayonnent autour de la revue, dans l'ordre du cycle d'engendrement. */
 .roue{display:flex;justify-content:center;margin:6px 0 2px}
 .roue-in{position:relative;width:min(340px,92vw);aspect-ratio:1}
+/* Le cycle d'engendrement, tracé en filigrane : cinq segments reliant les
+   voies, presque invisibles, qui donnent au groupe sa cohésion. */
+.roue-in::before{content:"";position:absolute;left:13%;top:13%;width:74%;height:74%;
+  border-radius:50%;border:1px dashed color-mix(in srgb,var(--line) 80%,transparent);
+  opacity:.55;pointer-events:none}
 .roue-c{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   width:29%;aspect-ratio:1;border-radius:50%;border:1px solid var(--line);
-  background:var(--surf);display:flex;flex-direction:column;align-items:center;
+  background:radial-gradient(circle at 38% 32%,color-mix(in srgb,var(--surf) 97%,#fff),var(--surf));
+  display:flex;flex-direction:column;align-items:center;
   justify-content:center;gap:1px;cursor:pointer;padding:0;
-  transition:transform .14s ease,border-color .18s ease,background .18s ease}
+  box-shadow:0 1px 3px rgba(0,0,0,.05);
+  transition:transform .2s cubic-bezier(.34,1.4,.5,1),border-color .2s ease,box-shadow .25s ease}
 .roue-c.on{border-color:var(--shu);border-width:2px;
-  background:color-mix(in srgb,var(--shu) 9%,var(--surf))}
-.roue-c.on:active{transform:translate(-50%,-50%) scale(.95)}
-.roue-c:disabled{opacity:.55;cursor:default}
-.rc-k{font-family:var(--disp);font-size:1.6875rem;line-height:1;color:var(--dim)}
-.roue-c.on .rc-k{color:var(--shu)}
+  background:radial-gradient(circle at 38% 32%,color-mix(in srgb,var(--shu) 13%,var(--surf)),color-mix(in srgb,var(--shu) 6%,var(--surf)));
+  box-shadow:0 3px 14px color-mix(in srgb,var(--shu) 20%,transparent),0 1px 3px rgba(0,0,0,.06)}
+/* Une pulsation très lente quand la revue attend : présence, pas agitation. */
+.roue-c.on::after{content:"";position:absolute;inset:-3px;border-radius:50%;
+  border:1.5px solid var(--shu);opacity:0;animation:pouls 3.4s ease-out infinite;pointer-events:none}
+@keyframes pouls{0%{transform:scale(1);opacity:.42}70%{transform:scale(1.16);opacity:0}100%{opacity:0}}
+.roue-c.on:active{transform:translate(-50%,-50%) scale(.94)}
+.roue-c:disabled{opacity:.5;cursor:default;box-shadow:none}
+.rc-k{font-family:var(--disp);font-size:1.6875rem;line-height:1;color:var(--dim);
+  transition:color .2s ease,text-shadow .3s ease}
+.roue-c.on .rc-k{color:var(--shu);text-shadow:0 1px 6px color-mix(in srgb,var(--shu) 32%,transparent)}
 .rc-n{font-size:0.7188rem;color:var(--mut);font-weight:600;line-height:1}
 .roue-c.on .rc-n{color:var(--shu)}
 .roue-v{position:absolute;transform:translate(-50%,-50%);width:25%;
   background:none;border:0;padding:0;cursor:pointer;display:flex;
   flex-direction:column;align-items:center;gap:3px;
-  transition:transform .14s ease}
-.roue-v:active{transform:translate(-50%,-50%) scale(.93)}
+  transition:transform .22s cubic-bezier(.34,1.4,.5,1)}
+.roue-v:active{transform:translate(-50%,-50%) scale(.9)}
+/* Arrivée en cascade : chaque voie se pose à son tour, dans l'ordre du cycle. */
+.roue-v{animation:poseVoie .5s cubic-bezier(.22,.9,.28,1) backwards}
+.roue-v:nth-child(2){animation-delay:.04s}
+.roue-v:nth-child(3){animation-delay:.10s}
+.roue-v:nth-child(4){animation-delay:.16s}
+.roue-v:nth-child(5){animation-delay:.22s}
+.roue-v:nth-child(6){animation-delay:.28s}
+@keyframes poseVoie{from{opacity:0;transform:translate(-50%,-50%) scale(.72)}
+  to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
 .rv-d{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;
-  border:1.5px solid var(--vc);background:color-mix(in srgb,var(--vc) 11%,transparent);
-  transition:background .18s ease,box-shadow .18s ease}
-.roue-v.sel .rv-d{background:var(--vc);box-shadow:0 0 0 4px color-mix(in srgb,var(--vc) 22%,transparent)}
-.rv-k{font-family:var(--disp);font-size:1.5625rem;line-height:1;color:var(--vc)}
-.roue-v.sel .rv-k{color:#fff}
+  border:1.5px solid var(--vc);
+  background:radial-gradient(circle at 36% 30%,color-mix(in srgb,var(--vc) 17%,transparent),color-mix(in srgb,var(--vc) 8%,transparent));
+  box-shadow:0 1px 4px color-mix(in srgb,var(--vc) 16%,transparent);
+  transition:background .25s ease,box-shadow .3s ease,border-color .2s ease}
+.roue-v:hover .rv-d{box-shadow:0 2px 10px color-mix(in srgb,var(--vc) 28%,transparent)}
+.roue-v.sel .rv-d{background:radial-gradient(circle at 36% 30%,color-mix(in srgb,var(--vc) 88%,#fff),var(--vc));
+  box-shadow:0 0 0 4px color-mix(in srgb,var(--vc) 20%,transparent),0 3px 12px color-mix(in srgb,var(--vc) 34%,transparent)}
+.rv-k{font-family:var(--disp);font-size:1.5625rem;line-height:1;color:var(--vc);
+  transition:color .2s ease,text-shadow .3s ease}
+.roue-v.sel .rv-k{color:#fff;text-shadow:0 1px 4px color-mix(in srgb,var(--vc) 60%,transparent)}
 .rv-n{font-size:0.6562rem;color:var(--mut);line-height:1.25;text-align:center;max-width:80px}
 .roue-v.sel .rv-n{color:var(--vc);font-weight:600}
 .rv-c{font-size:0.5938rem;color:var(--dim);line-height:1}
@@ -161,7 +188,11 @@ button.stat{font:inherit;width:100%}
   padding:14px;border:1px dashed var(--line);border-radius:var(--r)}
 .voie{border:1px solid var(--line);border-left:3px solid var(--vc);border-radius:var(--r);
   background:var(--surf);padding:13px 15px;margin-bottom:11px}
-.voie.ouverte{border-color:var(--vc);box-shadow:0 2px 10px color-mix(in srgb,var(--vc) 13%,transparent)}
+.voie.ouverte{border-color:var(--vc);
+  box-shadow:0 2px 14px color-mix(in srgb,var(--vc) 15%,transparent),0 1px 3px rgba(0,0,0,.04);
+  animation:deplieVoie .34s cubic-bezier(.22,.9,.28,1)}
+@keyframes deplieVoie{from{opacity:0;transform:translateY(-7px)}to{opacity:1;transform:none}}
+.voie.ouverte .vk{text-shadow:0 1px 8px color-mix(in srgb,var(--vc) 26%,transparent)}
 @media(max-width:360px){
   .roue-in{width:96vw}
   .rv-d{width:46px;height:46px}
@@ -520,7 +551,8 @@ main.nav-fwd>*{animation-name:slideIn}
 .crow{transition:background .15s ease}
 .crow:active{background:var(--surf2)}
 @media (prefers-reduced-motion:reduce){
-  main.anim>*,.tiles .tile,.qbox,.sheetbox,.opt.ok,.opt.no{animation:none!important}
+  main.anim>*,.tiles .tile,.qbox,.sheetbox,.opt.ok,.opt.no,.roue-v,.voie.ouverte{animation:none!important}
+  .roue-c.on::after{animation:none!important;opacity:0}
 }
 
 
@@ -8612,10 +8644,50 @@ function formeToggle(f){
   S.formesCible=cur; save();
 }
 
+/* Toutes les questions de lecture suivie, tous textes confondus. Elles ne
+   vivent normalement que dans les nœuds de l'arbre : on les rassemble ici
+   pour que la voie de l'eau puisse s'en servir librement. */
+function lecturePool(){
+  const out=[];
+  Object.keys(D.lect||{}).forEach(cle=>{
+    const t=D.lect[cle]; if(!t||!t.q) return;
+    t.q.forEach((q,i)=>{
+      out.push({type:"lect",key:"L:"+cle+":"+i,l:t.l||0,head:"Lecture · "+t.t,
+        q:q[0],sub:"D'après le texte",a:q[1][q[2]],o:shuffle(q[1].slice()),texte:cle});
+    });
+  });
+  return out;
+}
+
+/* Compte les questions d'un seul sous-type, avec les mêmes sources que
+   questionsVoie — sinon la dictée et la lecture afficheraient zéro. */
+function questionsVoie2(vid,k){
+  const pt=porteeDe(vid);
+  const borne=q=>{
+    if(pt==="tout") return true;
+    if(typeof pt==="number") return q.l===pt;
+    return !q.l || q.l<=S.ch;
+  };
+  if(k==="dic") return ttsAvailable()?dicteePool().filter(borne):[];
+  if(k==="lect") return lecturePool().filter(borne);
+  return poolPortee(pt).filter(q=>q.type===k);
+}
+
 /* Questions disponibles pour une voie, portée et filtres compris. */
 function questionsVoie(vid){
   const types=new Set(sousActifs(vid));
-  let list=poolPortee(porteeDe(vid)).filter(q=>types.has(q.type));
+  const pt=porteeDe(vid);
+  let list=poolPortee(pt).filter(q=>types.has(q.type));
+  /* La dictée et la lecture suivie ne figurent pas dans le vivier général :
+     la première est fabriquée à la demande, la seconde n'existe que dans les
+     nœuds. On les ajoute ici, filtrées par la portée comme le reste. */
+  const borne=q=>{
+    if(pt==="tout") return true;
+    if(typeof pt==="number") return q.l===pt;
+    return !q.l || q.l<=S.ch;
+  };
+  if(types.has("dic") && ttsAvailable()) list=list.concat(dicteePool().filter(borne));
+  if(types.has("lect")) list=list.concat(lecturePool().filter(borne));
   /* Dans la voie du feu, on peut n'garder qu'une ou deux formes verbales. */
   if(vid==="ka"){
     const ff=formesActives();
@@ -8964,7 +9036,7 @@ VIEWS.shugyo=m=>{
       const sel=(S.sousType||{})[v.id]||[];
       const sg=el("div","vsous");
       v.sous.forEach(([k,lab])=>{
-        const n=poolPortee(pt).filter(q=>q.type===k).length;
+        const n=questionsVoie2(v.id,k).length;
         const on=sel.length?sel.includes(k):true;
         const b=el("button","vchip"+(on?" on":""),lab+(n?' <u>'+n+'</u>':""));
         b.onclick=()=>{ sousToggle(v.id,k); render(); };
