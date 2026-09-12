@@ -46,9 +46,15 @@ button{font-family:inherit;font-size:inherit;color:inherit;background:none;borde
 input,select{font-family:inherit;font-size:1rem;color:inherit}
 :focus-visible{outline:2px solid var(--ai);outline-offset:2px;border-radius:6px}
 header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:8px;
-  padding:calc(10px + env(safe-area-inset-top)) 0 10px;background:linear-gradient(var(--bg) 72%,transparent)}
-.brand{font-family:var(--disp);font-size:1.3125rem;letter-spacing:.06em;line-height:1.15}
-.brand small{display:block;font-family:var(--ui);font-size:0.5312rem;letter-spacing:.17em;text-transform:uppercase;color:var(--dim);margin-top:2px}
+  padding:calc(6px + env(safe-area-inset-top)) 0 6px;background:linear-gradient(var(--bg) 80%,transparent)}
+.brand{font-family:var(--disp);font-size:1.1875rem;letter-spacing:.04em;line-height:1.1;
+  min-width:0;overflow:hidden}
+/* Le sous-titre tient sur une ligne : il passait sur deux et mangeait
+   de la hauteur sur toute la navigation. */
+.brand small{display:block;font-family:var(--ui);font-size:0.5rem;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--dim);margin-top:1px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:380px){ .brand small{display:none} }
 .hbtn{margin-left:auto;display:flex;gap:6px;align-items:center}
 .chip{border:1px solid var(--line);background:var(--surf);border-radius:999px;padding:6px 11px;font-size:0.8125rem;color:var(--mut);white-space:nowrap}
 .chip.on{background:var(--ai);border-color:var(--ai);color:var(--on);font-weight:700}
@@ -147,17 +153,24 @@ button.stat{font:inherit;width:100%}
 /* Plusieurs signes : on resserre l'interlettrage pour rester dans le cercle. */
 .rond-k.multi{letter-spacing:-.04em;padding:0 2px;text-align:center}
 /* ---- Rubriques en badges ronds, à la manière de la roue ---- */
-.ronds{display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));
-  gap:14px 8px;margin:4px 0 18px;justify-items:center}
+/* Chaque badge occupe une cellule à hauteur fixe : sans cela, un libellé
+   sur deux lignes débordait de sa rangée et chevauchait la suivante. */
+.ronds{display:grid;grid-template-columns:repeat(4,1fr);
+  gap:6px 4px;margin:4px 0 16px;align-items:start}
+@media(max-width:340px){ .ronds{grid-template-columns:repeat(3,1fr)} }
 .ronds.rep{margin:8px 0 14px}
-.rondwrap{position:relative;display:flex;justify-content:center}
-.rondbtn{background:none;border:0;padding:0;cursor:pointer;display:flex;
-  flex-direction:column;align-items:center;gap:6px;width:100%;
+.rondwrap{position:relative;display:flex;justify-content:center;width:100%}
+.rondbtn{background:none;border:0;padding:4px 0 0;cursor:pointer;display:flex;
+  flex-direction:column;align-items:center;gap:5px;width:100%;
+  min-height:92px;justify-content:flex-start;
+  font-family:var(--ui);
   transition:transform .18s cubic-bezier(.34,1.4,.5,1)}
 .rondbtn:active{transform:scale(.92)}
 .rondbtn:hover .rond-k{background:radial-gradient(circle at 36% 30%,color-mix(in srgb,var(--vc) 26%,transparent),color-mix(in srgb,var(--vc) 12%,transparent));
   box-shadow:0 2px 11px color-mix(in srgb,var(--vc) 26%,transparent)}
-.rb-n{font-size:0.6875rem;color:var(--mut);line-height:1.3;text-align:center;max-width:86px}
+.rb-n{font-size:0.6562rem;color:var(--mut);line-height:1.25;text-align:center;
+  width:100%;padding:0 2px;box-sizing:border-box;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .rondbtn:hover .rb-n{color:var(--ai)}
 /* Étoile d'épinglage, dans le répertoire */
 .rb-star{position:absolute;top:-2px;right:2px;width:22px;height:22px;border-radius:50%;
@@ -167,7 +180,7 @@ button.stat{font:inherit;width:100%}
 .rb-star:active{transform:scale(.88)}
 .rb-star.on{color:var(--yama);border-color:color-mix(in srgb,var(--yama) 55%,var(--line))}
 /* Arrivée en cascade, comme les voies de la roue */
-.ronds .rondbtn,.ronds .rondwrap{animation:poseRond .42s cubic-bezier(.22,.9,.28,1) backwards}
+.ronds .rondwrap{animation:poseRond .42s cubic-bezier(.22,.9,.28,1) backwards}
 .ronds>*:nth-child(2){animation-delay:.03s}
 .ronds>*:nth-child(3){animation-delay:.06s}
 .ronds>*:nth-child(4){animation-delay:.09s}
@@ -650,7 +663,7 @@ main.nav-fwd>*{animation-name:slideIn}
 .crow{transition:background .15s ease}
 .crow:active{background:var(--surf2)}
 @media (prefers-reduced-motion:reduce){
-  main.anim>*,.tiles .tile,.qbox,.sheetbox,.opt.ok,.opt.no,.roue-v,.voie.ouverte,.ronds .rondbtn,.ronds .rondwrap{animation:none!important}
+  main.anim>*,.tiles .tile,.qbox,.sheetbox,.opt.ok,.opt.no,.roue-v,.voie.ouverte,.ronds .rondwrap{animation:none!important}
   .an-fg{transition:none!important}
   .roue-c.on::after{animation:none!important;opacity:0}
 }
@@ -1853,23 +1866,23 @@ function toast(txt){
 const RUBRIQUES=[
   ["lecons","課","Leçons","Étudier"],
   ["fiches","要点","Fiches","Étudier"],
-  ["pieges","落とし穴","Pièges et oral","Étudier"],
+  ["pieges","落とし穴","Pièges","Étudier"],
   ["culture","文化","Culture","Étudier"],
   ["audio","音声","Audio","Étudier"],
-  ["manuel","本冊","Votre manuel","Étudier"],
-  ["aide","解説","Aide au manuel","Étudier"],
+  ["manuel","本冊","Manuel","Étudier"],
+  ["aide","解説","Aide","Étudier"],
   ["arbre","道","Le chemin","S'entraîner"],
   ["shugyo","修","Entraîner","S'entraîner"],
   ["minna","練習","Exercices","S'entraîner"],
-  ["lecture","読解","Compréhension","S'entraîner"],
-  ["jlpt","JLPT","Préparation JLPT","S'entraîner"],
+  ["lecture","読解","Lecture","S'entraîner"],
+  ["jlpt","JLPT","JLPT","S'entraîner"],
   ["phrase","作文","Construire","S'entraîner"],
   ["conjug","活用","Conjugueur","S'entraîner"],
   ["oral","音読","Voix haute","S'entraîner"],
   ["progres","記録","Progression","S'entraîner"],
-  ["dico","辞書","Dictionnaire","Chercher"],
-  ["jmdict","大辞典","Dictionnaire étendu","Chercher"],
-  ["kanji","漢字","Kanji et tracé","Chercher"],
+  ["dico","辞書","Dico","Chercher"],
+  ["jmdict","大辞典","Dico étendu","Chercher"],
+  ["kanji","漢字","Kanji","Chercher"],
   ["rads","部首","Radicaux","Chercher"],
   ["gram","助詞","Particules","Chercher"],
   ["expr","表現","Expressions","Chercher"],
@@ -2475,11 +2488,13 @@ VIEWS.home=m=>{
     const gr=el("div","ronds");
     fv.forEach(id=>{
       const r=RUBIDX[id]; if(!r) return;
+      const w=el("div","rondwrap");
       const b=el("button","rondbtn");
-      b.appendChild(rondK(r[1],"var(--ai)",56));
+      b.appendChild(rondK(r[1],"var(--ai)",54));
       b.appendChild(el("span","rb-n",esc(r[2])));
       b.onclick=()=>go(r[0]);
-      gr.appendChild(b);
+      w.appendChild(b);
+      gr.appendChild(w);
     });
     m.appendChild(gr);
   } else {
@@ -2515,7 +2530,7 @@ function ouvreRepertoire(){
         const on=fv.includes(r[0]);
         const w=el("div","rondwrap");
         const b=el("button","rondbtn");
-        b.appendChild(rondK(r[1],"var(--ai)",52));
+        b.appendChild(rondK(r[1],"var(--ai)",54));
         b.appendChild(el("span","rb-n",esc(r[2])));
         b.onclick=()=>{ back.remove(); go(r[0]); };
         w.appendChild(b);
