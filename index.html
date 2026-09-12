@@ -311,45 +311,6 @@ button.stat{font:inherit;width:100%}
 .replitete:hover{color:var(--ai)}
 .replitete i{font-style:normal;font-size:0.625rem;letter-spacing:0}
 .replitete b{font-weight:700;letter-spacing:.04em}
-/* ---- Orbites : profondeur réelle, cibles immobiles ----
-   Les satellites sont posés sur une ellipse (l'orbite vue de trois-quarts).
-   Le bas de l'ellipse est devant le centre, le haut derrière : l'échelle,
-   l'opacité et le z-index suivent cette profondeur. Les positions ne
-   bougent pas, donc les boutons restent faciles à viser. */
-.roue{perspective:760px;perspective-origin:50% 44%}
-.roue-c,.eq-c{z-index:2}
-/* Arrivée en orbite : chaque satellite quitte le centre, décrit un arc
-   en profondeur et se pose à sa place. Une seule fois, à l'ouverture. */
-.orb{animation:poseOrbite .78s cubic-bezier(.22,.86,.3,1) backwards}
-@keyframes poseOrbite{
-  0%  {opacity:0;transform:translate(-50%,-50%) scale(.34) translateZ(-70px)}
-  55% {opacity:1}
-  100%{opacity:1;transform:translate(-50%,-50%) scale(var(--ech,1)) translateZ(0)}
-}
-/* Au repos, l'échelle de profondeur est conservée */
-.orb{transform:translate(-50%,-50%) scale(var(--ech,1))}
-.orb:active{transform:translate(-50%,-50%) scale(calc(var(--ech,1) * .9))}
-/* Ombre plus marquée pour ce qui est devant, plus diffuse pour ce qui est loin */
-.orb .rv-d,.orb .eq-d{transition:box-shadow .3s ease,filter .3s ease}
-/* Parallaxe doux au défilement : la perspective réagit au geste */
-@media(hover:hover){
-  .roue:hover{perspective-origin:50% 40%}
-}
-/* ---- 記録 : orbite continue, la roue n'étant pas cliquable ---- */
-/* Le rayon suit la largeur de la roue pour ne pas déborder sur petit écran. */
-.eq-roue{transform-style:preserve-3d;--orb-r:min(111px,31.8vw)}
-/* La rotation est inclinée d'un quart pour que l'orbite se lise comme une
-   ellipse. La contre-rotation garde chaque disque face au lecteur. Le tri
-   devant/derrière est fait par le navigateur grâce à preserve-3d. */
-.eq-orb{position:absolute;left:50%;top:50%;transform-style:preserve-3d;
-  animation:tourne 38s linear infinite;
-  animation-delay:calc(var(--i) * -7.6s)}
-@keyframes tourne{
-  from{transform:translate(-50%,-50%) rotateX(-64deg) rotateZ(0deg)
-        translateX(var(--orb-r)) rotateZ(0deg) rotateX(64deg)}
-  to  {transform:translate(-50%,-50%) rotateX(-64deg) rotateZ(360deg)
-        translateX(var(--orb-r)) rotateZ(-360deg) rotateX(64deg)}
-}
 /* ---- 記録 Roue de l'équilibre des cinq voies ---- */
 .eq-roue{width:min(300px,86vw);margin:4px auto 2px}
 .eq-c{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
@@ -1229,6 +1190,55 @@ html[data-skin="retro"] nav button.on{text-shadow:0 0 10px color-mix(in srgb,var
 html[data-skin="retro"] .opt.ok{box-shadow:0 0 12px color-mix(in srgb,var(--take) 45%,transparent)}
 html[data-skin="retro"] .opt.no{box-shadow:0 0 12px color-mix(in srgb,var(--shu) 45%,transparent)}
 
+
+/* ============ Orbites : profondeur réelle, cibles immobiles ============
+   Déclaré en fin de feuille : .roue-v et .eq-v redéfinissent transform et
+   animation, il faut passer après eux pour ne pas être écrasé.
+   La perspective est portée par .roue-in, dont les satellites sont les
+   enfants directs — sur le parent, elle ne les atteindrait pas. */
+.roue-in{perspective:720px;perspective-origin:50% 42%}
+.roue-c,.eq-c{z-index:2}
+
+/* Position de repos : l'échelle traduit la profondeur sur l'orbite. */
+.roue-v.orb,.eq-v.orb{
+  transform:translate(-50%,-50%) scale(var(--ech,1));
+  animation:poseOrbite .8s cubic-bezier(.22,.86,.3,1) backwards;
+  transition:transform .2s cubic-bezier(.34,1.4,.5,1)}
+.roue-v.orb:active,.eq-v.orb:active{
+  transform:translate(-50%,-50%) scale(calc(var(--ech,1) * .9))}
+/* Vol depuis le centre, en passant réellement en profondeur. */
+@keyframes poseOrbite{
+  0%  {opacity:0;transform:translate(-50%,-50%) scale(.3) translateZ(-90px)}
+  60% {opacity:1}
+  100%{opacity:1;transform:translate(-50%,-50%) scale(var(--ech,1)) translateZ(0)}
+}
+/* Ce qui est devant porte une ombre plus franche. */
+.orb[style*="z-index: 3"] .rv-d,.orb[style*="z-index: 3"] .eq-d{
+  filter:drop-shadow(0 4px 10px rgba(0,0,0,.16))}
+.orb[style*="z-index: 1"] .rv-d,.orb[style*="z-index: 1"] .eq-d{
+  filter:drop-shadow(0 1px 4px rgba(0,0,0,.07))}
+@media(hover:hover){ .roue-in:hover{perspective-origin:50% 38%} }
+
+/* ---- 記録 : orbite continue, la roue n'étant pas cliquable ---- */
+.eq-roue{perspective:640px;perspective-origin:50% 46%;transform-style:preserve-3d;
+  --orb-r:min(104px,30vw)}
+.eq-v.eq-orb{position:absolute;left:50%;top:50%;
+  transform-style:preserve-3d;
+  animation:tourne 38s linear infinite;
+  animation-delay:calc(var(--i) * -7.6s)}
+/* L'orbite est basculée sur l'axe X : on la voit comme une ellipse. La
+   contre-rotation garde chaque disque face au lecteur, et preserve-3d
+   laisse le navigateur trier ce qui passe devant ou derrière. */
+@keyframes tourne{
+  from{transform:translate(-50%,-50%) rotateX(-66deg) rotateZ(0deg)
+        translateX(var(--orb-r)) rotateZ(0deg) rotateX(66deg)}
+  to  {transform:translate(-50%,-50%) rotateX(-66deg) rotateZ(360deg)
+        translateX(var(--orb-r)) rotateZ(-360deg) rotateX(66deg)}
+}
+@media(prefers-reduced-motion:reduce){
+  .roue-v.orb,.eq-v.orb{animation:none!important;opacity:1!important}
+  .eq-v.eq-orb{animation:none!important}
+}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -2651,14 +2661,17 @@ VIEWS.home=m=>{
 
   /* les favoris, répartis sur le cercle */
   if(fv.length){
-    const pas=360/fv.length;
     fv.forEach((id,i)=>{
       const r=RUBIDX[id]; if(!r) return;
-      const ang=(-90 + i*pas) * Math.PI/180;
-      const b=el("button","roue-v acc-v");
+      const o=orbite(i,fv.length,0.38);
+      const b=el("button","roue-v acc-v orb");
       b.style.setProperty("--vc","var(--ai)");
-      b.style.left=(50 + 38*Math.cos(ang))+"%";
-      b.style.top =(50 + 38*Math.sin(ang))+"%";
+      b.style.setProperty("--ech",o.ech.toFixed(3));
+      b.style.left=o.x+"%";
+      b.style.top =o.y+"%";
+      b.style.zIndex=o.plan;
+      b.style.opacity=o.op.toFixed(3);
+      b.style.animationDelay=(0.05+i*0.055)+"s";
       const d=el("span","rv-d");
       d.appendChild(el("span","rv-k",esc(r[1])));
       const k=$(".rv-k",d);
@@ -2781,12 +2794,15 @@ VIEWS.home=m=>{
   D.elements.forEach((e,i)=>{
     const need=bes0[e.id]||0, ont=acq0[e.id]||0;
     const pcf=need?Math.min(100,Math.round(ont/need*100)):100;
-    const ang=(-90 + i*72) * Math.PI/180;
     /* Chaque voie ouvre directement sa branche sur le chemin. */
-    const w=el("button","eq-v chemin-v");
+    const o=orbite(i,D.elements.length,0.37);
+    const w=el("button","eq-v chemin-v orb");
     w.style.setProperty("--vc",e.c);
-    w.style.left=(50 + 37*Math.cos(ang))+"%";
-    w.style.top =(50 + 37*Math.sin(ang))+"%";
+    w.style.setProperty("--ech",o.ech.toFixed(3));
+    w.style.left=o.x+"%";
+    w.style.top =o.y+"%";
+    w.style.zIndex=o.plan;
+    w.style.animationDelay=(0.05+i*0.055)+"s";
     w.title=e.n+" — "+ont+" sur "+need+" · ouvrir cette voie";
     if(!need) w.style.opacity=".45";
     w.innerHTML=`<span class="eq-d">
@@ -2911,6 +2927,22 @@ function ouvreReglageChapitre(){
   document.body.appendChild(back);
   back.onclick=e=>{ if(e.target===back){ back.remove(); render(); } };
 }
+/* Place un satellite sur une orbite inclinée et renvoie sa géométrie.
+   L'inclinaison comprime l'axe vertical : le bas de l'ellipse est devant le
+   centre, le haut derrière. Échelle et plan suivent cette profondeur, mais
+   les positions restent fixes — donc les boutons restent visables au doigt. */
+const ORB_INCL=26;
+function orbite(i,n,rayon){
+  const a=(-90 + i*(360/n))*Math.PI/180;
+  const ci=Math.cos(ORB_INCL*Math.PI/180), si=Math.sin(ORB_INCL*Math.PI/180);
+  const z=Math.sin(a)*si;
+  return { x:50 + rayon*Math.cos(a)*100,
+           y:50 + rayon*Math.sin(a)*ci*100,
+           z:z, ech:1 + 0.15*z,
+           op:1 - 0.18*Math.max(0,-z),
+           plan:z>0 ? 3 : 1 };
+}
+
 /* Cadran des huit rangs, en couronne segmentée autour de la pastille du rang.
    Chaque segment est un rang : plein pour ceux qui sont franchis, rempli au
    prorata pour le rang courant, vide pour les suivants. Lit d'un coup d'œil
@@ -5693,11 +5725,14 @@ VIEWS.arbre=m=>{
   D.elements.forEach((e,i)=>{
     const need=bes[e.id]||0, ont=acq[e.id]||0;
     const pc=need?Math.min(100,Math.round(ont/need*100)):100;
-    const ang=(-90 + i*72) * Math.PI/180;
-    const w=el("div","eq-v chemin-v");
+    const o=orbite(i,D.elements.length,0.37);
+    const w=el("div","eq-v chemin-v orb");
     w.style.setProperty("--vc",e.c);
-    w.style.left=(50 + 37*Math.cos(ang))+"%";
-    w.style.top =(50 + 37*Math.sin(ang))+"%";
+    w.style.setProperty("--ech",o.ech.toFixed(3));
+    w.style.left=o.x+"%";
+    w.style.top =o.y+"%";
+    w.style.zIndex=o.plan;
+    w.style.animationDelay=(0.05+i*0.055)+"s";
     w.title=e.n+" — "+e.d;
     if(!need) w.style.opacity=".45";
     w.innerHTML=`<span class="eq-d">
