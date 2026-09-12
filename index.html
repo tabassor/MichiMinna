@@ -1201,6 +1201,21 @@ html[data-skin="retro"] .opt.ok{box-shadow:0 0 12px color-mix(in srgb,var(--take
 html[data-skin="retro"] .opt.no{box-shadow:0 0 12px color-mix(in srgb,var(--shu) 45%,transparent)}
 
 
+/* ---- Nœuds du cercle : relief et profondeur ----
+   Le cercle est vu de biais (axe vertical comprimé) et chaque nœud est
+   dimensionné selon son écart au foyer. --pr vaut 1 au foyer, 0 à l'opposé. */
+.enso .cv-n{transition:transform .42s cubic-bezier(.22,.9,.28,1),opacity .3s ease;
+  opacity:calc(.60 + .40 * var(--pr,1))}
+.enso .cv-n.actif{opacity:1}
+.enso .cv-num{opacity:calc(.30 + .70 * var(--pr,1))}
+/* Ombre de contact : plus franche près du foyer, diffuse au loin */
+.enso .cv-n .cv-c{
+  filter:drop-shadow(0 calc(1px + 3px * var(--pr,1)) calc(2px + 5px * var(--pr,1))
+    rgba(0,0,0,calc(.06 + .16 * var(--pr,1))))}
+/* Le disque du nœud reçoit un dégradé plutôt qu'un aplat */
+.enso .cv-n.open .cv-c,.enso .cv-n.fait .cv-c{
+  fill:url(#gradNoeud)}
+
 /* ============ Orbites : profondeur réelle, cibles immobiles ============
    Déclaré en fin de feuille : .roue-v et .eq-v redéfinissent transform et
    animation, il faut passer après eux pour ne pas être écrasé.
@@ -2684,18 +2699,13 @@ VIEWS.home=m=>{
 
   /* les favoris, répartis sur le cercle */
   if(fv.length){
+    const sats=[];
     fv.forEach((id,i)=>{
       const r=RUBIDX[id]; if(!r) return;
-      const o=orbite(i,fv.length,0.38);
       const b=el("button","roue-v acc-v orb");
       b.style.setProperty("--vc","var(--ai)");
-      b.style.setProperty("--ech",o.ech.toFixed(3));
-      b.style.left=o.x+"%";
-      b.style.top =o.y+"%";
-      b.style.zIndex=o.plan;
-      b.style.setProperty("--fl",o.fl.toFixed(2)+"px");
-      b.style.opacity=o.op.toFixed(3);
       b.style.animationDelay=(0.05+i*0.055)+"s";
+      sats.push(b);
       const d=el("span","rv-d");
       d.appendChild(el("span","rv-k",esc(r[1])));
       const k=$(".rv-k",d);
@@ -2704,8 +2714,23 @@ VIEWS.home=m=>{
       if(n>1 && k) k.style.letterSpacing="-.04em";
       b.appendChild(d);
       b.appendChild(el("span","rv-n",esc(r[2])));
-      b.onclick=()=>vaRubrique(r[0]);
+      b.onclick=()=>{
+        if(R._bouge>6){ R._bouge=0; return; }      /* c'était un glissement */
+        const o=orbite(i,fv.length,0.38,"acc");
+        if(o.z < 0.35){ R._amener(i); return; }    /* au fond : on l'amène devant */
+        vaRubrique(r[0]);
+      };
       R.appendChild(b);
+    });
+  }
+  if(fv.length){
+    roueTournante(R,"acc",fv.length,0.38,(i,o)=>{
+      const b=sats[i]; if(!b) return;
+      b.style.setProperty("--ech",o.ech.toFixed(3));
+      b.style.left=o.x+"%"; b.style.top=o.y+"%";
+      b.style.zIndex=o.plan;
+      b.style.setProperty("--fl",o.fl.toFixed(2)+"px");
+      b.style.opacity=o.op.toFixed(3);
     });
   }
   roue.appendChild(R);
@@ -2815,29 +2840,39 @@ VIEWS.home=m=>{
   cctr.title="Rang "+(TS.rang+1)+" sur "+D.rangs.length+" — "+RG.n+" · "+progRang(TS.rang)+" % du rang";
   cctr.onclick=()=>go("arbre");
   CR.appendChild(cctr);
+  const satsCh=[];
   D.elements.forEach((e,i)=>{
     const need=bes0[e.id]||0, ont=acq0[e.id]||0;
     const pcf=need?Math.min(100,Math.round(ont/need*100)):100;
     /* Chaque voie ouvre directement sa branche sur le chemin. */
-    const o=orbite(i,D.elements.length,0.37);
     const w=el("button","eq-v chemin-v orb");
     w.style.setProperty("--vc",e.c);
-    w.style.setProperty("--ech",o.ech.toFixed(3));
-    w.style.left=o.x+"%";
-    w.style.top =o.y+"%";
-    w.style.zIndex=o.plan;
-      w.style.setProperty("--fl",o.fl.toFixed(2)+"px");
     w.style.animationDelay=(0.05+i*0.055)+"s";
+    satsCh.push(w);
     w.title=e.n+" — "+ont+" sur "+need+" · ouvrir cette voie";
-    if(!need) w.style.opacity=".45";
+    if(!need) w.dataset.vide="1";
     w.innerHTML=`<span class="eq-d">
         <svg viewBox="0 0 60 60" aria-hidden="true"><circle class="eq-bg" cx="30" cy="30" r="26"/>
           <circle class="eq-fg" cx="30" cy="30" r="26" stroke-dasharray="163"
             stroke-dashoffset="${163-163*pcf/100}"/></svg>
         <span class="eq-k">${esc(e.j)}</span></span>
       <span class="eq-n">${ont}${need?'<u>/'+need+'</u>':""}</span>`;
-    w.onclick=ev=>{ ev.stopPropagation(); arbreRang=TS.rang; arbreVoie=e.id; go("arbre"); };
+    w.onclick=ev=>{
+      ev.stopPropagation();
+      if(CR._bouge>6){ CR._bouge=0; return; }
+      const o=orbite(i,D.elements.length,0.37,"chemin");
+      if(o.z < 0.35){ CR._amener(i); return; }
+      arbreRang=TS.rang; arbreVoie=e.id; go("arbre");
+    };
     CR.appendChild(w);
+  });
+  roueTournante(CR,"chemin",D.elements.length,0.37,(i,o)=>{
+    const w=satsCh[i]; if(!w) return;
+    w.style.setProperty("--ech",o.ech.toFixed(3));
+    w.style.left=o.x+"%"; w.style.top=o.y+"%";
+    w.style.zIndex=o.plan;
+    w.style.setProperty("--fl",o.fl.toFixed(2)+"px");
+    w.style.opacity=(w.dataset.vide?0.45:o.op).toFixed(3);
   });
   cr.appendChild(CR);
   pv.appendChild(cr);
@@ -2957,8 +2992,12 @@ function ouvreReglageChapitre(){
    centre, le haut derrière. Échelle et plan suivent cette profondeur, mais
    les positions restent fixes — donc les boutons restent visables au doigt. */
 const ORB_INCL=46;
-function orbite(i,n,rayon){
-  const a=(-90 + i*(360/n))*Math.PI/180;
+/* Rotation courante de chaque roue, en tours (0 = position d'origine).
+   Gardée en mémoire vive : c'est un réglage du moment, pas une préférence. */
+const roueRot={};
+function orbite(i,n,rayon,cle){
+  const dec=(roueRot[cle]||0)*360;
+  const a=(-90 + i*(360/n) + dec)*Math.PI/180;
   const ci=Math.cos(ORB_INCL*Math.PI/180), si=Math.sin(ORB_INCL*Math.PI/180);
   const z=Math.sin(a)*si;                 /* -0,72 derrière … +0,72 devant */
   return { x:50 + rayon*Math.cos(a)*100,
@@ -2968,6 +3007,62 @@ function orbite(i,n,rayon){
            op:1 - 0.26*Math.max(0,-z),    /* l'arrière s'estompe */
            fl:Math.max(0,-z)*1.3,         /* et se voile légèrement */
            plan:z>0 ? 3 : 1 };
+}
+
+/* Rend une roue tournante. `poser` reçoit l'index et la géométrie et place
+   le satellite ; il est rappelé à chaque mouvement. On peut faire glisser
+   la roue du doigt, ou toucher un satellite du fond pour l'amener devant. */
+function roueTournante(conteneur, cle, n, rayon, poser){
+  const place=()=>{ for(let i=0;i<n;i++) poser(i, orbite(i,n,rayon,cle)); };
+  place();
+  /* La position d'un satellite le plus en avant correspond à l'indice
+     dont l'angle vaut +90° : on cale la rotation pour l'y amener. */
+  conteneur._amener=(i)=>{
+    const vise=(90 - (-90 + i*(360/n)))/360;
+    let d=vise-(roueRot[cle]||0);
+    d=d-Math.round(d);                       /* par le plus court chemin */
+    const dep=roueRot[cle]||0, fin=dep+d, t0=performance.now();
+    const pas=now=>{
+      const k=Math.min(1,(now-t0)/420);
+      const e=1-Math.pow(1-k,3);
+      roueRot[cle]=dep+(fin-dep)*e;
+      place();
+      if(k<1) requestAnimationFrame(pas);
+    };
+    requestAnimationFrame(pas);
+  };
+  /* Glissement horizontal : un demi-écran fait un tour complet. */
+  let actif=false, x0=0, r0=0, bouge=0;
+  const large=()=>conteneur.getBoundingClientRect().width||300;
+  conteneur.addEventListener("pointerdown",ev=>{
+    if(ev.target.closest("button")&&ev.pointerType!=="mouse") { /* on laisse le tap */ }
+    actif=true; x0=ev.clientX; r0=roueRot[cle]||0; bouge=0;
+    conteneur.setPointerCapture&&conteneur.setPointerCapture(ev.pointerId);
+  });
+  conteneur.addEventListener("pointermove",ev=>{
+    if(!actif) return;
+    const d=ev.clientX-x0;
+    if(Math.abs(d)>4) bouge=Math.max(bouge,Math.abs(d));
+    roueRot[cle]=r0 + d/(large()*1.15);
+    place();
+  });
+  const fin=()=>{
+    if(!actif) return;
+    actif=false;
+    /* On se cale sur le satellite le plus proche de l'avant. */
+    if(bouge>6){
+      let best=0,bz=-9;
+      for(let i=0;i<n;i++){ const o=orbite(i,n,rayon,cle); if(o.z>bz){bz=o.z;best=i;} }
+      conteneur._amener(best);
+    }
+    conteneur._bouge=bouge;
+  };
+  conteneur.addEventListener("pointerup",fin);
+  conteneur.addEventListener("pointercancel",fin);
+  conteneur.addEventListener("pointerleave",fin);
+  conteneur.style.touchAction="pan-y";
+  conteneur.style.cursor="grab";
+  return conteneur;
 }
 
 /* Cadran des huit rangs, en couronne segmentée autour de la pastille du rang.
@@ -5749,20 +5844,16 @@ VIEWS.arbre=m=>{
     rctr.disabled=true;
   }
   RR.appendChild(rctr);
+  const satsR=[];
   D.elements.forEach((e,i)=>{
     const need=bes[e.id]||0, ont=acq[e.id]||0;
     const pc=need?Math.min(100,Math.round(ont/need*100)):100;
-    const o=orbite(i,D.elements.length,0.37);
-    const w=el("div","eq-v chemin-v orb");
+    const w=el("button","eq-v chemin-v orb"+(arbreVoie===e.id?" active":""));
     w.style.setProperty("--vc",e.c);
-    w.style.setProperty("--ech",o.ech.toFixed(3));
-    w.style.left=o.x+"%";
-    w.style.top =o.y+"%";
-    w.style.zIndex=o.plan;
-      w.style.setProperty("--fl",o.fl.toFixed(2)+"px");
     w.style.animationDelay=(0.05+i*0.055)+"s";
     w.title=e.n+" — "+e.d;
-    if(!need) w.style.opacity=".45";
+    if(!need) w.dataset.vide="1";
+    satsR.push(w);
     w.innerHTML=`<span class="eq-d">
         <svg viewBox="0 0 60 60" aria-hidden="true"><circle class="eq-bg" cx="30" cy="30" r="26"/>
           <circle class="eq-fg" cx="30" cy="30" r="26" stroke-dasharray="163"
@@ -5770,7 +5861,25 @@ VIEWS.arbre=m=>{
         <span class="eq-k">${esc(e.j)}</span></span>
       <span class="eq-n">${ont}${need?'<u>/'+need+'</u>':""}</span>
       <span class="eq-l">${esc(e.n)}</span>`;
+    w.onclick=()=>{
+      if(RR._bouge>6){ RR._bouge=0; return; }
+      const o=orbite(i,D.elements.length,0.37,"rang");
+      if(o.z < 0.35){ RR._amener(i); return; }
+      const y=window.scrollY; arbreVoie=e.id; render();
+      requestAnimationFrame(()=>window.scrollTo(0,y));
+    };
     RR.appendChild(w);
+  });
+  /* La roue s'ouvre sur la voie sélectionnée, amenée devant. */
+  const iSel=Math.max(0,D.elements.findIndex(x=>x.id===arbreVoie));
+  roueRot["rang"]=(90-(-90+iSel*(360/D.elements.length)))/360;
+  roueTournante(RR,"rang",D.elements.length,0.37,(i,o)=>{
+    const w=satsR[i]; if(!w) return;
+    w.style.setProperty("--ech",o.ech.toFixed(3));
+    w.style.left=o.x+"%"; w.style.top=o.y+"%";
+    w.style.zIndex=o.plan;
+    w.style.setProperty("--fl",o.fl.toFixed(2)+"px");
+    w.style.opacity=(w.dataset.vide?0.45:o.op).toFixed(3);
   });
   rr.appendChild(RR);
   c.appendChild(rr);
@@ -6056,7 +6165,7 @@ function carteRang(rid,vidSel){
   const W=344, CX=W/2, R=20;
   const n=ns.length;
   const RAYON=Math.max(112,Math.min(138, 30+n*5.2));
-  const H=RAYON*2+2*R+40;
+  const H=RAYON*2*0.80+2*R+44;   /* l'ellipse est moins haute que le cercle */
   const CY=H/2;
   const pas=360/n;
   /* l'angle s'accumule : on tourne toujours par le plus court chemin,
@@ -6070,14 +6179,26 @@ function carteRang(rid,vidSel){
     "aria-label":"Cercle de la voie "+e.n+" — "+ns.length+" nœuds, "+libres.length+" jouables"});
   svg.style.width="100%"; svg.style.height="auto";
 
+  /* Dégradé partagé par les disques de nœud : la lumière vient du haut-gauche. */
+  const defs=el2("defs",{});
+  const gr=el2("radialGradient",{id:"gradNoeud",cx:"34%",cy:"26%",r:"72%"});
+  const st1=el2("stop",{offset:"0%"}); st1.setAttribute("stop-color","var(--surf)");
+  const st2=el2("stop",{offset:"100%"}); st2.setAttribute("stop-color","var(--surf2)");
+  gr.appendChild(st1); gr.appendChild(st2); defs.appendChild(gr);
+  svg.appendChild(defs);
+
   const C=2*Math.PI*RAYON;
-  svg.appendChild(el2("circle",{cx:CX,cy:CY,r:RAYON,"class":"enso-fond"}));
+  svg.appendChild(el2("ellipse",{cx:CX,cy:CY,rx:RAYON,ry:(RAYON*0.80).toFixed(1),"class":"enso-fond"}));
   const faits=ns.filter(x=>estFait(x.id)).length;
-  const trait=el2("circle",{cx:CX,cy:CY,r:RAYON,"class":"enso-trait",
+  /* La jauge d'avancement épouse l'ellipse. Sa longueur est approchée par
+     la formule de Ramanujan, sans quoi le remplissage serait faux. */
+  const rb=RAYON*0.80, hh=Math.pow(RAYON-rb,2)/Math.pow(RAYON+rb,2);
+  const CE=Math.PI*(RAYON+rb)*(1+3*hh/(10+Math.sqrt(4-3*hh)));
+  const trait=el2("ellipse",{cx:CX,cy:CY,rx:RAYON,ry:rb.toFixed(1),"class":"enso-trait",
     transform:"rotate(-90 "+CX+" "+CY+")"});
   trait.style.setProperty("--c",e.c);
-  trait.style.strokeDasharray=C;
-  trait.style.strokeDashoffset=C*(1-faits/n);
+  trait.style.strokeDasharray=CE;
+  trait.style.strokeDashoffset=CE*(1-faits/n);
   svg.appendChild(trait);
 
   /* au centre : ce que l'on s'apprête à faire */
@@ -6095,9 +6216,18 @@ function carteRang(rid,vidSel){
   const anneau=el2("g",{"class":"enso-ring",transform:"rotate("+rot+" "+CX+" "+CY+")"});
   svg.appendChild(anneau);
 
+  /* Le cercle est vu légèrement de biais : l'axe vertical est comprimé et
+     chaque nœud est dimensionné selon son écart au foyer. On garde la
+     rotation de groupe existante — seule la géométrie se creuse. */
+  const ENS_CI=0.80;                       /* compression verticale */
+  const ensProf=(k)=>{                     /* 1 au foyer, 0 à l'opposé */
+    let d=Math.abs(((k*pas+ensoAngle)%360+360)%360);
+    if(d>180) d=360-d;
+    return 1-d/180;
+  };
   ns.forEach((nd,i)=>{
     const a=(-90+i*pas)*Math.PI/180;
-    const x=CX+RAYON*Math.cos(a), y=CY+RAYON*Math.sin(a);
+    const x=CX+RAYON*Math.cos(a), y=CY+RAYON*Math.sin(a)*ENS_CI;
     const fait=estFait(nd.id), op=ouvert(nd), vise=arbreCh&&nd.ch&&nd.ch[0]<=arbreCh&&arbreCh<=nd.ch[1];
     const actif=nd.id===arbreFocus;
     const g=el2("g",{"class":"cv-n"+(fait?" fait":(op?" open":" lock"))+(vise?" vise":"")+
@@ -6106,7 +6236,9 @@ function carteRang(rid,vidSel){
       "aria-label":nd.t+", "+e.n+", "+(fait?"acquis":(op?"jouable":"verrouillé"))+(nd.minna?", "+nd.minna:""),
       transform:"translate("+x.toFixed(1)+","+y.toFixed(1)+") rotate("+(-rot)+")"});
     g.style.setProperty("--c",e.c);
-    const r2=actif?R*1.42:R;
+    const pr=ensProf(i);
+    g.style.setProperty("--pr",pr.toFixed(3));
+    const r2=actif?R*1.42:R*(0.80+0.20*pr);
     if(op&&!fait) g.appendChild(el2("circle",{r:r2+6,"class":"cv-halo"}));
     if(fait) g.appendChild(el2("circle",{r:r2+4.5,"class":"cv-ring"}));
     g.appendChild(el2("circle",{r:r2,"class":"cv-c"}));
@@ -6140,9 +6272,11 @@ function carteRang(rid,vidSel){
     cases.forEach((g2,k)=>{
       g2.setAttribute("transform","translate("+
         (CX+RAYON*Math.cos((-90+k*pas)*Math.PI/180)).toFixed(1)+","+
-        (CY+RAYON*Math.sin((-90+k*pas)*Math.PI/180)).toFixed(1)+") rotate("+(-ensoAngle)+")");
+        (CY+RAYON*Math.sin((-90+k*pas)*Math.PI/180)*ENS_CI).toFixed(1)+") rotate("+(-ensoAngle)+")");
       g2.classList.toggle("actif",k===i);
-      const r3=(k===i)?R*1.42:R;
+      const pr2=ensProf(k);
+      g2.style.setProperty("--pr",pr2.toFixed(3));
+      const r3=(k===i)?R*1.42:R*(0.80+0.20*pr2);
       g2.querySelectorAll("circle").forEach(c2=>{
         if(c2.classList.contains("cv-c")) c2.setAttribute("r",r3);
         else if(c2.classList.contains("cv-halo")) c2.setAttribute("r",r3+6);
