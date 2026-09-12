@@ -197,19 +197,33 @@ button.stat{font:inherit;width:100%}
 .acc-v:hover .rv-n{color:var(--ai)}
 /* ---- 道 Roue du chemin : le rang au centre, les cinq exigences autour ---- */
 .chemin-tete{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px}
-.chemin-roue{width:min(288px,84vw);margin:0 auto}
-.chemin-c{width:37%!important;border:0;cursor:pointer;padding:0;
+.chemin-roue{width:min(310px,88vw);margin:0 auto}
+/* Le centre est resserré : il porte le cadran des huit rangs, les cinq voies
+   qui l'entourent sont la vraie matière et méritent la place. */
+.chemin-c{width:29%!important;border:0;cursor:pointer;padding:0;position:absolute;
   transition:transform .16s cubic-bezier(.34,1.4,.5,1),box-shadow .25s ease}
-.chemin-c:active{transform:translate(-50%,-50%) scale(.95)}
+.chemin-c:active{transform:translate(-50%,-50%) scale(.94)}
+/* Cadran segmenté des huit rangs, posé autour de la pastille */
+.cad{position:absolute;inset:-9px;width:calc(100% + 18px);height:calc(100% + 18px);
+  transform:rotate(-90deg);pointer-events:none;overflow:visible}
+.cad-bg{fill:none;stroke:color-mix(in srgb,var(--line) 72%,transparent);stroke-width:4;stroke-linecap:round}
+.cad-fg{fill:none;stroke:var(--ai);stroke-width:4;stroke-linecap:round;
+  filter:drop-shadow(0 0 2px color-mix(in srgb,var(--ai) 42%,transparent))}
+.cad-fg.plein{stroke:var(--take);filter:drop-shadow(0 0 2px color-mix(in srgb,var(--take) 40%,transparent))}
 .ch-cn{display:flex;flex-direction:column;align-items:center;justify-content:center;
-  line-height:1;gap:4px;padding:0 6px}
+  line-height:1;gap:3px;padding:0 4px;position:relative;z-index:1}
 .ch-cn b{font-family:var(--disp);color:var(--ai);font-weight:400;text-align:center;
   text-shadow:0 1px 2px rgba(255,255,255,.85)}
-.ch-cn i{font-style:normal;font-size:0.5312rem;letter-spacing:.06em;text-transform:uppercase;
-  color:var(--mut);text-align:center;line-height:1.2;max-width:78px}
-.chemin-v .eq-d{width:52px;height:52px}
-.chemin-v .eq-k{font-size:1.25rem}
-.chemin-v .eq-n{font-size:0.6562rem}
+.ch-cn i{font-style:normal;font-size:0.6875rem;font-weight:700;color:var(--tx);
+  text-align:center;line-height:1}
+.ch-cn i u{text-decoration:none;font-size:0.5312rem;font-weight:400;color:var(--dim)}
+/* Les voies gagnent en diamètre */
+.chemin-v{width:27%!important}
+.chemin-v .eq-d{width:64px;height:64px}
+.chemin-v .eq-fg{stroke-width:4.5}
+.chemin-v .eq-bg{stroke-width:4.5}
+.chemin-v .eq-k{font-size:1.5625rem}
+.chemin-v .eq-n{font-size:0.7188rem}
 .chemin-v .eq-n u{text-decoration:none;color:var(--dim);font-weight:400}
 .eq-l{display:block;font-size:0.5625rem;color:var(--dim);letter-spacing:.03em;line-height:1.2;
   text-align:center;max-width:68px}
@@ -2624,7 +2638,7 @@ VIEWS.home=m=>{
   pv.style.borderColor="color-mix(in srgb,var(--ai) 34%,var(--line))";
 
   const enT=el("div","chemin-tete");
-  enT.innerHTML=`<span class="eyebrow">Rang ${TS.rang+1} sur ${D.rangs.length}${RG.jlpt?" · JLPT N"+RG.jlpt:""}</span>
+  enT.innerHTML=`<span class="eyebrow">${esc(RG.n)}${RG.jlpt?" · JLPT N"+RG.jlpt:""}</span>
     <span class="eyebrow">${progRang(TS.rang)} % du rang</span>`;
   pv.appendChild(enT);
 
@@ -2632,9 +2646,11 @@ VIEWS.home=m=>{
   const CR=el("div","roue-in chemin-roue");
   const cctr=el("button","eq-c chemin-c");
   const nrg=[...RG.j].length;
-  cctr.innerHTML=`<span class="ch-cn">
-      <b class="jpx" style="font-size:${nrg<=1?26:nrg===2?18:14}px${nrg>1?";letter-spacing:-.04em":""}">${esc(RG.j)}</b>
-      <i>${esc(RG.n)}</i></span>`;
+  cctr.innerHTML=cadranRangs(TS.rang, progRang(TS.rang))+
+    `<span class="ch-cn">
+      <b class="jpx" style="font-size:${nrg<=1?20:nrg===2?14:11}px${nrg>1?";letter-spacing:-.04em":""}">${esc(RG.j)}</b>
+      <i>${TS.rang+1}<u>/${D.rangs.length}</u></i></span>`;
+  cctr.title="Rang "+(TS.rang+1)+" sur "+D.rangs.length+" — "+RG.n+" · "+progRang(TS.rang)+" % du rang";
   cctr.onclick=()=>go("arbre");
   CR.appendChild(cctr);
   D.elements.forEach((e,i)=>{
@@ -2658,16 +2674,8 @@ VIEWS.home=m=>{
   cr.appendChild(CR);
   pv.appendChild(cr);
 
-  /* l'échelle des huit rangs, en pastilles */
-  const ech=el("div","echelle");
-  D.rangs.forEach((R2,i)=>{
-    const et=el("span","ech"+(i<TS.rang?" passe":(i===TS.rang?" ici":"")));
-    et.innerHTML=`<i class="jpx">${esc([...R2.j][0])}</i>`;
-    et.title=R2.j+" "+R2.n+(R2.jlpt?" · N"+R2.jlpt:"");
-    if(i===TS.rang){ const f=el("u"); f.style.width=progRang(TS.rang)+"%"; et.appendChild(f); }
-    ech.appendChild(et);
-  });
-  pv.appendChild(ech);
+  /* le cadran de la pastille centrale porte déjà la progression des huit
+     rangs : l'échelle en pastilles faisait doublon, elle est retirée */
 
   pv.appendChild(el("div","chemin-etat",
     nx.length? nx.length+" nœud"+(nx.length>1?"s":"")+" ouvert"+(nx.length>1?"s":"")+" à ce rang"
@@ -2777,6 +2785,30 @@ function ouvreReglageChapitre(){
   document.body.appendChild(back);
   back.onclick=e=>{ if(e.target===back){ back.remove(); render(); } };
 }
+/* Cadran des huit rangs, en couronne segmentée autour de la pastille du rang.
+   Chaque segment est un rang : plein pour ceux qui sont franchis, rempli au
+   prorata pour le rang courant, vide pour les suivants. Lit d'un coup d'œil
+   où l'on en est sur tout le parcours. */
+function cadranRangs(rangCourant, pcCourant){
+  const n=D.rangs.length, r=34, C=2*Math.PI*r, pas=C/n, trait=pas-3.2;
+  let svg=`<svg class="cad" viewBox="0 0 80 80" aria-hidden="true">`;
+  for(let i=0;i<n;i++){
+    const off=-(i*pas);
+    svg+=`<circle class="cad-bg" cx="40" cy="40" r="${r}"
+      stroke-dasharray="${trait.toFixed(2)} ${(C-trait).toFixed(2)}"
+      stroke-dashoffset="${off.toFixed(2)}"/>`;
+    let part=0;
+    if(i<rangCourant) part=1;
+    else if(i===rangCourant) part=Math.max(0,Math.min(1,(pcCourant||0)/100));
+    if(part>0){
+      svg+=`<circle class="cad-fg${i<rangCourant?" plein":""}" cx="40" cy="40" r="${r}"
+        stroke-dasharray="${(trait*part).toFixed(2)} ${(C-trait*part).toFixed(2)}"
+        stroke-dashoffset="${off.toFixed(2)}"/>`;
+    }
+  }
+  return svg+`</svg>`;
+}
+
 /* Pastille ronde portant un ou plusieurs kanji. La fonte s'adapte au nombre
    de signes : à taille fixe, 修行者 ou 師範代 débordaient du cercle. */
 function remplitRonds(racine){
@@ -5511,9 +5543,11 @@ VIEWS.arbre=m=>{
   const RR=el("div","roue-in chemin-roue");
   const rctr=el("div","eq-c chemin-c");
   const nR=[...R.j].length;
-  rctr.innerHTML=`<span class="ch-cn">
-      <b class="jpx" style="font-size:${nR<=1?27:nR===2?19:14.5}px${nR>1?";letter-spacing:-.04em":""}">${esc(R.j)}</b>
-      <i>${progRang(T.rang)} %</i></span>`;
+  rctr.innerHTML=cadranRangs(T.rang, progRang(T.rang))+
+    `<span class="ch-cn">
+      <b class="jpx" style="font-size:${nR<=1?21:nR===2?15:11.5}px${nR>1?";letter-spacing:-.04em":""}">${esc(R.j)}</b>
+      <i>${progRang(T.rang)}<u>%</u></i></span>`;
+  rctr.title="Rang "+(T.rang+1)+" sur "+D.rangs.length+" — "+progRang(T.rang)+" % franchi";
   RR.appendChild(rctr);
   D.elements.forEach((e,i)=>{
     const need=bes[e.id]||0, ont=acq[e.id]||0;
