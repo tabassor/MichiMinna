@@ -6188,16 +6188,20 @@ function carteRang(rid,vidSel){
   /* l'angle s'accumule : on tourne toujours par le plus court chemin,
      et jamais en sens inverse d'un tour complet */
   if(ensoCle!==rid+"|"+vid){ ensoCle=rid+"|"+vid; ensoAngle=-iF*pas; }
-  let rot=ensoAngle;
 
   /* Le cercle est vu de biais : l'axe vertical est comprimé. La profondeur
      découle de la position sur l'ellipse — le bas est près du lecteur, le
      haut est loin. Le nœud au foyer garde son emphase propre, séparément. */
   const ENS_CI=0.74;                       /* compression verticale */
-  const ensProf=(k)=>{                     /* 0 en haut (loin) … 1 en bas (près) */
-    const a=(-90 + k*pas + ensoAngle)*Math.PI/180;
-    return (Math.sin(a)+1)/2;
-  };
+  /* Angle effectif d'un nœud. Le foyer est amené en BAS de l'ellipse, donc
+     au plus près du lecteur : c'est là qu'il doit être le plus lisible.
+     Le groupe n'est plus tourné en bloc — cela faisait pivoter l'ellipse
+     elle-même, axe compris, alors que le fond restait immobile. */
+  const ensAng=(k)=>(90 + k*pas + ensoAngle)*Math.PI/180;
+  const ensPos=(k)=>{ const a=ensAng(k);
+    return [CX+RAYON*Math.cos(a), CY+RAYON*ENS_CI*Math.sin(a)]; };
+  const ensProf=(k)=>(Math.sin(ensAng(k))+1)/2;   /* 0 en haut (loin) … 1 en bas (près) */
+  const ensRayon=(k,act)=>(act?R*1.42:R)*(0.84+0.22*ensProf(k));
 
   const NS="http://www.w3.org/2000/svg";
   const el2=(t,a)=>{ const x=document.createElementNS(NS,t); for(const k in a) x.setAttribute(k,a[k]); return x; };
@@ -6248,24 +6252,24 @@ function carteRang(rid,vidSel){
   const pc=el2("text",{x:CX,y:CY+40,"text-anchor":"middle","class":"enso-pc"});
   pc.textContent=faits+" / "+n; svg.appendChild(pc);
 
-  /* l'anneau tourne d'un bloc ; chaque nœud se redresse pour rester lisible */
-  const anneau=el2("g",{"class":"enso-ring",transform:"rotate("+rot+" "+CX+" "+CY+")"});
+  /* Simple conteneur : chaque nœud porte sa propre position sur l'ellipse,
+     ce qui laisse l'ellipse fixe quelle que soit la rotation. */
+  const anneau=el2("g",{"class":"enso-ring"});
   svg.appendChild(anneau);
 
   ns.forEach((nd,i)=>{
-    const a=(-90+i*pas)*Math.PI/180;
-    const x=CX+RAYON*Math.cos(a), y=CY+RAYON*ENS_CI*Math.sin(a);
+    const [x,y]=ensPos(i);
     const fait=estFait(nd.id), op=ouvert(nd), vise=arbreCh&&nd.ch&&nd.ch[0]<=arbreCh&&arbreCh<=nd.ch[1];
     const actif=nd.id===arbreFocus;
     const g=el2("g",{"class":"cv-n"+(fait?" fait":(op?" open":" lock"))+(vise?" vise":"")+
         (actif?" actif":"")+(S.tree&&S.tree.neuf===nd.id?" neuf":""),
       "tabindex":"0","data-nid":nd.id,role:"listitem",
       "aria-label":nd.t+", "+e.n+", "+(fait?"acquis":(op?"jouable":"verrouillé"))+(nd.minna?", "+nd.minna:""),
-      transform:"translate("+x.toFixed(1)+","+y.toFixed(1)+") rotate("+(-rot)+")"});
+      transform:"translate("+x.toFixed(1)+","+y.toFixed(1)+")"});
     g.style.setProperty("--c",e.c);
     const pr=ensProf(i);
     g.style.setProperty("--pr",pr.toFixed(3));
-    const r2=(actif?R*1.42:R)*(0.84+0.22*pr);
+    const r2=ensRayon(i,actif);
     if(op&&!fait) g.appendChild(el2("circle",{r:r2+6,"class":"cv-halo"}));
     if(fait) g.appendChild(el2("circle",{r:r2+4.5,"class":"cv-ring"}));
     g.appendChild(el2("circle",{r:r2,"class":"cv-c"}));
@@ -6294,16 +6298,14 @@ function carteRang(rid,vidSel){
     while(cible-ensoAngle<-180) ensoAngle-=360;
     ensoAngle=cible;
     arbreFocus=ns[i].id;
-    anneau.style.transition=(anime===false)?"none":"";
-    anneau.setAttribute("transform","rotate("+ensoAngle+" "+CX+" "+CY+")");
     cases.forEach((g2,k)=>{
-      g2.setAttribute("transform","translate("+
-        (CX+RAYON*Math.cos((-90+k*pas)*Math.PI/180)).toFixed(1)+","+
-        (CY+RAYON*ENS_CI*Math.sin((-90+k*pas)*Math.PI/180)).toFixed(1)+") rotate("+(-ensoAngle)+")");
+      g2.style.transition=(anime===false)?"none":"";
+      const [px,py]=ensPos(k);
+      g2.setAttribute("transform","translate("+px.toFixed(1)+","+py.toFixed(1)+")");
       g2.classList.toggle("actif",k===i);
       const pr2=ensProf(k);
       g2.style.setProperty("--pr",pr2.toFixed(3));
-      const r3=(k===i?R*1.42:R)*(0.84+0.22*pr2);
+      const r3=ensRayon(k,k===i);
       g2.querySelectorAll("circle").forEach(c2=>{
         if(c2.classList.contains("cv-c")) c2.setAttribute("r",r3);
         else if(c2.classList.contains("cv-halo")) c2.setAttribute("r",r3+6);
@@ -6331,17 +6333,20 @@ function carteRang(rid,vidSel){
       return Math.atan2(ev.clientY-cy, ev.clientX-cx)*180/Math.PI;
     };
     const place=()=>{
-      anneau.setAttribute("transform","rotate("+ensoAngle+" "+CX+" "+CY+")");
       cases.forEach((g2,k)=>{
-        const a2=(-90+k*pas)*Math.PI/180;
-        /* La compression elliptique doit être appliquée ici aussi : sans
-           elle, les nœuds sautaient sur le cercle pendant le glissement. */
-        g2.setAttribute("transform","translate("+(CX+RAYON*Math.cos(a2)).toFixed(1)+","+
-          (CY+RAYON*ENS_CI*Math.sin(a2)).toFixed(1)+") rotate("+(-ensoAngle)+")");
+        const [px,py]=ensPos(k);
+        g2.style.transition="none";
+        g2.setAttribute("transform","translate("+px.toFixed(1)+","+py.toFixed(1)+")");
         const pr3=ensProf(k);
         g2.style.setProperty("--pr",pr3.toFixed(3));
-        const cc=g2.querySelector(".cv-c");
-        if(cc) cc.setAttribute("r",((g2.classList.contains("actif")?R*1.42:R)*(0.84+0.22*pr3)).toFixed(1));
+        const act=g2.classList.contains("actif");
+        const r4=ensRayon(k,act);
+        g2.querySelectorAll("circle").forEach(c2=>{
+          if(c2.classList.contains("cv-c")) c2.setAttribute("r",r4.toFixed(1));
+          else if(c2.classList.contains("cv-halo")) c2.setAttribute("r",(r4+6).toFixed(1));
+          else if(c2.classList.contains("cv-ring")) c2.setAttribute("r",(r4+4.5).toFixed(1));
+        });
+        const nm=g2.querySelector(".cv-num"); if(nm) nm.setAttribute("y",(-r4-6).toFixed(1));
       });
     };
     cadre.addEventListener("pointerdown",ev=>{
@@ -6382,13 +6387,15 @@ function carteRang(rid,vidSel){
         cases.forEach((g3,k)=>{
           const a3=k===iV;
           g3.classList.toggle("actif",a3);
-          const r4=a3?R*1.42:R;
+          /* le rayon garde son facteur de profondeur, sinon les nœuds
+             reprenaient leur taille de cercle pendant le geste */
+          const r4=ensRayon(k,a3);
           g3.querySelectorAll("circle").forEach(c3=>{
-            if(c3.classList.contains("cv-c")) c3.setAttribute("r",r4);
-            else if(c3.classList.contains("cv-halo")) c3.setAttribute("r",r4+6);
-            else if(c3.classList.contains("cv-ring")) c3.setAttribute("r",r4+4.5);
+            if(c3.classList.contains("cv-c")) c3.setAttribute("r",r4.toFixed(1));
+            else if(c3.classList.contains("cv-halo")) c3.setAttribute("r",(r4+6).toFixed(1));
+            else if(c3.classList.contains("cv-ring")) c3.setAttribute("r",(r4+4.5).toFixed(1));
           });
-          const nu=g3.querySelector(".cv-num"); if(nu) nu.setAttribute("y",-r4-6);
+          const nu=g3.querySelector(".cv-num"); if(nu) nu.setAttribute("y",(-r4-6).toFixed(1));
           const tx=g3.querySelector(".cv-t"); if(tx) tx.setAttribute("y",a3?8:6);
         });
       }
@@ -6397,7 +6404,9 @@ function carteRang(rid,vidSel){
     const fin=()=>{
       if(!drag) return;
       const bougea=drag.bouge, mode=drag.mode; drag=null;
-      anneau.style.transition="";
+      /* place() a coupé les transitions le temps du geste : on les rend,
+         sans quoi le calage final serait sec. */
+      cases.forEach(g2=>{ g2.style.transition=""; });
       if(!bougea||mode!=="tourne") return;
       svg._glisse=Date.now();
       viser(Math.round(-ensoAngle/pas));
