@@ -330,6 +330,16 @@ button.stat{font:inherit;width:100%}
 .eq-v{position:absolute;transform:translate(-50%,-50%);width:24%;
   display:flex;flex-direction:column;align-items:center;gap:3px}
 .eq-d{position:relative;width:56px;height:56px;display:grid;place-items:center}
+/* Disque plein sous la jauge : sans lui, le satellite est un simple anneau
+   et l'on voit le centre au travers quand il passe devant. */
+.eq-d::before{content:"";position:absolute;inset:4px;border-radius:50%;
+  background:radial-gradient(circle at 34% 26%,
+    color-mix(in srgb,var(--vc) var(--pa-a),var(--surf)),
+    color-mix(in srgb,var(--vc) var(--pa-b),var(--surf)));
+  box-shadow:inset 0 1px 0 var(--pa-hi),
+    inset 0 -3px 5px color-mix(in srgb,var(--vc) 12%,transparent);
+  z-index:0}
+.eq-d svg,.eq-k{position:relative;z-index:1}
 .eq-d svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
 .eq-bg{fill:none;stroke:color-mix(in srgb,var(--line) 75%,transparent);stroke-width:4}
 .eq-fg{fill:none;stroke:var(--vc);stroke-width:4;stroke-linecap:round;
@@ -1204,6 +1214,15 @@ html[data-skin="retro"] .opt.no{box-shadow:0 0 12px color-mix(in srgb,var(--shu)
   transform:translate(-50%,-50%) scale(var(--ech,1));
   animation:poseOrbite .8s cubic-bezier(.22,.86,.3,1) backwards;
   transition:transform .2s cubic-bezier(.34,1.4,.5,1)}
+/* Les disques en orbite sont opaques : sans cela, celui qui passe devant
+   laisse voir le centre au travers et l'illusion de profondeur tombe. */
+.orb .rv-d{filter:blur(var(--fl,0px))}
+.orb .eq-d{filter:blur(var(--fl,0px))}
+/* Ombre de contact plus franche pour ce qui est devant */
+.orb[style*="z-index: 3"] .eq-d::before,.orb[style*="z-index: 3"] .rv-d{
+  box-shadow:0 6px 16px rgba(0,0,0,.2),inset 0 1px 0 var(--pa-hi)}
+/* Le voile de l'arrière-plan ne doit pas flouter le texte du satellite. */
+.orb .rv-n,.orb .eq-n,.orb .eq-l{filter:none}
 .roue-v.orb:active,.eq-v.orb:active{
   transform:translate(-50%,-50%) scale(calc(var(--ech,1) * .9))}
 /* Vol depuis le centre, en passant réellement en profondeur. */
@@ -1226,6 +1245,10 @@ html[data-skin="retro"] .opt.no{box-shadow:0 0 12px color-mix(in srgb,var(--shu)
   transform-style:preserve-3d;
   animation:tourne 38s linear infinite;
   animation-delay:calc(var(--i) * -7.6s)}
+/* En orbite continue, l'ombre portée accompagne le passage devant le centre. */
+.eq-orb .eq-d::before{box-shadow:0 5px 14px rgba(0,0,0,.18),
+  inset 0 1px 0 var(--pa-hi),
+  inset 0 -3px 5px color-mix(in srgb,var(--vc) 12%,transparent)}
 /* L'orbite est basculée sur l'axe X : on la voit comme une ellipse. La
    contre-rotation garde chaque disque face au lecteur, et preserve-3d
    laisse le navigateur trier ce qui passe devant ou derrière. */
@@ -2670,6 +2693,7 @@ VIEWS.home=m=>{
       b.style.left=o.x+"%";
       b.style.top =o.y+"%";
       b.style.zIndex=o.plan;
+      b.style.setProperty("--fl",o.fl.toFixed(2)+"px");
       b.style.opacity=o.op.toFixed(3);
       b.style.animationDelay=(0.05+i*0.055)+"s";
       const d=el("span","rv-d");
@@ -2802,6 +2826,7 @@ VIEWS.home=m=>{
     w.style.left=o.x+"%";
     w.style.top =o.y+"%";
     w.style.zIndex=o.plan;
+      w.style.setProperty("--fl",o.fl.toFixed(2)+"px");
     w.style.animationDelay=(0.05+i*0.055)+"s";
     w.title=e.n+" — "+ont+" sur "+need+" · ouvrir cette voie";
     if(!need) w.style.opacity=".45";
@@ -2931,15 +2956,17 @@ function ouvreReglageChapitre(){
    L'inclinaison comprime l'axe vertical : le bas de l'ellipse est devant le
    centre, le haut derrière. Échelle et plan suivent cette profondeur, mais
    les positions restent fixes — donc les boutons restent visables au doigt. */
-const ORB_INCL=26;
+const ORB_INCL=46;
 function orbite(i,n,rayon){
   const a=(-90 + i*(360/n))*Math.PI/180;
   const ci=Math.cos(ORB_INCL*Math.PI/180), si=Math.sin(ORB_INCL*Math.PI/180);
-  const z=Math.sin(a)*si;
+  const z=Math.sin(a)*si;                 /* -0,72 derrière … +0,72 devant */
   return { x:50 + rayon*Math.cos(a)*100,
            y:50 + rayon*Math.sin(a)*ci*100,
-           z:z, ech:1 + 0.15*z,
-           op:1 - 0.18*Math.max(0,-z),
+           z:z,
+           ech:1 + 0.30*z,                /* ~50 % d'écart entre avant et arrière */
+           op:1 - 0.26*Math.max(0,-z),    /* l'arrière s'estompe */
+           fl:Math.max(0,-z)*1.3,         /* et se voile légèrement */
            plan:z>0 ? 3 : 1 };
 }
 
@@ -5732,6 +5759,7 @@ VIEWS.arbre=m=>{
     w.style.left=o.x+"%";
     w.style.top =o.y+"%";
     w.style.zIndex=o.plan;
+      w.style.setProperty("--fl",o.fl.toFixed(2)+"px");
     w.style.animationDelay=(0.05+i*0.055)+"s";
     w.title=e.n+" — "+e.d;
     if(!need) w.style.opacity=".45";
