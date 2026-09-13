@@ -1,7 +1,7 @@
 {
   "name": "みち — compagnon d'étude du japonais",
   "short_name": "みち",
-  "description": "Vocabulaire, kanji, grammaire et entraînement espacé pour apprendre le japonais.",
+  "description": "Vocabulaire, kanji, grammaire et entraînement espacé pour apprendre le japonais. © Felipe Medina.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

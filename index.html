@@ -1,4 +1,14 @@
 <!DOCTYPE html>
+<!--
+  みち — compagnon d'étude du japonais
+  © Felipe Medina. Tous droits réservés.
+
+  Conception, code, explications grammaticales, notes culturelles et
+  traductions par l'auteur. Application indépendante, sans lien avec les
+  éditeurs des manuels cités. Les données linguistiques tierces restent
+  sous leurs licences respectives — le détail figure dans l'application,
+  sous 利用者 → À propos et licences.
+-->
 <html lang="fr">
 <head>
 <meta charset="utf-8">
@@ -8,8 +18,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="みち">
+<meta name="author" content="Felipe Medina">
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 <meta name="googlebot" content="noindex, nofollow">
+<meta name="description" content="みち — compagnon d'étude du japonais, construit autour de Minna no Nihongo.">
+<meta name="copyright" content="© Felipe Medina — tous droits réservés.">
 <meta name="description" content="Compagnon de révision Minna no Nihongo : vocabulaire, kanji, grammaire, entraînement espacé.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -1850,6 +1863,8 @@ function voixDe(t){
 }
 function say(t){ try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(voixDe(t));u.lang="ja-JP";u.rate=.85;speechSynthesis.speak(u);}catch(e){} }
 const isKanji=c=>/[\u4e00-\u9fff\u3005]/.test(c);
+/* Auteur de l'application : repris dans les licences et le pied de page. */
+const AUTEUR="Felipe Medina";
 const VERSION="1.0";
 const KIDX={}; D.kanji.forEach(k=>KIDX[k.c]=k);
 const RIDX={}; D.radicaux.forEach(r=>RIDX[r.c]=r);
@@ -2927,8 +2942,8 @@ VIEWS.users=m=>{
   const lic=el("div");
   lic.innerHTML=`<div style="font-size:0.8125rem;color:var(--mut);line-height:1.6">
     <p style="margin:6px 0"><b>みち</b> — compagnon d'étude du japonais. Version ${VERSION}.</p>
-    <p style="margin:6px 0">Interface, code, explications grammaticales, notes culturelles et traductions :
-    © ${new Date().getFullYear()} — tous droits réservés.</p>
+    <p style="margin:6px 0">Conception, code, explications grammaticales, notes culturelles
+    et traductions : © ${new Date().getFullYear()} ${esc(AUTEUR)} — tous droits réservés.</p>
     <p style="margin:6px 0">Application indépendante, sans lien avec les éditeurs des manuels cités.
     Les données linguistiques ci-dessous restent sous leurs licences respectives.</p>
     </div>`;
