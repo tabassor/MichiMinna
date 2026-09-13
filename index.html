@@ -364,9 +364,12 @@ button.stat{font:inherit;width:100%}
 .ronds{display:grid;grid-template-columns:repeat(4,1fr);
   gap:6px 4px;margin:4px 0 16px;align-items:start}
 @media(max-width:340px){ .ronds{grid-template-columns:repeat(3,1fr)} }
-/* Dans le répertoire, trois colonnes : les libellés y ont plus de place
-   et l'étoile d'épinglage ne mord pas sur le badge voisin. */
-.ronds.rep{grid-template-columns:repeat(3,1fr);gap:10px 6px;margin:8px 0 14px}
+/* Dans le répertoire, trois colonnes et des gouttières resserrées : chaque
+   cellule gagne en largeur, ce qui laisse les libellés longs — Progression,
+   Radicaux, Construire — s'écrire d'un seul tenant. */
+.ronds.rep{grid-template-columns:repeat(3,1fr);gap:14px 2px;margin:8px 0 14px}
+.ronds.rep .rondbtn{min-height:100px}
+.ronds.rep .rb-n{font-size:0.6875rem;max-width:none;padding:0}
 .rondwrap{position:relative;display:flex;justify-content:center;width:100%}
 .rondbtn{background:none;border:0;padding:4px 0 0;cursor:pointer;display:flex;
   flex-direction:column;align-items:center;gap:5px;width:100%;
@@ -380,11 +383,15 @@ button.stat{font:inherit;width:100%}
     color-mix(in srgb,var(--vc) calc(var(--pa-b) + 10%),var(--surf)));
   box-shadow:0 6px 16px color-mix(in srgb,var(--vc) 34%,transparent),
     0 1px 3px rgba(0,0,0,.08),inset 0 1px 0 var(--pa-hi),var(--pa-ring)}
-/* Retour à la ligne normal : -webkit-box empêchait le mot de se couper
-   et le texte était rogné au bord de la cellule. */
-.rb-n{font-size:0.6562rem;color:var(--mut);line-height:1.25;text-align:center;
-  width:100%;padding:0 1px;box-sizing:border-box;
-  overflow-wrap:break-word;word-break:normal;hyphens:auto}
+/* Les libellés ne se coupent jamais au milieu d'un mot : la césure
+   automatique produisait « Le-çons », « Radi-caux », « Pro-gres-sion »
+   alors que les mots tiennent entiers. Ils débordent légèrement de leur
+   cellule si besoin, ce qui est sans conséquence — les cellules sont
+   espacées et le texte reste centré. */
+.rb-n{font-size:0.6562rem;color:var(--mut);line-height:1.3;text-align:center;
+  width:100%;box-sizing:border-box;
+  overflow-wrap:normal;word-break:keep-all;hyphens:none;
+  white-space:normal}
 .rondbtn:hover .rb-n{color:var(--ai)}
 /* Étoile d'épinglage, dans le répertoire */
 .rb-star{position:absolute;top:-2px;right:2px;width:22px;height:22px;border-radius:50%;
