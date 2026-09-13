@@ -2221,21 +2221,25 @@ function conjSheet(key){
 
 
 /* tableau affichable : libellé français, valeur, leçon d'apparition */
+/* Le libellé se limite au nom de la forme : il figure en regard de la forme
+   conjuguée, où le sens n'apporte rien et allonge chaque ligne. Le sens est
+   accessible d'un tap sur le libellé, qui ouvre la fiche de la forme, et
+   listé en clair dans le sélecteur de formes et le rappel 形. */
 const VSPEC=[
- ["ます — présent poli","ます",4],["ません — négatif poli","ません",4],
- ["ました — passé poli","ました",4],["ませんでした","ませんでした",4],
- ["たい — envie de","たい",13],
- ["て — forme て","て",14],["ています — en cours","ています",14],
- ["ない — forme ない","ない",17],
- ["辞書 — dictionnaire","辞書",18],
- ["た — passé neutre","た",19],["なかった — passé nég. neutre","なかった",20],
- ["たら — si, quand","たら",25],
- ["可能 — potentiel","可能",27],
- ["意向 — volitif","意向",31],
- ["命令 — impératif","命令",33],["禁止 — prohibitif","禁止",33],
- ["ば — conditionnel","ば",35],
- ["受身 — passif","受身",37],
- ["使役 — causatif","使役",48],["使役受身 — causatif-passif","使役受身",48]
+ ["ます","ます",4],["ません","ません",4],
+ ["ました","ました",4],["ませんでした","ませんでした",4],
+ ["たい","たい",13],
+ ["て","て",14],["ています","ています",14],
+ ["ない","ない",17],
+ ["辞書","辞書",18],
+ ["た","た",19],["なかった","なかった",20],
+ ["たら","たら",25],
+ ["可能","可能",27],
+ ["意向","意向",31],
+ ["命令","命令",33],["禁止","禁止",33],
+ ["ば","ば",35],
+ ["受身","受身",37],
+ ["使役","使役",48],["使役受身","使役受身",48]
 ];
 const DERIVED={"可能":1,"受身":1,"使役":1,"使役受身":1,"ています":1};
 function conjTable(w,all){
@@ -2258,10 +2262,13 @@ function conjTable(w,all){
   });
   return rows;
 }
+/* Pour les adjectifs, les premières formes n'ont pas de nom japonais : le
+   français est alors le seul libellé possible. Les suivantes en ont un, on
+   s'y tient, comme pour les verbes. */
 const ASPEC=[
  ["présent","p",8],["négatif","n",8],["passé","pa",12],["passé négatif","pn",12],
- ["adverbe","adv",19],["devient…","naru",19],["si… (たら)","tara",25],["même si… (ても)","temo",25],
- ["conditionnel (ば)","ba",35],["trop… (すぎる)","sugi",44]
+ ["adverbe","adv",19],["なる","naru",19],["たら","tara",25],["ても","temo",25],
+ ["ば","ba",35],["すぎる","sugi",44]
 ];
 function adjTable(w,all,forceKana){
   if(!["ai","na"].includes(w.c)) return null;
