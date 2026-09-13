@@ -5690,7 +5690,8 @@ function wordSheet(t){
   back.innerHTML=`<div class="sheetbox">
     <div class="sheethead">
       <div><div class="jpx" style="font-size:1.75rem;line-height:1.2">${jp(t)}</div>
-      ${info&&info.k&&info.k!==t?`<div style="font-size:0.8125rem;color:var(--mut)">${esc(info.k)}</div>`:""}</div>
+      ${info&&info.k&&info.k!==t?`<div style="font-size:0.8125rem;color:var(--mut)">${esc(info.k)}</div>`:""}
+      <div id="shDic" style="font-size:0.7812rem;color:var(--dim);margin-top:2px"></div></div>
       <button class="ico" id="shSay">🔊</button>
       <button class="ico" id="shX">✕</button></div>
     ${info?`<div class="sheetfr">${esc(info.f)}</div>
@@ -5714,6 +5715,15 @@ function wordSheet(t){
   const wA=words(50).find(x=>x.k===t||x.j===t)||(info&&info.k?{k:info.k,j:info.j}:null);
   if(wA){ const ab=accentBloc(wA); if(ab) $("#shAcc",back).replaceWith(ab); }
   const wV=(wA&&wA.c)?wA:(info?words(50).find(x=>x.k===info.k||x.j===info.j):null);
+  /* Rappel de la forme du dictionnaire : le titre montre ce qu'on a touché,
+     qui peut être la forme ~ます. Savoir sous quelle entrée le mot se cherche
+     est utile, sans pour autant remplacer ce que l'on a cliqué. */
+  if(wV&&["v1","v2","v3"].includes(wV.c)){
+    const fv2=forms(wV);
+    const dic=fv2?(((fv2.kanji&&fv2.kanji.辞書)||fv2.辞書)):null;
+    const zd=$("#shDic",back);
+    if(zd&&dic&&dic!==t) zd.innerHTML="forme du dictionnaire : "+jpn(dic);
+  }
   if(wV&&["v1","v2","v3"].includes(wV.c)){
     const vb=verbeResume(wV); if(vb) $("#shVerb",back).replaceWith(vb);
   }
@@ -7307,7 +7317,15 @@ VIEWS.conjug=m=>{
     vs.filter(w=>!q||w.k.includes(q)||w.j.includes(q)||w.f.toLowerCase().includes(q.toLowerCase())).slice(0,60).forEach(w=>{
       const rows=anyTable(w,cjAll); if(!rows||!rows.length) return;
       const c=el("div","card");
-      c.innerHTML=`<h3><span class="jpx">${jp(disp(w))}</span> <span class="tag">${CATS[w.c]}</span> <span class="tag">L${w.l}</span></h3>
+      /* Le titre porte la forme neutre — celle du dictionnaire pour un verbe,
+         la forme brute pour un adjectif. C'est l'entrée sous laquelle le mot
+         se cherche, et c'est déjà ce qu'affiche le dictionnaire. La forme
+         ~ます reste dans le tableau juste en dessous. */
+      const vf=forms(w);
+      const titre = vf ? ((S.script==="kana"||!w.j) ? vf.辞書
+                                                   : ((vf.kanji&&vf.kanji.辞書)||vf.辞書))
+                       : disp(w);
+      c.innerHTML=`<h3><span class="jpx">${jp(titre)}</span> <span class="tag">${CATS[w.c]}</span> <span class="tag">L${w.l}</span></h3>
         <div style="font-size:0.8125rem;color:var(--mut)">${esc(w.f)}</div>`;
       const g=el("div","conj");
       rows.forEach(r=>{
