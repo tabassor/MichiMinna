@@ -3,15 +3,17 @@
   みち — compagnon d'étude du japonais
   © Felipe Medina. Tous droits réservés.
 
-  Conception, code, explications grammaticales, notes culturelles et
-  traductions par l'auteur. Les exercices, phrases d'exemple et textes de
-  lecture sont originaux : seul l'ordre d'introduction du vocabulaire et de
-  la grammaire suit celui de Minna no Nihongo, pour que l'application reste
-  utilisable en parallèle du manuel. Aucun contenu de celui-ci n'est
-  reproduit. Application indépendante, ni éditée ni approuvée par les
-  éditeurs des manuels cités. Les données linguistiques tierces restent
-  sous leurs licences respectives — le détail figure dans l'application,
-  sous 利用者 → À propos et licences.
+  Conception, architecture, code et interface par l'auteur. La sélection,
+  l'organisation et la mise en forme des contenus constituent une base de
+  données protégée.
+
+  Seul l'ordre d'introduction du vocabulaire et de la grammaire suit celui
+  de Minna no Nihongo, pour que l'application reste utilisable en parallèle
+  du manuel ; aucun contenu de celui-ci n'est reproduit. Application
+  indépendante, ni éditée ni approuvée par les éditeurs des manuels cités.
+
+  Les données linguistiques tierces restent sous leurs licences respectives
+  — le détail figure dans l'application, sous 利用者 → À propos et licences.
 -->
 <html lang="fr">
 <head>
@@ -26,7 +28,7 @@
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 <meta name="googlebot" content="noindex, nofollow">
 <meta name="description" content="みち — compagnon d'étude du japonais, construit autour de Minna no Nihongo.">
-<meta name="copyright" content="© Felipe Medina — tous droits réservés.">
+<meta name="copyright" content="© Felipe Medina — conception, code et base de données. Tous droits réservés.">
 <meta name="description" content="Compagnon de révision Minna no Nihongo : vocabulaire, kanji, grammaire, entraînement espacé.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -2946,8 +2948,8 @@ VIEWS.users=m=>{
   const lic=el("div");
   lic.innerHTML=`<div style="font-size:0.8125rem;color:var(--mut);line-height:1.6">
     <p style="margin:6px 0"><b>みち</b> — compagnon d'étude du japonais. Version ${VERSION}.</p>
-    <p style="margin:6px 0">Conception, code, explications grammaticales, notes culturelles
-    et traductions : © ${new Date().getFullYear()} ${esc(AUTEUR)} — tous droits réservés.</p>
+    <p style="margin:6px 0">© ${new Date().getFullYear()} ${esc(AUTEUR)} — tous droits réservés.
+    Conception, architecture, code et interface.</p>
     <p style="margin:6px 0">Application indépendante, sans lien avec les éditeurs des manuels cités.
     Les données linguistiques ci-dessous restent sous leurs licences respectives.</p>
     </div>`;
@@ -2973,9 +2975,9 @@ VIEWS.users=m=>{
     <i>Minna no Nihongo Shokyū I &amp; II</i>, © 3A Corporation (スリーエーネットワーク),
     afin de rester utilisable en parallèle du manuel. Aucun contenu n'en est reproduit :
     ni ses phrases, ni ses exercices, ni ses textes.</p>
-    <p style="margin:6px 0"><b>Exercices, phrases d'exemple, textes de lecture, explications
-    grammaticales, notes culturelles et traductions</b> — écrits pour cette application.
-    Les cent séries d'exercices, leurs phrases et leurs corrigés sont originaux.</p>
+    <p style="margin:6px 0"><b>Contenus</b> — la sélection, l'organisation et la mise en forme
+    de l'ensemble des contenus constituent une base de données protégée. Les contenus
+    originaux ont été produits pour cette application ; aucun contenu tiers n'y est reproduit.</p>
     <p style="margin:6px 0">Application indépendante : elle n'est ni éditée, ni approuvée,
     ni soutenue par 3A Corporation, et ne se substitue pas au manuel.</p>
     </div>`;
