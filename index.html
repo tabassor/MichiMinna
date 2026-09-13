@@ -13,7 +13,7 @@
 <meta name="description" content="Compagnon de révision Minna no Nihongo : vocabulaire, kanji, grammaire, entraînement espacé.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192-v3.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192-v4.png">
 <title>みち — compagnon d'étude du japonais</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3357,6 +3357,25 @@ function ouvreReglageChapitre(){
   document.body.appendChild(back);
   back.onclick=e=>{ if(e.target===back){ back.remove(); render(); } };
 }
+/* Section repliable pour tout ce qui relève de l'installation ou du réglage.
+   Le pli par défaut suit le contexte : ouverte tant que la chose reste à
+   faire, refermée une fois qu'elle est faite. On ne cache donc jamais à un
+   débutant l'étape qu'il doit accomplir, et on n'encombre pas l'écran de
+   celui qui a déjà tout en place. L'utilisateur peut forcer l'un ou l'autre,
+   et son choix prime ensuite. */
+function sectionRepliable(m,cle,titre,ouvertParDefaut,remplir){
+  const forcee=(S.plis||{})[cle];
+  const ouvert = forcee===undefined ? ouvertParDefaut : !!forcee;
+  const c=el("div","card");
+  const t=el("button","replitete");
+  t.innerHTML=`<span>${titre}</span><i>${ouvert?"▲":"▾"}</i>`;
+  t.onclick=()=>{ S.plis=S.plis||{}; S.plis[cle]=ouvert?0:1; save(); render(); };
+  c.appendChild(t);
+  if(ouvert) remplir(c);
+  m.appendChild(c);
+  return c;
+}
+
 /* Rappel du sens de chaque forme conjuguée. Volontairement bref : la règle
    de formation complète vit dans les fiches de 要点, on ne la duplique pas. */
 function ouvreRappelFormes(){
@@ -8851,11 +8870,18 @@ VIEWS.manuel=m=>{
   m.appendChild(c);
 
   if(!MANUELS.length) return;
+  /* Une fois au moins un volume importé, l'index des pages et les réglages
+     passent sous un pli : on n'y revient qu'à l'occasion. */
 
   /* --- l'index des pages --- */
   S.pages=S.pages||{};
+  /* Combien de leçons ont déjà leur page ? Si l'index est rempli, on replie. */
+  let nPages=0;
+  for(let l=1;l<=50;l++) if(manuelDe(l)&&S.pages[l]) nPages++;
+  let nAttendu=0;
+  for(let l=1;l<=50;l++) if(manuelDe(l)) nAttendu++;
+  const indexFait = nAttendu>0 && nPages>=nAttendu*0.8;
   const ix=el("div","card");
-  ix.appendChild(el("div","sec","À quelle page commence chaque leçon ?"));
   ix.appendChild(el("div","note","Ouvrez le PDF, relevez le numéro de page affiché par votre lecteur, et saisissez-le. Une seule fois."));
   const g=el("div","pgrid");
   for(let l=1;l<=50;l++){
@@ -8899,7 +8925,9 @@ VIEWS.manuel=m=>{
   bz.onclick=()=>{ if(confirm("Effacer tout l'index des pages ?")){ S.pages={}; save(); render(); } };
   cc.appendChild(bp); cc.appendChild(bz);
   ix.appendChild(cc);
-  m.appendChild(ix);
+  sectionRepliable(m,"manuel:index",
+    "À quelle page commence chaque leçon ?"+(nPages?' <b style="color:var(--take)">· '+nPages+"/"+nAttendu+"</b>":""),
+    !indexFait, c2=>{ while(ix.firstChild) c2.appendChild(ix.firstChild); });
 
   /* Recherche plein texte dans les PDF importés qui ont été extraits.
      Simple parcours de chaque page ; on affiche les pages qui contiennent
@@ -9789,8 +9817,10 @@ VIEWS.audio=m=>{
   /* La prose explicative est passée sous le bouton « i » du titre : elle
      disait exactement la même chose et occupait le haut de l'écran en
      permanence. Ne restent ici que les actions. */
+  /* Installation : ouverte tant qu'aucune piste n'est en place, refermée
+     ensuite — on n'y revient qu'en cas de besoin. */
+  const dejaDesPistes=!!(audCache&&audCache.length);
   const src=el("div","card");
-  src.appendChild(el("div","sec","Où trouver les fichiers"));
   const lk=el("div","ctrl"); lk.style.marginTop="10px";
   [["Écouter en ligne — leçons 1 à 25",25],["Écouter en ligne — leçons 26 à 50",50]].forEach(([lab,n])=>{
     const a=el("button","btn",lab);
@@ -9874,7 +9904,9 @@ VIEWS.audio=m=>{
     dl.appendChild(bz);
   });
   src.appendChild(dl); src.appendChild(etat);
-  m.appendChild(src);
+  sectionRepliable(m,"audio:src","Installer l'audio",!dejaDesPistes,c=>{
+    while(src.firstChild) c.appendChild(src.firstChild);
+  });
 
   m.appendChild(moletteChapitre(audLes,S.ch,v=>{ audLes=v; render(); }));
 
