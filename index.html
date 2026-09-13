@@ -1622,6 +1622,32 @@ nav button.on .jp{filter:drop-shadow(0 1px 0 var(--pa-hi))
 /* Rangées de pastilles de niveau, resserrées */
 .ronds.niveaux{grid-template-columns:repeat(auto-fit,minmax(64px,1fr));
   gap:8px 4px;max-width:420px;margin-left:auto;margin-right:auto}
+
+/* Menu utilisateur : réglages en lignes lisibles plutôt qu'en liste plate */
+.sreg{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  width:100%;text-align:left;padding:11px 10px;margin-top:2px;
+  border-radius:var(--r-sm);border:1px solid transparent;background:none;
+  cursor:pointer;font-family:var(--ui);
+  transition:background .16s ease,border-color .16s ease}
+.sreg:hover{border-color:var(--line);background:color-mix(in srgb,var(--ai) 4%,transparent)}
+.sreg:active{transform:scale(.99)}
+.sr-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.sr-t b{font-size:0.875rem;font-weight:500;color:var(--tx)}
+.sr-t i{font-style:normal;font-size:0.7188rem;color:var(--dim);line-height:1.3}
+.sr-v{flex:0 0 auto;font-size:0.7812rem;color:var(--ai);font-weight:600;
+  padding:4px 11px;border-radius:99px;
+  border:1px solid color-mix(in srgb,var(--ai) 30%,var(--line));
+  background:radial-gradient(circle at 34% 26%,
+    color-mix(in srgb,var(--ai) 6%,var(--surf)),
+    color-mix(in srgb,var(--ai) 18%,var(--surf)));
+  box-shadow:0 1px 3px rgba(0,0,0,.05),inset 0 1px 0 var(--pa-hi)}
+/* Avatars de profil */
+.ronds.profils{grid-template-columns:repeat(auto-fit,minmax(86px,1fr));
+  max-width:440px;margin:8px auto 18px}
+.rond-k.ajout{border-style:dashed;opacity:.7}
+.profils .rondbtn.sel .rond-k{box-shadow:0 0 0 3px color-mix(in srgb,var(--ai) 22%,transparent),
+  0 4px 12px color-mix(in srgb,var(--ai) 30%,transparent),inset 0 1px 0 var(--pa-hi)}
+.profils .rondbtn.sel .rb-n{color:var(--ai);font-weight:700}
 </style>
 </head>
 <body>
@@ -2750,74 +2776,127 @@ document.addEventListener("click",e=>{
 
 /* ================= profils ================= */
 VIEWS.users=m=>{
-  head(m,"利用者","Plusieurs personnes peuvent réviser sur cet appareil");
-  const c=el("div","card");
-  if(!USERS.length) c.appendChild(el("div","empty","<b>人</b>Aucun profil pour le moment."));
+  head(m,"利用者","Plusieurs personnes peuvent réviser sur cet appareil",
+    "Chaque profil a sa propre progression, ses favoris et ses réglages. Rien n'est partagé entre eux, et tout reste sur cet appareil.");
+
+  /* Les profils en avatars ronds : on les distingue d'un coup d'œil et le
+     profil actif se voit sans avoir à lire une étiquette. */
+  const gp=el("div","ronds profils");
   USERS.forEach(u=>{
-    const r=el("div","urow");
-    r.innerHTML=`<div class="ava">${esc([...u.n][0])}</div>
-      <div class="n"><b>${esc(u.n)}</b><span>${u.id===UID?"profil actif":"toucher pour activer"}</span></div>`;
-    const del=el("button","ico","✕"); del.title="Supprimer";
-    del.onclick=async ev=>{ ev.stopPropagation();
-      if(!confirm("Supprimer le profil « "+u.n+" » et toute sa progression ?")) return;
-      USERS=USERS.filter(x=>x.id!==u.id); await sSet("michi:u:"+u.id,"");
-      if(UID===u.id){ UID=USERS.length?USERS[0].id:null; }
-      await saveUsers();
-      if(UID) switchUser(UID); else { S=NEW(); render(); }
-    };
-    r.appendChild(del);
-    r.querySelector(".n").onclick=()=>switchUser(u.id);
-    r.querySelector(".ava").onclick=()=>switchUser(u.id);
-    c.appendChild(r);
+    const actif=u.id===UID;
+    const w=el("div","rondwrap");
+    const b2=el("button","rondbtn"+(actif?" sel":""));
+    b2.appendChild(rondK([...u.n][0],"var(--ai)",58));
+    b2.appendChild(el("span","rb-n",esc(u.n)));
+    b2.onclick=()=>{ if(!actif) switchUser(u.id); };
+    w.appendChild(b2);
+    if(!actif){
+      const del=el("button","rb-star","✕");
+      del.title="Supprimer ce profil";
+      del.onclick=async ev=>{ ev.stopPropagation();
+        if(!confirm("Supprimer le profil « "+u.n+" » et toute sa progression ?")) return;
+        USERS=USERS.filter(x=>x.id!==u.id); await sSet("michi:u:"+u.id,"");
+        if(UID===u.id){ UID=USERS.length?USERS[0].id:null; }
+        await saveUsers();
+        if(UID) switchUser(UID); else { S=NEW(); render(); }
+      };
+      w.appendChild(del);
+    }
+    gp.appendChild(w);
   });
-  m.appendChild(c);
+  /* Ajouter un profil, sous la même forme que les autres */
+  const wa=el("div","rondwrap");
+  const ba=el("button","rondbtn");
+  const da=rondK("＋","var(--dim)",58); da.classList.add("ajout");
+  ba.appendChild(da);
+  ba.appendChild(el("span","rb-n","Nouveau"));
+  ba.onclick=()=>{
+    const n=prompt("Prénom du nouveau profil :","");
+    if(n&&n.trim()) createUser(n.trim().slice(0,20));
+  };
+  wa.appendChild(ba); gp.appendChild(wa);
+  m.appendChild(gp);
+  if(!USERS.length) m.appendChild(el("div","empty","<b>人</b>Aucun profil pour le moment."));
 
-  const nc=el("div","card");
-  nc.appendChild(el("h3",null,"Nouveau profil"));
-  const inp=el("input","search"); inp.placeholder="Prénom"; inp.maxLength=20; nc.appendChild(inp);
-  const b=el("button","btn p w","Créer le profil");
-  b.onclick=()=>{ const n=inp.value.trim(); if(!n) return; createUser(n); };
-  nc.appendChild(b); m.appendChild(nc);
-
-  const st=el("div","card");
-  st.appendChild(el("h3",null,"Réglages"));
-  const row=(lab,ctlText,fn)=>{ const r=el("div","urow");
-    r.innerHTML=`<div class="n"><b>${lab}</b></div>`;
-    const btn=el("button","chip",ctlText); btn.onclick=fn; r.appendChild(btn); st.appendChild(r); };
-  row("Écriture affichée", S.script==="kana"?"Kana":"Kanji", ()=>{S.script=S.script==="kana"?"kanji":"kana";save();render();});
-  row("Furigana", S.furi?"Activés":"Désactivés", ()=>{S.furi=S.furi?0:1;save();render();});
+  /* Les réglages, groupés par domaine et repliés. Ils étaient alignés en
+     une seule liste de seize lignes : impossible d'y retrouver quoi que ce
+     soit, et l'écran défilait sans fin avant d'atteindre le reste. */
+  const reglage=(hote,lab,valeur,fn,aide)=>{
+    const r=el("button","sreg");
+    r.innerHTML=`<span class="sr-t"><b>${lab}</b>${aide?`<i>${aide}</i>`:""}</span>
+      <span class="sr-v">${valeur}</span>`;
+    r.onclick=fn;
+    hote.appendChild(r);
+  };
   const TZ=["auto","Europe/Paris","Europe/Brussels","Europe/Zurich","America/Montreal","Asia/Tokyo","Indian/Reunion","Pacific/Noumea"];
-  const tzName=t=>t==="auto"?("Automatique — "+(Intl.DateTimeFormat().resolvedOptions().timeZone||"système")):t.split("/")[1].replace("_"," ");
-  row("Blocs pièges", S.leurres===0?"Aucun":"Oui",
-      ()=>{ S.leurres=(S.leurres===0)?1:0; save(); render(); });
-  row("Construction de phrases",
+  const tzName=t=>t==="auto"?("Automatique"):t.split("/")[1].replace("_"," ");
+
+  sectionRepliable(m,"reg:affichage","Affichage",false,c2=>{
+    reglage(c2,"Écriture affichée",S.script==="kana"?"Kana":"Kanji",
+      ()=>{S.script=S.script==="kana"?"kanji":"kana";save();render();},
+      "Kanji ou tout en kana");
+    reglage(c2,"Furigana",S.furi?"Activés":"Désactivés",
+      ()=>{S.furi=S.furi?0:1;save();render();},
+      "Lecture au-dessus des kanji");
+    reglage(c2,"Traductions françaises",
+      S.tr==="visible"?"Toujours":"À la demande",
+      ()=>{S.tr=S.tr==="visible"?"demande":"visible";save();render();},
+      "Sous les phrases japonaises");
+    reglage(c2,"Traduction au toucher",S.gloss?"Activée":"Désactivée",
+      ()=>{S.gloss=S.gloss?0:1;save();render();},
+      "Toucher un mot en donne le sens");
+    const tsr=el("div","vsous"); tsr.style.marginTop="10px";
+    tsr.appendChild(el("span","vlab","Taille du texte :"));
+    [[1,"Normal"],[1.15,"Confort"],[1.3,"Grand"],[1.5,"Très grand"],[1.75,"Maximum"]].forEach(([v,l])=>{
+      const b3=el("button","vchip"+(Math.abs((S.fs||1)-v)<0.01?" on":""),l);
+      b3.style.setProperty("--vc","var(--ai)");
+      b3.onclick=()=>{S.fs=v;save();render();}; tsr.appendChild(b3);
+    });
+    c2.appendChild(tsr);
+    c2.appendChild(el("div","note",
+      '<span class="jpx" style="font-size:1rem">日本語を勉強しています。</span><br>'+
+      '<span style="font-size:0.7812rem">Aperçu — J\'étudie le japonais.</span>'));
+  });
+
+  sectionRepliable(m,"reg:entrainement","Entraînement",false,c2=>{
+    reglage(c2,"Objectif quotidien",S.goal+" questions",
+      ()=>{S.goal=S.goal>=40?10:S.goal+10;save();render();},
+      "Ce que vise la jauge de l'accueil");
+    reglage(c2,"Réponses",
+      {auto:"Adaptées",saisie:"Écrites",mixte:"Alternées",qcm:"À choix"}[S.input||"auto"],
+      ()=>{ const o=["auto","saisie","mixte","qcm"];
+            S.input=o[(o.indexOf(S.input||"auto")+1)%o.length]; save(); render(); },
+      "Saisie libre ou choix multiple");
+    reglage(c2,"Propositions masquées",S.hideOpts?"Oui":"Non",
+      ()=>{S.hideOpts=S.hideOpts?0:1;save();render();},
+      "Chercher avant de voir les choix");
+    reglage(c2,"Blocs pièges",S.leurres===0?"Aucun":"Oui",
+      ()=>{ S.leurres=(S.leurres===0)?1:0; save(); render(); },
+      "Blocs en trop dans les phrases à bâtir");
+    reglage(c2,"Construction de phrases",
       S.compo==="saisie"?"Saisie libre":(S.compo==="fin"?"Blocs fins":"Blocs"),
       ()=>{ const o=["blocs","fin","saisie"];
             S.compo=o[(o.indexOf(S.compo||"blocs")+1)%o.length]; save(); render(); });
-  row("Revoir la présentation","3 écrans",()=>{ guideEtape=0; go("guide"); });
-  row("Fuseau horaire", tzName(S.tz||"auto"),
-      ()=>{ const i=TZ.indexOf(S.tz||"auto"); S.tz=TZ[(i+1)%TZ.length]; tickDay(); save(); render(); });
-  row("Objectif quotidien", S.goal+" questions", ()=>{S.goal=S.goal>=40?10:S.goal+10;save();render();});
-  row("Nœuds ouverts par voie",
-      S.libre?"Rang entier — parcours libre":(S.fenetre||3)+" à la fois",
+  });
+
+  sectionRepliable(m,"reg:parcours","Parcours",false,c2=>{
+    reglage(c2,"Nœuds ouverts par voie",
+      S.libre?"Rang entier":(S.fenetre||3)+" à la fois",
       ()=>{ const o=[2,3,5,"libre"]; const cur=S.libre?"libre":(S.fenetre||3);
             const nx=o[(o.indexOf(cur)+1)%o.length];
             if(nx==="libre"){S.libre=1;} else {S.libre=0;S.fenetre=nx;}
-            save(); render(); });
-  row("Mode grand débutant (kana)", S.kana?"Activé":"Désactivé",
-      ()=>{S.kana=S.kana?0:1; poolCache=null; save(); render();});
-  row("Traductions françaises",
-      S.tr==="visible"?"Toujours affichées":"À la demande (bouton 訳)",
-      ()=>{S.tr=S.tr==="visible"?"demande":"visible";save();render();});
-  row("Traduction des mots au toucher", S.gloss?"Activée":"Désactivée",
-      ()=>{S.gloss=S.gloss?0:1;save();render();});
-  row("Propositions masquées au départ", S.hideOpts?"Oui":"Non",
-      ()=>{S.hideOpts=S.hideOpts?0:1;save();render();});
-  row("Réponses à l'entraînement",
-      {auto:"Adaptées à la question",saisie:"Toujours écrites",mixte:"Alternées",qcm:"Toujours à choix"}[S.input||"auto"],
-      ()=>{ const o=["auto","saisie","mixte","qcm"];
-            S.input=o[(o.indexOf(S.input||"auto")+1)%o.length]; save(); render(); });
-  m.appendChild(st);
+            save(); render(); },
+      "Combien de nœuds jouables en même temps");
+    reglage(c2,"Mode grand débutant",S.kana?"Activé":"Désactivé",
+      ()=>{S.kana=S.kana?0:1; poolCache=null; save(); render();},
+      "Ajoute les kana au parcours");
+    reglage(c2,"Fuseau horaire",tzName(S.tz||"auto"),
+      ()=>{ const i2=TZ.indexOf(S.tz||"auto"); S.tz=TZ[(i2+1)%TZ.length]; tickDay(); save(); render(); },
+      "Détermine le changement de jour");
+    reglage(c2,"Revoir la présentation","3 écrans",
+      ()=>{ guideEtape=0; go("guide"); });
+  });
+
 
   if(PROMPT||!INSTALLED){
     const ic=el("div","card");
@@ -2836,20 +2915,10 @@ VIEWS.users=m=>{
     m.appendChild(ic);
   }
 
-  const ts=el("div","card");
-  ts.appendChild(el("h3",null,"Taille du texte"));
-  const tsr=el("div","filters");
-  [[1,"Normal"],[1.15,"Confortable"],[1.3,"Grand"],[1.5,"Très grand"],[1.75,"Maximum"]].forEach(([v,l])=>{
-    const b=el("button","chip"+(Math.abs((S.fs||1)-v)<0.01?" on":""),l);
-    b.onclick=()=>{S.fs=v;save();render();}; tsr.appendChild(b);
-  });
-  ts.appendChild(tsr);
-  ts.appendChild(el("div",null,'<span class="jpx" style="font-size:1rem">日本語を勉強しています。</span><br><span style="font-size:0.8125rem;color:var(--mut)">Aperçu — J\'étudie le japonais.</span>'));
-  m.appendChild(ts);
 
-  const lic=el("div","card");
-  lic.appendChild(el("h3",null,"À propos et licences"));
-  lic.innerHTML+=`<div style="font-size:0.8125rem;color:var(--mut);line-height:1.6">
+
+  const lic=el("div");
+  lic.innerHTML=`<div style="font-size:0.8125rem;color:var(--mut);line-height:1.6">
     <p style="margin:6px 0"><b>みち</b> — compagnon d'étude du japonais. Version ${VERSION}.</p>
     <p style="margin:6px 0">Interface, code, explications grammaticales, notes culturelles et traductions :
     © ${new Date().getFullYear()} — tous droits réservés.</p>
@@ -2878,7 +2947,9 @@ VIEWS.users=m=>{
     Cette application est un outil de révision personnel, sans lien avec l'éditeur ni son approbation.</p>
     <p style="margin:6px 0"><b>Textes français, explications et notes culturelles</b> — rédigés pour cette application.</p>
     </div>`;
-  m.appendChild(lic);
+  sectionRepliable(m,"reg:licences","À propos et licences",false,c2=>{
+    while(lic.firstChild) c2.appendChild(lic.firstChild);
+  });
 
   const ap=el("div","card");
   ap.appendChild(el("h3",null,"Apparence"));
