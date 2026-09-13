@@ -1461,6 +1461,167 @@ nav button:active{transform:translateY(1px) scale(.94)}
   .crow .cch,.ccell{transition:none!important}
   .crow:active .cch,.ccell:active{transform:none!important}
 }
+
+/* ============ Lot 1 : textures manquantes ============ */
+
+/* La roue du menu d'exercices utilisait la règle de base .rv-d, qui n'avait
+   jamais reçu le traitement de relief — seule la variante de l'accueil
+   l'avait. Le dégradé part désormais de la surface, pas du transparent. */
+.roue-v .rv-d{
+  border:1px solid color-mix(in srgb,var(--vc) var(--pa-bd),var(--line));
+  box-sizing:border-box;
+  background:radial-gradient(circle at 34% 26%,
+    color-mix(in srgb,var(--vc) var(--pa-a),var(--surf)),
+    color-mix(in srgb,var(--vc) var(--pa-b),var(--surf)));
+  box-shadow:0 3px 9px color-mix(in srgb,var(--vc) calc(var(--pa-om)*100%),transparent),
+    0 1px 2px rgba(0,0,0,.06),
+    inset 0 1px 0 var(--pa-hi),
+    inset 0 -3px 5px color-mix(in srgb,var(--vc) 12%,transparent),
+    var(--pa-ring)}
+.roue-v:hover .rv-d{
+  box-shadow:0 6px 16px color-mix(in srgb,var(--vc) 34%,transparent),
+    0 1px 3px rgba(0,0,0,.08),inset 0 1px 0 var(--pa-hi),var(--pa-ring)}
+.roue-v.sel .rv-d{
+  background:radial-gradient(circle at 34% 26%,
+    color-mix(in srgb,var(--vc) 72%,#fff),var(--vc));
+  box-shadow:0 0 0 4px color-mix(in srgb,var(--vc) 20%,transparent),
+    0 4px 14px color-mix(in srgb,var(--vc) 38%,transparent),
+    inset 0 1px 0 rgba(255,255,255,.35)}
+.roue-v .rv-k{text-shadow:0 1px 1px var(--pa-hi)}
+.roue-v.sel .rv-k{text-shadow:0 1px 3px rgba(0,0,0,.25)}
+
+/* Cases de caractères : même matière que les pastilles, en carré adouci.
+   Dégradé radial décalé vers le haut-gauche plutôt qu'un simple linéaire. */
+.kcell{
+  background:radial-gradient(115% 115% at 30% 22%,
+    color-mix(in srgb,var(--surf) 98%,#fff),
+    color-mix(in srgb,var(--line) 30%,var(--surf)));
+  box-shadow:0 3px 7px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.03),
+    inset 0 1px 0 var(--pa-hi),
+    inset 0 -3px 5px color-mix(in srgb,var(--line) 22%,transparent),
+    var(--pa-ring)}
+.kcell:active{box-shadow:0 1px 2px rgba(0,0,0,.07),
+  inset 0 2px 5px rgba(0,0,0,.07)}
+/* Les cases marquées par un niveau JLPT prennent la teinte correspondante. */
+.kcell.n5,.kcell.n4{
+  background:radial-gradient(115% 115% at 30% 22%,
+    color-mix(in srgb,var(--take) 4%,var(--surf)),
+    color-mix(in srgb,var(--take) 16%,var(--surf)))}
+.kcell.n1,.kcell.n2,.kcell.n3{
+  background:radial-gradient(115% 115% at 30% 22%,
+    color-mix(in srgb,var(--shu) 4%,var(--surf)),
+    color-mix(in srgb,var(--shu) 14%,var(--surf)))}
+.kcell.rad{
+  background:radial-gradient(115% 115% at 30% 22%,
+    color-mix(in srgb,var(--shu) 5%,var(--surf)),
+    color-mix(in srgb,var(--shu) 18%,var(--surf)))}
+
+/* Kanji de titre : gravé plutôt que posé à plat. Le dégradé de texte donne
+   la lumière rasante, l'ombre portée le détache du fond. */
+h1 .jpx{
+  background:linear-gradient(168deg,
+    color-mix(in srgb,var(--tx) 88%,#fff),
+    color-mix(in srgb,var(--tx) 100%,transparent));
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;color:transparent;
+  filter:drop-shadow(0 1px 0 var(--pa-hi)) drop-shadow(0 2px 4px rgba(0,0,0,.14))}
+/* Le kanji des onglets du bas prend le même galbe, en plus discret. */
+nav button .jp{filter:drop-shadow(0 1px 0 var(--pa-hi))}
+nav button.on .jp{filter:drop-shadow(0 1px 0 var(--pa-hi))
+  drop-shadow(0 2px 5px color-mix(in srgb,var(--ai) 40%,transparent))}
+
+/* JLPT : les pastilles de niveau et les cases héritent du relief ci-dessus ;
+   on ajoute la marque de l'anneau de progression. */
+.jl-an .an-fg{filter:drop-shadow(0 0 3px color-mix(in srgb,var(--ai) 45%,transparent))}
+
+/* Titre de page avec son bouton d'information */
+.htitre{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.htitre h1{margin:0;flex:1;min-width:0}
+.btn-i{flex:0 0 auto;width:30px;height:30px;border-radius:50%;margin-top:6px;
+  border:1px solid var(--line);color:var(--dim);font-family:var(--tit);
+  font-size:0.9375rem;font-style:italic;line-height:1;cursor:pointer;padding:0;
+  background:radial-gradient(circle at 34% 28%,var(--surf),
+    color-mix(in srgb,var(--line) 26%,var(--surf)));
+  box-shadow:0 2px 5px rgba(0,0,0,.06),inset 0 1px 0 var(--pa-hi);
+  transition:transform .13s ease,box-shadow .2s ease,color .18s ease,border-color .18s ease}
+.btn-i:active{transform:scale(.9)}
+.btn-i.on{border-color:var(--ai);color:var(--ai);
+  background:radial-gradient(circle at 34% 28%,
+    color-mix(in srgb,var(--ai) 8%,var(--surf)),
+    color-mix(in srgb,var(--ai) 24%,var(--surf)));
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--ai) 15%,transparent),
+    inset 0 1px 0 var(--pa-hi)}
+.aide-i{border-left:3px solid var(--ai);animation:deplieVoie .3s cubic-bezier(.22,.9,.28,1)}
+
+/* Molette de chapitre : une pastille et deux flèches, au lieu de cinquante puces */
+.molette{display:flex;align-items:center;justify-content:center;gap:14px;
+  margin:4px 0 16px}
+.mol-fl{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);
+  color:var(--dim);font-size:1.25rem;line-height:1;cursor:pointer;padding:0;
+  background:radial-gradient(circle at 34% 28%,var(--surf),
+    color-mix(in srgb,var(--line) 26%,var(--surf)));
+  box-shadow:0 2px 5px rgba(0,0,0,.06),inset 0 1px 0 var(--pa-hi);
+  transition:transform .13s ease,box-shadow .2s ease}
+.mol-fl:active{transform:scale(.9)}
+.mol-fl:disabled{opacity:.35;cursor:default;box-shadow:none}
+.mol-d{width:64px;height:64px;border-radius:50%;cursor:pointer;padding:0;
+  border:1px solid color-mix(in srgb,var(--ai) var(--pa-bd),var(--line));
+  box-sizing:border-box;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:1px;line-height:1;
+  background:radial-gradient(circle at 34% 26%,
+    color-mix(in srgb,var(--ai) var(--pa-a),var(--surf)),
+    color-mix(in srgb,var(--ai) var(--pa-b),var(--surf)));
+  box-shadow:0 3px 10px color-mix(in srgb,var(--ai) 24%,transparent),
+    0 1px 2px rgba(0,0,0,.06),inset 0 1px 0 var(--pa-hi),
+    inset 0 -3px 5px color-mix(in srgb,var(--ai) 12%,transparent),var(--pa-ring);
+  transition:transform .14s cubic-bezier(.34,1.4,.5,1),box-shadow .2s ease}
+.mol-d:active{transform:scale(.93)}
+.mol-d b{font-size:1.4375rem;font-weight:700;color:var(--tx)}
+.mol-d i{font-family:var(--disp);font-style:normal;font-size:0.5938rem;color:var(--dim)}
+
+/* Filtres du dictionnaire : quatre pastilles, chacune ouvrant sa liste */
+.filtrons{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:6px 0 14px}
+.fltwrap{display:flex;justify-content:center}
+.fltbtn{background:none;border:0;padding:0;cursor:pointer;width:100%;
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  font-family:var(--ui);transition:transform .14s cubic-bezier(.34,1.4,.5,1)}
+.fltbtn:active{transform:scale(.92)}
+.flt-d{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;
+  box-sizing:border-box;border:1px solid var(--line);
+  background:radial-gradient(circle at 34% 26%,var(--surf),
+    color-mix(in srgb,var(--line) 26%,var(--surf)));
+  box-shadow:0 2px 6px rgba(0,0,0,.06),inset 0 1px 0 var(--pa-hi),var(--pa-ring);
+  transition:border-color .18s ease,box-shadow .2s ease,background .2s ease}
+.flt-d i{font-family:var(--disp);font-style:normal;font-size:1.1875rem;line-height:1;color:var(--dim)}
+.fltbtn.on .flt-d{border-color:var(--ai);
+  background:radial-gradient(circle at 34% 26%,
+    color-mix(in srgb,var(--ai) 8%,var(--surf)),
+    color-mix(in srgb,var(--ai) 26%,var(--surf)));
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--ai) 15%,transparent),
+    0 3px 10px color-mix(in srgb,var(--ai) 24%,transparent),inset 0 1px 0 var(--pa-hi)}
+.fltbtn.on .flt-d i{color:var(--ai)}
+.flt-t{font-size:0.5938rem;letter-spacing:.05em;text-transform:uppercase;color:var(--dim);line-height:1}
+.flt-v{font-size:0.6562rem;color:var(--mut);line-height:1.2;text-align:center;
+  max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fltbtn.on .flt-v{color:var(--ai);font-weight:600}
+
+/* Liste de choix en feuille modale */
+.choixlist{display:flex;flex-direction:column;gap:2px;margin-top:12px;
+  max-height:60vh;overflow-y:auto}
+.choixrow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  padding:10px 10px;border-radius:var(--r-sm);border:1px solid transparent;
+  background:none;cursor:pointer;font-family:var(--ui)}
+.choixrow.on{border-color:color-mix(in srgb,var(--ai) 34%,var(--line));
+  background:color-mix(in srgb,var(--ai) 7%,transparent)}
+.cx-ck{width:17px;flex:0 0 auto;color:var(--ai);font-size:0.75rem;font-weight:700}
+.cx-j{font-family:var(--disp);font-size:1rem;color:var(--ai);flex:0 0 auto}
+.cx-n{flex:1;min-width:0;font-size:0.875rem;color:var(--tx)}
+.choixrow.on .cx-n{color:var(--ai);font-weight:600}
+.cx-c{flex:0 0 auto;font-size:0.7188rem;color:var(--dim)}
+
+/* Rangées de pastilles de niveau, resserrées */
+.ronds.niveaux{grid-template-columns:repeat(auto-fit,minmax(64px,1fr));
+  gap:8px 4px;max-width:420px;margin-left:auto;margin-right:auto}
 </style>
 </head>
 <body>
@@ -2381,33 +2542,38 @@ function toast(txt){
 }
 /* Toutes les rubriques de l'application, avec leur kanji et leur groupe.
    Sert à la fois aux favoris de l'accueil et au répertoire complet. */
+/* Trois groupes par usage réel, et non par nature du contenu :
+   ce qui suit la progression, ce qu'on ouvre pour vérifier, et ce qui
+   travaille sur le matériel de l'utilisateur. */
 const RUBRIQUES=[
-  ["lecons","課","Leçons","Étudier"],
-  ["fiches","要点","Fiches","Étudier"],
-  ["pieges","落とし穴","Pièges","Étudier"],
-  ["culture","文化","Culture","Étudier"],
-  ["audio","音声","Audio","Étudier"],
-  ["manuel","本冊","Manuel","Étudier"],
-  ["aide","解説","Aide","Étudier"],
-  ["arbre","道","Le chemin","S'entraîner"],
-  ["shugyo","修","Entraîner","S'entraîner"],
-  ["minna","練習","Exercices","S'entraîner"],
-  ["lecture","読解","Lecture","S'entraîner"],
-  ["jlpt","JLPT","JLPT","S'entraîner"],
-  ["phrase","作文","Construire","S'entraîner"],
-  ["conjug","活用","Conjugueur","S'entraîner"],
-  ["oral","音読","Voix haute","S'entraîner"],
-  ["progres","記録","Progression","S'entraîner"],
-  ["dico","辞書","Dico","Chercher"],
-  ["jmdict","大辞典","Dico étendu","Chercher"],
-  ["kanji","漢字","Kanji","Chercher"],
-  ["rads","部首","Radicaux","Chercher"],
-  ["gram","助詞","Particules","Chercher"],
-  ["expr","表現","Expressions","Chercher"],
-  ["cnt","助数詞","Compteurs","Chercher"],
-  ["adv","副詞","Adverbes","Chercher"],
-  ["kana","仮名","Kana","Chercher"],
-  ["dojo","道場","Dojo kana","S'entraîner"]
+  /* 学ぶ — ce qui suit votre progression */
+  ["lecons","課","Leçons","Apprendre"],
+  ["arbre","道","Le chemin","Apprendre"],
+  ["shugyo","修","Entraîner","Apprendre"],
+  ["fiches","要点","Fiches","Apprendre"],
+  ["minna","練習","Exercices","Apprendre"],
+  ["lecture","読解","Lecture","Apprendre"],
+  ["phrase","作文","Construire","Apprendre"],
+  ["oral","音読","Voix haute","Apprendre"],
+  ["jlpt","JLPT","JLPT","Apprendre"],
+  ["dojo","道場","Dojo kana","Apprendre"],
+  ["progres","記録","Progression","Apprendre"],
+  /* 引く — ce qu'on ouvre pour vérifier */
+  ["dico","辞書","Dico","Consulter"],
+  ["kanji","漢字","Kanji","Consulter"],
+  ["rads","部首","Radicaux","Consulter"],
+  ["gram","助詞","Particules","Consulter"],
+  ["expr","表現","Expressions","Consulter"],
+  ["cnt","助数詞","Compteurs","Consulter"],
+  ["adv","副詞","Adverbes","Consulter"],
+  ["kana","仮名","Kana","Consulter"],
+  ["pieges","落とし穴","Pièges","Consulter"],
+  ["culture","文化","Culture","Consulter"],
+  /* 道具 — ce qui travaille sur votre matériel */
+  ["manuel","本冊","Manuel","Outils"],
+  ["audio","音声","Audio","Outils"],
+  ["aide","解説","Aide","Outils"],
+  ["conjug","活用","Conjugueur","Outils"]
 ];
 const RUBIDX={}; RUBRIQUES.forEach(r=>RUBIDX[r[0]]=r);
 const FAVS_DEF=["lecons","fiches","minna","aide","dico","manuel"];
@@ -2500,9 +2666,28 @@ function drawNav(){
     b.onclick=()=>go(v); n.appendChild(b);
   });
 }
-function head(m,jpt,fr){
+function head(m,jpt,fr,aide){
   const b=el("button","back","← Retour"); b.onclick=back; m.appendChild(b);
-  m.appendChild(el("h1",null,`<span class="jpx">${jpt}</span>`));
+  const t=el("div","htitre");
+  t.innerHTML=`<h1><span class="jpx">${jpt}</span></h1>`;
+  /* Bouton « i » : les explications d'usage encombraient le haut de chaque
+     écran alors qu'on ne les lit qu'une fois. Elles se déplient à la demande,
+     et l'état est retenu par écran. */
+  if(aide){
+    const cle="aide:"+jpt;
+    const ouvert=!!(S.aidesVues||{})[cle];
+    const bi=el("button","btn-i"+(ouvert?" on":""),"i");
+    bi.title=ouvert?"Masquer l'explication":"À quoi sert cet écran ?";
+    bi.onclick=()=>{ S.aidesVues=S.aidesVues||{};
+      if(ouvert) delete S.aidesVues[cle]; else S.aidesVues[cle]=1;
+      save(); render(); };
+    t.appendChild(bi);
+    m.appendChild(t);
+    if(fr) m.appendChild(el("p",null,`<span style="font-size:0.8125rem;color:var(--mut)">${fr}</span>`));
+    if(ouvert) m.appendChild(el("div","note aide-i",aide));
+    return;
+  }
+  m.appendChild(t);
   if(fr) m.appendChild(el("p",null,`<span style="font-size:0.8125rem;color:var(--mut)">${fr}</span>`));
 }
 function render(){
@@ -3108,9 +3293,10 @@ function ouvreRepertoire(){
         <div><div class="jpx" style="font-size:1.375rem;line-height:1.2;color:var(--ai)">目録</div>
           <div style="font-size:0.8125rem;color:var(--mut);margin-top:2px">Touchez l'étoile pour épingler à l'accueil · ${fv.length}/8</div></div>
         <button class="ico" id="rpX">✕</button></div>`;
-    const groupes=[...new Set(RUBRIQUES.map(r=>r[3]))];
+    const groupes=["Apprendre","Consulter","Outils"];
     groupes.forEach(g=>{
-      box.appendChild(el("div","sec",g));
+      const kanjiG={Apprendre:"学ぶ",Consulter:"引く",Outils:"道具"}[g]||"";
+      box.appendChild(el("div","sec",(kanjiG?'<span class="jpx" style="color:var(--ai)">'+kanjiG+'</span> — ':"")+g));
       const gr=el("div","ronds rep");
       RUBRIQUES.filter(r=>r[3]===g).forEach(r=>{
         const on=fv.includes(r[0]);
@@ -3171,6 +3357,106 @@ function ouvreReglageChapitre(){
   document.body.appendChild(back);
   back.onclick=e=>{ if(e.target===back){ back.remove(); render(); } };
 }
+/* Rappel du sens de chaque forme conjuguée. Volontairement bref : la règle
+   de formation complète vit dans les fiches de 要点, on ne la duplique pas. */
+function ouvreRappelFormes(){
+  const back=document.createElement("div"); back.className="sheet";
+  const box=el("div","sheetbox");
+  box.innerHTML=`<div class="sheethead">
+      <div><div class="jpx" style="font-size:1.375rem;line-height:1.2;color:var(--ai)">形</div>
+        <div style="font-size:0.8125rem;color:var(--mut);margin-top:2px">À quoi sert chaque forme</div></div>
+      <button class="ico" id="rfX">✕</button></div>`;
+  const l=el("div","formeslist"); l.style.marginTop="10px";
+  FORMES_CIBLE.forEach(([k,lab,lec])=>{
+    const r=el("div","formerow on");
+    r.style.setProperty("--vc","var(--ai)");
+    r.style.cursor="pointer";
+    r.innerHTML=`<span class="fm-j jpx">${esc(k)}</span>
+      <span class="fm-f">${esc(lab)}</span>
+      <span class="fm-l">L${lec}</span>`;
+    r.onclick=()=>{ back.remove(); conjSheet(CONJ_REF_KEY[k]||k); };
+    l.appendChild(r);
+  });
+  box.appendChild(l);
+  box.appendChild(el("div","note","Touchez une forme pour ouvrir sa fiche : règle de formation par groupe, exceptions et exemples."));
+  back.appendChild(box);
+  document.body.appendChild(back);
+  $("#rfX",box).onclick=()=>back.remove();
+  back.onclick=e=>{ if(e.target===back) back.remove(); };
+}
+
+/* Feuille de choix générique : un titre, une liste d'options avec leur
+   décompte, l'option courante marquée. Sert aux filtres du dictionnaire
+   comme à tout sélecteur qui aurait sinon aligné trop de puces. */
+function ouvreChoix(titre,options,courant,onPick){
+  const back=document.createElement("div"); back.className="sheet";
+  const box=el("div","sheetbox");
+  box.innerHTML=`<div class="sheethead">
+      <div><div style="font-size:1.0625rem;font-weight:600;color:var(--tx)">${esc(titre)}</div>
+        <div style="font-size:0.7812rem;color:var(--mut);margin-top:2px">${options.length} choix</div></div>
+      <button class="ico" id="chxX">✕</button></div>`;
+  const l=el("div","choixlist");
+  options.forEach(o=>{
+    const on=o.id===courant;
+    const b=el("button","choixrow"+(on?" on":""));
+    b.innerHTML=`<span class="cx-ck">${on?"✓":""}</span>
+      ${o.j?`<span class="cx-j jpx">${esc(o.j)}</span>`:""}
+      <span class="cx-n">${esc(o.nom)}</span>
+      <span class="cx-c">${o.n}</span>`;
+    b.onclick=()=>{ back.remove(); onPick(o.id); };
+    l.appendChild(b);
+  });
+  box.appendChild(l);
+  back.appendChild(box);
+  document.body.appendChild(back);
+  $("#chxX",box).onclick=()=>back.remove();
+  back.onclick=e=>{ if(e.target===back) back.remove(); };
+}
+
+/* Molette de chapitre : une pastille ronde portant le numéro, deux flèches
+   pour avancer d'un cran, et un appui sur la pastille pour ouvrir la liste
+   complète. Remplace les rangées de cinquante puces, impraticables au doigt. */
+function moletteChapitre(val,max,onChange,libelle){
+  const w=el("div","molette");
+  const maj=()=>{
+    w.innerHTML="";
+    const moins=el("button","mol-fl","‹");
+    moins.disabled=val<=1;
+    moins.onclick=()=>{ if(val>1){ val--; onChange(val); } };
+    const pas=el("button","mol-d");
+    pas.innerHTML='<b>'+val+'</b><i>'+(libelle||"課")+'</i>';
+    pas.title="Choisir dans la liste";
+    pas.onclick=()=>ouvreListeChapitre(val,max,v=>{ val=v; onChange(v); });
+    const plus=el("button","mol-fl","›");
+    plus.disabled=val>=max;
+    plus.onclick=()=>{ if(val<max){ val++; onChange(val); } };
+    w.appendChild(moins); w.appendChild(pas); w.appendChild(plus);
+  };
+  maj();
+  return w;
+}
+/* Liste complète en feuille modale, en pastilles rondes. */
+function ouvreListeChapitre(cur,max,onPick){
+  const back=document.createElement("div"); back.className="sheet";
+  const box=el("div","sheetbox");
+  box.innerHTML=`<div class="sheethead">
+      <div><div class="jpx" style="font-size:1.375rem;line-height:1.2;color:var(--ai)">課</div>
+        <div style="font-size:0.8125rem;color:var(--mut);margin-top:2px">Choisir une leçon</div></div>
+      <button class="ico" id="lcX">✕</button></div>`;
+  const g=el("div","chgrid"); g.style.marginTop="12px";
+  for(let l=1;l<=max;l++){
+    const b=el("button","chbtn"+(l===cur?" on":""));
+    b.textContent=l;
+    b.onclick=()=>{ back.remove(); onPick(l); };
+    g.appendChild(b);
+  }
+  box.appendChild(g);
+  back.appendChild(box);
+  document.body.appendChild(back);
+  $("#lcX",box).onclick=()=>back.remove();
+  back.onclick=e=>{ if(e.target===back) back.remove(); };
+}
+
 /* Place un satellite sur une orbite inclinée et renvoie sa géométrie.
    L'inclinaison comprime l'axe vertical : le bas de l'ellipse est devant le
    centre, le haut derrière. Échelle et plan suivent cette profondeur, mais
@@ -3480,31 +3766,43 @@ VIEWS.dico=m=>{
   head(m,"辞書","Vocabulaire des chapitres 1 à "+S.ch);
   const s=el("input","search"); s.placeholder="Chercher en français, en kana ou en kanji…"; s.value=dq;
   s.oninput=e=>{dq=e.target.value;list();}; m.appendChild(s);
-  const groups=[["all","Tous"],["nom","Noms"],["verbe","Verbes"],["adj","Adjectifs"],["exp","Formules"],["adv","Adverbes"],["q","Interrogatifs"]];
-  const f1=el("div","filters");
-  groups.forEach(([k,l])=>{const b=el("button","chip"+(dcat===k?" on":""),l);b.onclick=()=>{dcat=k;render();};f1.appendChild(b);});
-  const fb=el("button","chip"+(dfav?" on":""),"★ Favoris");fb.onclick=()=>{dfav=!dfav;render();};f1.appendChild(fb);
-  m.appendChild(f1);
-  const ft=el("div","filters");
-  const at=el("button","chip"+(dth?"":" on"),"Tous les thèmes");
-  at.onclick=()=>{dth="";render();}; ft.appendChild(at);
-  D.themes.forEach(t=>{
-    const n=words().filter(w=>w.th&&w.th.includes(t.id)).length;
-    if(!n) return;
-    const b=el("button","chip"+(dth===t.id?" on":""));
-    b.innerHTML=`<span class="jpx">${esc(t.j)}</span> ${esc(t.n.split(" et ")[0])} <span style="opacity:.6">${n}</span>`;
-    b.onclick=()=>{dth=dth===t.id?"":t.id;render();};
-    ft.appendChild(b);
-  });
-  m.appendChild(ft);
-  const f2=el("div","filters");
-  const all=el("button","chip"+(dlesson===0?" on":""),"Tous les chapitres");all.onclick=()=>{dlesson=0;render();};f2.appendChild(all);
-  for(let l=S.ch;l>=1;l--){const b=el("button","chip"+(dlesson===l?" on":""),"L"+l);b.onclick=()=>{dlesson=l;render();};f2.appendChild(b);}
-  m.appendChild(f2);
-  const jb=el("button","btn w","大辞典  Chercher dans le dictionnaire étendu");
-  jb.style.marginBottom="10px";
-  jb.onclick=()=>{jq=dq;go("jmdict");};
-  m.appendChild(jb);
+  /* Trois filtres, trois pastilles. Chacune ouvre sa liste de choix : les
+     rangées de puces demandaient de tout faire défiler pour voir l'offre,
+     et la ligne des cinquante chapitres était impraticable au doigt. */
+  const groups=[["all","Tous"],["nom","Noms"],["verbe","Verbes"],["adj","Adjectifs"],
+                ["exp","Formules"],["adv","Adverbes"],["q","Interrogatifs"]];
+  const nomCat=(groups.find(g=>g[0]===dcat)||groups[0])[1];
+  const thCour=dth?D.themes.find(t=>t.id===dth):null;
+  const fl=el("div","filtrons");
+  const pastille=(kan,titre,valeur,actif,action)=>{
+    const w=el("div","fltwrap");
+    const b=el("button","fltbtn"+(actif?" on":""));
+    b.innerHTML=`<span class="flt-d"><i class="jpx">${kan}</i></span>
+      <span class="flt-t">${esc(titre)}</span>
+      <span class="flt-v">${esc(valeur)}</span>`;
+    b.onclick=action;
+    w.appendChild(b); fl.appendChild(w);
+  };
+  pastille("類","Type",nomCat,dcat!=="all",()=>ouvreChoix("Type de mot",
+    groups.map(([k,l])=>({id:k,nom:l,n:words().filter(w=>{
+      if(k==="all") return true;
+      if(k==="nom") return ["n","pron","num"].includes(w.c);
+      if(k==="verbe") return ["v1","v2","v3"].includes(w.c);
+      if(k==="adj") return ["ai","na"].includes(w.c);
+      return w.c===k; }).length})),
+    dcat,v=>{dcat=v;render();}));
+  pastille("題","Thème",thCour?thCour.n.split(" et ")[0]:"Tous",!!dth,()=>ouvreChoix("Thème",
+    [{id:"",nom:"Tous les thèmes",n:words().length}].concat(
+      D.themes.map(t=>({id:t.id,j:t.j,nom:t.n,
+        n:words().filter(w=>w.th&&w.th.includes(t.id)).length})).filter(x=>x.n)),
+    dth,v=>{dth=v;render();}));
+  pastille("課","Chapitre",dlesson?("L"+dlesson):"Tous",!!dlesson,()=>ouvreChoix("Chapitre",
+    [{id:0,nom:"Tous les chapitres",n:words().length}].concat(
+      Array.from({length:S.ch},(_,i)=>i+1).map(l=>({id:l,nom:"Leçon "+l,
+        n:words().filter(w=>w.l===l).length}))),
+    dlesson,v=>{dlesson=v;render();}));
+  pastille("★","Favoris",dfav?"Oui":"Non",dfav,()=>{dfav=!dfav;render();});
+  m.appendChild(fl);
   const box=el("div","card"); m.appendChild(box);
   function match(w){
     if(dth&&!(w.th&&w.th.includes(dth))) return false;
@@ -3589,6 +3887,34 @@ VIEWS.dico=m=>{
       box.appendChild(d);
     });
     if(ws.length>300) box.appendChild(el("div","note","Seules les 300 premières entrées sont affichées. Affinez la recherche ou filtrez par chapitre."));
+
+    /* Le dictionnaire étendu à la suite, dans le même écran : le séparer
+       en rubrique n'apportait rien puisque la recherche est la même. On ne
+       montre que ce qui n'est pas déjà dans le vocabulaire du manuel. */
+    if(dq.trim().length>=1){
+      const vus=new Set(ws.map(w=>w.k+"|"+w.j));
+      let ext=[];
+      try{ ext=jmSearch(dq,true,40).filter(w=>!vus.has(w[1]+"|"+w[0])); }catch(e){}
+      if(ext.length){
+        box.appendChild(el("div","sec","大辞典 — Dictionnaire étendu"));
+        box.appendChild(el("div","note","Hors du manuel : ces entrées ne comptent pas dans votre progression."));
+        ext.slice(0,25).forEach(w=>{
+          const d=el("div","word");
+          d.innerHTML=`<div class="l"><div class="k">${motCliquable(w[0],w[1])}</div>
+            <div class="f">${esc(w[2].split(" ¶ ")[0])}${
+              w[3]?` <span class="tag">${esc(w[3].split("").map(x=>JPOS[x]).filter(Boolean).join(", "))}</span>`:""}</div></div>
+            <div class="r"><button class="ico">🔊</button></div>`;
+          d.querySelector(".ico").onclick=e=>{ e.stopPropagation(); say(w[1]||w[0]); };
+          box.appendChild(d);
+        });
+        if(ext.length>25){
+          const pl=el("button","btn w","Voir les "+ext.length+" résultats étendus");
+          pl.style.marginTop="10px";
+          pl.onclick=()=>{ jq=dq; go("jmdict"); };
+          box.appendChild(pl);
+        }
+      }
+    }
   }
   list();
 };
@@ -4188,12 +4514,18 @@ function dojoNouveau(){
   dojoLot=shuffle(dojoKana()); dojoI=0; dojoVu=false; dojoBilan={su:0,pas:0};
 }
 VIEWS.dojo=m=>{
-  head(m,"道場","S'exercer aux kana, sans note et sans enjeu");
+  head(m,"道場","S'exercer aux kana, sans note et sans enjeu",
+    "Un espace d'entraînement libre : rien n'est compté, rien n'est retenu. On y répète les kana autant qu'on veut avant d'affronter les nœuds du chemin, où les réponses comptent.");
 
-  const r1=el("div","filters");
-  [["h","ひらがな"],["k","カタカナ"],["b","les deux"]].forEach(([v,lab])=>{
-    const b=el("button","chip"+(dojoEcr===v?" on":""),lab);
-    b.onclick=()=>{dojoEcr=v;dojoNouveau();render();}; r1.appendChild(b);
+  const r1=el("div","ronds niveaux");
+  [["h","あ","hiragana"],["k","ア","katakana"],["b","あア","les deux"]].forEach(([v,kan,lab])=>{
+    const on=dojoEcr===v;
+    const w=el("div","rondwrap");
+    const b=el("button","rondbtn"+(on?" sel":""));
+    b.appendChild(rondK(kan, on?"var(--ai)":"var(--mut)", 50));
+    b.appendChild(el("span","rb-n",lab));
+    b.onclick=()=>{dojoEcr=v;dojoNouveau();render();};
+    w.appendChild(b); r1.appendChild(w);
   });
   m.appendChild(r1);
   const r2=el("div","filters");
@@ -4803,15 +5135,20 @@ VIEWS.phrase=m=>{
 /* ================= compréhension écrite 読解 ================= */
 let lectNiv=0, lectId=null;
 VIEWS.lecture=m=>{
-  head(m,"読解","Comprendre un texte, non plus une phrase");
+  head(m,"読解","Comprendre un texte, non plus une phrase",
+    "Des textes courts, calibrés sur votre progression, suivis de questions de compréhension. On y lit du japonais suivi plutôt que des phrases isolées — c'est le passage que le manuel prépare sans vraiment l'entraîner.");
   const tous=Object.entries(D.lect||{});
-  const f=el("div","filters");
+  const f=el("div","ronds niveaux");
   [[0,"Tous"],[5,"N5"],[4,"N4"],[3,"N3"],[2,"N2"],[1,"N1"]].forEach(([n,lab])=>{
     const nb=n?tous.filter(([,t])=>t.n===n).length:tous.length;
     if(!nb) return;
-    const b=el("button","chip"+(lectNiv===n?" on":""));
-    b.innerHTML=lab+' <span style="opacity:.6">'+nb+'</span>';
-    b.onclick=()=>{lectNiv=n;render();}; f.appendChild(b);
+    const on=lectNiv===n;
+    const w=el("div","rondwrap");
+    const b=el("button","rondbtn"+(on?" sel":""));
+    b.appendChild(rondK(lab, on?"var(--ai)":"var(--mut)", 50));
+    b.appendChild(el("span","rb-n",nb+" texte"+(nb>1?"s":"")));
+    b.onclick=()=>{lectNiv=n;render();};
+    w.appendChild(b); f.appendChild(w);
   });
   m.appendChild(f);
   const list=tous.filter(([,t])=>!lectNiv||t.n===lectNiv);
@@ -6924,14 +7261,20 @@ VIEWS.fiches=m=>{
 };
 let cjAll=false;
 VIEWS.conjug=m=>{
-  head(m,"活用","Choisissez un mot, voyez toutes ses formes");
+  head(m,"活用","Choisissez un mot, voyez toutes ses formes",
+    "Toutes les formes d'un verbe ou d'un adjectif, côte à côte. Le rappel des formes ci-dessous dit à quoi sert chacune ; dans les fiches, seules les formes et leur conjugaison apparaissent, sans le commentaire.");
   const vs=words().filter(w=>["v1","v2","v3","ai","na"].includes(w.c));
-  const s=el("input","search"); s.placeholder="Filtrer les verbes et adjectifs…"; m.appendChild(s);
-  const fl=el("div","filters");
-  const c1=el("button","chip"+(cjAll?"":" on"),"Formes vues");
-  const c2=el("button","chip"+(cjAll?" on":""),"Toutes les formes");
+  const s=el("input","search"); s.placeholder="Chercher un verbe ou un adjectif…"; m.appendChild(s);
+  /* Rappel du sens des formes, en une pastille : l'explication vit ici, une
+     fois pour toutes, plutôt que d'être répétée dans chaque fiche. */
+  const bar=el("div","ctrl"); bar.style.marginBottom="12px";
+  const bRap=el("button","btn","形 Que veut dire chaque forme ?");
+  bRap.onclick=()=>ouvreRappelFormes();
+  bar.appendChild(bRap);
+  const c1=el("button","btn"+(cjAll?"":" p"),"Formes vues");
+  const c2=el("button","btn"+(cjAll?" p":""),"Toutes");
   c1.onclick=()=>{cjAll=false;render();}; c2.onclick=()=>{cjAll=true;render();};
-  fl.appendChild(c1); fl.appendChild(c2); m.appendChild(fl);
+  bar.appendChild(c1); bar.appendChild(c2); m.appendChild(bar);
   const box=el("div"); m.appendChild(box);
   function draw(q){
     box.innerHTML="";
@@ -7070,28 +7413,31 @@ VIEWS.rad=m=>{
 
 /* ================= culture ================= */
 VIEWS.culture=m=>{
-  head(m,"文化","Ce que la langue doit aux usages");
-  filterBar(m,"culture","Chercher un usage, un thème…",()=>render());
+  head(m,"文化","Ce que la langue doit aux usages",
+    "Les usages, les rituels et les hiérarchies qui expliquent pourquoi la langue se dit ainsi. On y trouve ce qu'une grammaire ne dit pas : à quel moment une formule devient déplacée, ce qu'un silence signifie, ce que l'histoire a laissé dans le vocabulaire courant.");
+  filterBar(m,"culture","Chercher un usage, un rituel, une notion…",()=>render());
   const q=FQ.culture||"";
+  /* Cette vue ne présente que les notes de culture. Elle affichait aussi
+     l'inventaire de vocabulaire et le bouton manuel de chaque leçon, ce qui
+     répétait ici tout le contenu de l'écran des leçons. */
   let n=0;
   D.lessons.forEach(L=>{
-    const bm=boutonManuel(L.n);
-  if(bm){ const cm=el("div","ctrl"); cm.style.margin="0 0 14px"; cm.appendChild(bm); m.appendChild(cm); }
-  inventaireLecon(m,L.n);
-  const cu=D.culture[String(L.n)];
+    const cu=D.culture[String(L.n)];
     if(!cu||L.n>S.ch) return;
     if(!fMatch(q,cu.t,cu.b,"第"+L.n+"課 L"+L.n)) return;
     n++;
     const c=el("div","card");
-    c.innerHTML=`<h3>${esc(cu.t)} <span class="tag">第${L.n}課</span></h3>
-      <div style="font-size:0.875rem;color:var(--mut);line-height:1.65">${jpw(cu.b)}</div>`;
-    const b=el("button","chip","Voir la leçon");
-    b.style.marginTop="10px"; b.onclick=()=>go("lecon",L.n);
-    c.appendChild(b);
+    c.innerHTML=`<h3>${esc(cu.t)}</h3>
+      <div style="font-size:0.875rem;color:var(--mut);line-height:1.65;margin-top:6px">${jpw(cu.b)}</div>`;
+    const bar=el("div","ctrl"); bar.style.marginTop="12px";
+    const b=el("button","btn","第"+L.n+"課 — voir la leçon");
+    b.style.fontSize="12.5px"; b.style.padding="6px 12px";
+    b.onclick=()=>go("lecon",L.n);
+    bar.appendChild(b);
+    c.appendChild(bar);
     m.appendChild(c);
   });
   if(!n) m.appendChild(el("div","empty","<b>文</b>Aucune note ne correspond."));
-  else if(!q) m.appendChild(el("div","note","Ces notes ne remplacent pas un cours de civilisation : elles éclairent les points de langue de chaque leçon, là où la grammaire seule ne suffit pas à comprendre l'usage."));
 };
 
 /* ================= recherche globale ================= */
@@ -8370,16 +8716,14 @@ function boutonManuel(l){
 }
 
 VIEWS.manuel=m=>{
-  head(m,"本冊","Votre exemplaire, sur cet appareil");
+  head(m,"本冊","Votre exemplaire, sur cet appareil",
+    "Importez le PDF du manuel que vous possédez : il reste sur cet appareil, "+
+    "n'est ni envoyé, ni partagé, ni inclus dans vos sauvegardes. En indiquant "+
+    "à quelle page commence chaque leçon — l'application sait souvent les "+
+    "détecter seule — tous les boutons 本 de l'application ouvrent le manuel "+
+    "directement à la bonne page.");
   if(MANUELS===null){ chargeManuels().then(render);
     m.appendChild(el("div","empty","<b>…</b>Lecture en cours.")); return; }
-
-  const av=el("div","card");
-  av.innerHTML=`<div style="font-size:0.8438rem;color:var(--mut);line-height:1.6">
-    Importez le PDF du manuel que vous possédez. Il reste sur cet appareil :
-    il n'est ni envoyé, ni partagé, ni inclus dans vos sauvegardes.
-    Chaque leçon affichera ensuite un bouton qui l'ouvre à la bonne page.</div>`;
-  m.appendChild(av);
 
   /* --- les volumes importés --- */
   const c=el("div","card");
@@ -9204,7 +9548,8 @@ if(!window.__michiAideMsgListener){
 }
 
 VIEWS.aide=m=>{
-  head(m,"解説","Photographiez une page, obtenez l'explication");
+  head(m,"解説","Photographiez une page, obtenez l'explication",
+    "Une photo ou une page de votre PDF part vers l'API Google Gemini avec votre clé personnelle. Les photos ne sont jamais conservées ; les analyses de pages du PDF le sont si le cache est actif, pour ne pas refaire deux fois le même travail. Seule la clé est enregistrée localement.");
   const key=aideKey();
 
   /* Réglages repliés par défaut quand la clé est déjà configurée : la page
@@ -9227,10 +9572,7 @@ VIEWS.aide=m=>{
   }
 
   if(showConf){
-  const av=el("div","note");
-  av.style.borderLeft="3px solid var(--ai)";
-  av.innerHTML='<b>Comment ça marche —</b> L\'image ou la page part directement de votre appareil vers l\'API Google Gemini, avec votre clé personnelle. Les photos ne sont jamais conservées. Les analyses de pages du PDF importé sont conservées localement quand le cache est actif (voir ci-dessous), pour vous éviter de dépenser de l\'énergie IA sur une même page revisitée. Seule la clé est enregistrée localement pour ne pas avoir à la re-saisir. Les <a href="https://ai.google.dev/gemini-api/terms" target="_blank" style="color:var(--ai)">conditions de Google Gemini</a> s\'appliquent aux données transmises.';
-  m.appendChild(av);
+
 
   /* Écran de configuration : d'abord si la clé manque, sinon repliable. */
   const conf=el("div","card");
@@ -9435,16 +9777,20 @@ VIEWS.aide=m=>{
 
 
 VIEWS.audio=m=>{
-  head(m,"音声","L'audio officiel du manuel, sur votre appareil");
+  head(m,"音声","L'audio officiel du manuel, sur votre appareil",
+    "3A Corporation met l'audio du manuel à disposition gratuitement, sans inscription. "+
+    "<b>Écouter en ligne</b> ouvre leur lecteur dans le navigateur, leçon par leçon. "+
+    "<b>Installer</b> télécharge l'archive complète une fois pour toutes : l'application "+
+    "l'ouvre elle-même et range chaque piste dans sa leçon, sans que vous ayez à "+
+    "décompresser quoi que ce soit, et tout fonctionne ensuite sans connexion. "+
+    "Vous pouvez aussi importer vos propres fichiers. Rien ne quitte cet appareil.");
   if(!audLes) audLes=Math.min(S.ch,50);
 
+  /* La prose explicative est passée sous le bouton « i » du titre : elle
+     disait exactement la même chose et occupait le haut de l'écran en
+     permanence. Ne restent ici que les actions. */
   const src=el("div","card");
-  src.appendChild(el("h3",null,"Où trouver les fichiers"));
-  src.innerHTML+=`<div style="font-size:0.875rem;color:var(--mut);line-height:1.6">
-    3A Corporation met l'audio du manuel à disposition gratuitement, sans inscription.
-    Deux façons d'y accéder : <b>écouter en ligne</b> ouvre leur lecteur dans le
-    navigateur, leçon par leçon ; <b>installer</b> place l'audio sur votre appareil,
-    une fois pour toutes, et il fonctionnera ensuite sans connexion.</div>`;
+  src.appendChild(el("div","sec","Où trouver les fichiers"));
   const lk=el("div","ctrl"); lk.style.marginTop="10px";
   [["Écouter en ligne — leçons 1 à 25",25],["Écouter en ligne — leçons 26 à 50",50]].forEach(([lab,n])=>{
     const a=el("button","btn",lab);
@@ -9528,15 +9874,9 @@ VIEWS.audio=m=>{
     dl.appendChild(bz);
   });
   src.appendChild(dl); src.appendChild(etat);
-  src.appendChild(el("div","note","<b>Installer</b> demande une connexion le temps du téléchargement, puis plus rien : l'application ouvre l'archive et range chaque piste dans sa leçon. Vous n'avez rien à décompresser."));
   m.appendChild(src);
 
-  const f=el("div","filters");
-  for(let l=1;l<=S.ch;l++){
-    const b=el("button","chip"+(audLes===l?" on":""),"L"+l);
-    b.onclick=()=>{audLes=l;render();}; f.appendChild(b);
-  }
-  m.appendChild(f);
+  m.appendChild(moletteChapitre(audLes,S.ch,v=>{ audLes=v; render(); }));
 
   const box=el("div","card");
   box.appendChild(el("h3",null,"Leçon "+audLes));
@@ -10260,25 +10600,28 @@ VIEWS.shugyo=m=>{
     /* ---- autres façons de travailler ---- */
     const autres=el("div","card");
     autres.appendChild(el("div","sec","Autres façons de travailler"));
-    const ag=el("div","vsous");
-    const mixb=el("button","vchip on","Séance mixte");
-    mixb.onclick=()=>startSession("mix");
-    ag.appendChild(mixb);
-    if(S.kana){
-      const kb=el("button","vchip on","道場 Kana");
-      kb.onclick=()=>{ dojoNouveau(); go("dojo"); };
-      ag.appendChild(kb);
-      const kb2=el("button","vchip on","Série kana");
-      kb2.onclick=()=>startSession("kana");
-      ag.appendChild(kb2);
-    }
-    const ob=el("button","vchip on","音読 Voix haute");
-    ob.onclick=()=>go("oral");
-    ag.appendChild(ob);
-    const cb=el("button","vchip on","稽古 Plusieurs chapitres");
-    cb.onclick=()=>go("cible");
-    ag.appendChild(cb);
-    autres.appendChild(ag);
+    /* Les autres formes d'entraînement, en pastilles rondes : elles étaient
+       jusqu'ici joignables seulement par le répertoire, alors qu'elles font
+       partie de la pratique quotidienne au même titre que les séances. */
+    const gr2=el("div","ronds");
+    const ajoute=(kan,nom,act,dispo)=>{
+      if(dispo===false) return;
+      const w=el("div","rondwrap");
+      const b=el("button","rondbtn");
+      b.appendChild(rondK(kan,"var(--ai)",54));
+      b.appendChild(el("span","rb-n",nom));
+      b.onclick=act;
+      w.appendChild(b); gr2.appendChild(w);
+    };
+    ajoute("混","Séance mixte",()=>startSession("mix"));
+    ajoute("音読","Voix haute",()=>go("oral"));
+    ajoute("読解","Lecture suivie",()=>go("lecture"));
+    ajoute("作文","Construire",()=>go("phrase"));
+    ajoute("活用","Conjugueur",()=>go("conjug"));
+    ajoute("稽古","Plusieurs chapitres",()=>go("cible"));
+    ajoute("道場","Dojo kana",()=>{ dojoNouveau(); go("dojo"); },!!S.kana);
+    ajoute("仮名","Série kana",()=>startSession("kana"),!!S.kana);
+    autres.appendChild(gr2);
     m.appendChild(autres);
 
     m.appendChild(el("div","note","Une réponse fausse revient deux questions plus loin dans la même série, puis dès le lendemain. Une réponse juste s'espace : 1 jour, puis 2, 4, 8, 16, 32, 64. En portée « acquis », la séance suit ces échéances ; sur toute la base ou une leçon isolée, elle tire au hasard."));
