@@ -1694,6 +1694,24 @@ nav button.on .jp{filter:drop-shadow(0 1px 0 var(--pa-hi))
 /* Texte de lecture affiché en entier pour la lecture à voix haute */
 .ora-suivi{font-family:var(--disp);font-size:1.0625rem;line-height:2;text-align:left;
   padding:4px 2px;max-height:46vh;overflow-y:auto}
+
+/* Bandeau de réglage du module oral : résumé replié, ouvert à la demande */
+.oracfg{display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+  padding:11px 15px;margin-bottom:12px;cursor:pointer;
+  border:1px solid var(--line);border-radius:99px;font-family:var(--ui);
+  background:linear-gradient(168deg,color-mix(in srgb,var(--surf) 96%,#fff),
+    color-mix(in srgb,var(--line) 20%,var(--surf)));
+  box-shadow:0 2px 6px rgba(0,0,0,.05),inset 0 1px 0 var(--pa-hi);
+  transition:border-color .18s ease,box-shadow .2s ease}
+.oracfg.on{border-color:color-mix(in srgb,var(--ai) 40%,var(--line));
+  border-radius:var(--r) var(--r) 0 0;margin-bottom:0}
+.oracfg:active{transform:scale(.995)}
+.oc-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.oc-t b{font-size:0.8125rem;font-weight:600;color:var(--tx);line-height:1.35;
+  overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.oc-t i{font-style:normal;font-size:0.7188rem;color:var(--ai);font-weight:600}
+.oc-i{flex:0 0 auto;font-size:0.6875rem;color:var(--dim)}
+.oracfg.on + .card{border-top-left-radius:0;border-top-right-radius:0;margin-top:0}
 </style>
 </head>
 <body>
@@ -4641,62 +4659,89 @@ VIEWS.oral=m=>{
     return;
   }
 
-  /* ---- réglages ---- */
-  const cfg=el("div","card");
-  cfg.appendChild(el("div","sec","Réglages"));
-  const l1=el("div","filters");
-  [["lent",1.35,"Posé"],["normal",1,"Normal"],["vif",0.72,"Vif"]].forEach(([k,v,lab])=>{
-    const on=(S.oraTempo||1)===v;
-    const b=el("button","chip"+(on?" on":""),lab);
-    b.onclick=()=>{ S.oraTempo=v; save(); render(); };
-    l1.appendChild(b);
-  });
-  cfg.appendChild(l1);
-  /* Source du vivier : la sélection orale d'origine, ou l'ensemble des
-     exercices écrits converti pour l'oral — ce dernier ouvre la conjugaison
-     complète et le ciblage par forme, comme dans 修. */
-  const srcL=el("div","filters");
-  [["oral","Sélection orale"],["ecrit","Tous les exercices"],["lect","Textes de lecture"]].forEach(([k,lab])=>{
-    const b=el("button","chip"+((S.oraSource||"oral")===k?" on":""),lab);
-    b.onclick=()=>{ S.oraSource=k; save(); render(); };
-    srcL.appendChild(b);
-  });
-  cfg.appendChild(srcL);
+  /* ---- réglages, repliés une fois la série configurée ----
+     L'écran sert à pratiquer, pas à régler : tout le paramétrage vit sous
+     un pli, résumé en une ligne. On l'ouvre pour composer sa série, on le
+     referme et il n'encombre plus. */
+  const src=S.oraSource||"oral";
+  const ecrit=(src==="ecrit"), lectSrc=(src==="lect");
+  const NOMSRC={oral:"Sélection orale",ecrit:"Tous les exercices",lect:"Textes de lecture"};
 
-  const ecrit=(S.oraSource==="ecrit");
-  const lectSrc=(S.oraSource==="lect");
-  const GEN=ecrit?[["mot","Mots"],["conj","Conjugaison"],["phrase","Phrases"],["lecture","Lectures"]]
-                 :[["mot","Mots"],["conj","Conjugaison"],["phrase","Phrases"]];
-  const l2=el("div","filters");
-  if(!lectSrc) GEN.forEach(([k,lab])=>{
-    const on=!S.oraGenres||S.oraGenres.includes(k);
-    const b=el("button","chip"+(on?" on":""),lab);
-    b.onclick=()=>{
-      const g=S.oraGenres?S.oraGenres.slice():GEN.map(x=>x[0]);
-      const i2=g.indexOf(k);
-      if(i2<0) g.push(k); else if(g.length>1) g.splice(i2,1);
-      S.oraGenres=g; save(); render();
-    };
-    l2.appendChild(b);
-  });
-  cfg.appendChild(l2);
-
-  if(!ecrit){
-    const l4=el("div","filters");
-    [["jusqua","jusqu'à mon chapitre"],["seul","ce chapitre seul"],["cible","mes chapitres ciblés"]]
-      .forEach(([k,lab])=>{
-        const b=el("button","chip"+((S.oraPortee||"jusqua")===k?" on":""),lab);
-        b.onclick=()=>{
-          if(k==="cible"&&!(S.cible||[]).length){
-            toast("Choisissez d'abord des chapitres dans 稽古"); return;
-          }
-          S.oraPortee=k; save(); render();
-        };
-        l4.appendChild(b);
-      });
-    cfg.appendChild(l4);
+  /* Le résumé : ce que la série contient, en une phrase. */
+  const nbDispo=(()=>{ try{
+      const so=ecrit?oraLotEcrit():lectSrc?oraLotLecture():oraLot();
+      const libres=["suivi","question"];
+      return so.filter(x=>libres.includes(x.genre)
+        ||(S.oraGenres||["mot","conj","phrase","lecture"]).includes(x.genre)).length;
+    }catch(e){ return 0; } })();
+  const morceaux=[NOMSRC[src]];
+  if(ecrit){
+    const vs=(S.oraVoies&&S.oraVoies.length)?S.oraVoies:VOIES.map(v=>v.id);
+    morceaux.push(vs.length===VOIES.length?"toutes les voies"
+      :vs.map(id=>(VOIES.find(v=>v.id===id)||{}).j).join(" "));
+    const ff=S.formesCible||[];
+    if(vs.includes("ka")&&ff.length) morceaux.push("formes "+ff.join(" "));
+    morceaux.push(porteeDe("ka")==="tout"?"toute la base":"jusqu'à L"+S.ch);
+  } else if(lectSrc){
+    const us=S.oraLectUsages||["phrase","suivi","question"];
+    morceaux.push({phrase:"phrase à phrase",suivi:"lecture suivie",question:"questions"}
+      ? us.map(u=>({phrase:"phrase à phrase",suivi:"lecture suivie",question:"questions"})[u]).join(", ")
+      : "");
+  } else {
+    morceaux.push((S.oraGenres||["mot","conj","phrase"]).length===3?"tous genres"
+      :(S.oraGenres||[]).join(", "));
   }
-  if(lectSrc){
+  const tempoNom={1.35:"posé",1:"normal",0.72:"vif"}[S.oraTempo||1]||"normal";
+  morceaux.push("débit "+tempoNom);
+  if(S.oraOrdre==="lecon") morceaux.push("par leçon");
+
+  const ouvert=!!S.oraCfgOuvert;
+  const resume=el("button","oracfg"+(ouvert?" on":""));
+  resume.innerHTML=`<span class="oc-t"><b>${esc(morceaux.join(" · "))}</b>
+      <i>${nbDispo} énoncé${nbDispo>1?"s":""} dans la série</i></span>
+    <span class="oc-i">${ouvert?"▲":"▾"}</span>`;
+  resume.onclick=()=>{ S.oraCfgOuvert=ouvert?0:1; save(); render(); };
+  m.appendChild(resume);
+
+  if(ouvert){
+  const cfg=el("div","card");
+
+  /* --- la source --- */
+  cfg.appendChild(el("div","sec","Où puiser"));
+  const srcL=el("div","filters");
+  [["oral","Sélection orale"],["ecrit","Tous les exercices"],["lect","Textes de lecture"]]
+    .forEach(([k,lab])=>{
+      const b=el("button","chip"+(src===k?" on":""),lab);
+      b.onclick=()=>{ S.oraSource=k; save(); render(); };
+      srcL.appendChild(b);
+    });
+  cfg.appendChild(srcL);
+  cfg.appendChild(el("div","note", ecrit
+    ? "Le vivier complet des exercices, reformulé pour l'oral : conjugaison, vocabulaire, lectures de kanji."
+    : lectSrc
+    ? "Les soixante-six textes de compréhension, à dire phrase à phrase, à lire d'un trait ou à commenter."
+    : "Une sélection resserrée : du vocabulaire en contexte, des formes conjuguées et les phrases du manuel."));
+
+  /* --- ce qu'on travaille --- */
+  if(!lectSrc){
+    cfg.appendChild(el("div","sec","Ce qu'on travaille"));
+    const GEN=ecrit?[["mot","Mots"],["conj","Conjugaison"],["phrase","Phrases"],["lecture","Lectures"]]
+                   :[["mot","Mots"],["conj","Conjugaison"],["phrase","Phrases"]];
+    const l2=el("div","filters");
+    GEN.forEach(([k,lab])=>{
+      const on=!S.oraGenres||S.oraGenres.includes(k);
+      const b=el("button","chip"+(on?" on":""),lab);
+      b.onclick=()=>{
+        const g=S.oraGenres?S.oraGenres.slice():GEN.map(x=>x[0]);
+        const i2=g.indexOf(k);
+        if(i2<0) g.push(k); else if(g.length>1) g.splice(i2,1);
+        S.oraGenres=g; save(); render();
+      };
+      l2.appendChild(b);
+    });
+    cfg.appendChild(l2);
+  } else {
+    cfg.appendChild(el("div","sec","Ce qu'on travaille"));
     const us=S.oraLectUsages||["phrase","suivi","question"];
     const lu=el("div","filters");
     [["phrase","Phrase à phrase"],["suivi","Lecture suivie"],["question","Questions"]]
@@ -4711,23 +4756,14 @@ VIEWS.oral=m=>{
         lu.appendChild(b);
       });
     cfg.appendChild(lu);
-  }
-  cfg.appendChild(el("div","note", ecrit
-    ? "Le vivier complet des exercices, reformulé pour l'oral. Les voies et les formes se règlent ci-dessous, exactement comme dans 修."
-    : lectSrc
-    ? "Les trente textes de compréhension. <b>Phrase à phrase</b> demande de produire le japonais depuis le français ; <b>lecture suivie</b> fait lire le texte entier d'un trait ; <b>questions</b> les pose en japonais et attend une réponse en japonais. Six textes dont la traduction n'est pas alignée phrase à phrase sont écartés du premier usage, mais restent lisibles en entier."
-    : "Une sélection resserrée : du vocabulaire en contexte, des formes conjuguées et les phrases du manuel."));
-  if(lectSrc){
-    const n=oraLotLecture().length;
-    cfg.appendChild(el("div","note","<b>"+n+"</b> énoncé"+(n>1?"s":"")+" avec ces réglages."));
+    cfg.appendChild(el("div","note","Six textes dont la traduction n'est pas alignée phrase à phrase sont écartés du premier usage, mais restent lisibles en entier."));
   }
 
-  /* Avec le vivier écrit, on retrouve les mêmes réglages que dans 修 :
-     quelles voies, quelle portée, et quelles formes verbales cibler. */
+  /* --- voies, portée et formes : seulement pour le vivier écrit --- */
   if(ecrit){
+    cfg.appendChild(el("div","sec","Voies"));
     const sel=(S.oraVoies&&S.oraVoies.length)?S.oraVoies:VOIES.map(v=>v.id);
-    const vl=el("div","vsous"); vl.style.marginTop="10px";
-    vl.appendChild(el("span","vlab","Voies :"));
+    const vl=el("div","vsous");
     VOIES.forEach(v=>{
       const on=sel.includes(v.id);
       const b=el("button","vchip"+(on?" on":""),v.j+" "+v.nom);
@@ -4741,8 +4777,6 @@ VIEWS.oral=m=>{
     });
     cfg.appendChild(vl);
 
-    /* La portée se règle par voie dans 修 ; ici on l'applique en bloc pour
-       ne pas multiplier les commandes dans un écran de pratique. */
     const pl=el("div","vsous"); pl.style.marginTop="8px";
     pl.appendChild(el("span","vlab","Portée :"));
     const ptC=porteeDe("ka");
@@ -4753,20 +4787,19 @@ VIEWS.oral=m=>{
     });
     cfg.appendChild(pl);
 
-    /* Formes verbales ciblées : même liste que dans 修, repliée. */
     if(sel.includes("ka")){
       const ff=(S.formesCible||[]);
       const maxL=(ptC==="tout")?50:S.ch;
       const acc=FORMES_CIBLE.filter(f=>f[2]<=maxL);
       if(acc.length){
-        const fb=el("div"); fb.style.marginTop="10px";
-        const ouv=!!S.oraFormesOuvert;
+        const fb=el("div"); fb.style.marginTop="12px";
+        const ouvF=!!S.oraFormesOuvert;
         const tete=el("button","replitete");
         tete.innerHTML='<span>Formes travaillées<b style="color:var(--ai)"> · '+
-          (ff.length? ff.length+" sur "+acc.length : "toutes")+'</b></span><i>'+(ouv?"▲":"▾")+'</i>';
-        tete.onclick=()=>{ S.oraFormesOuvert=ouv?0:1; save(); render(); };
+          (ff.length? ff.length+" sur "+acc.length : "toutes")+'</b></span><i>'+(ouvF?"▲":"▾")+'</i>';
+        tete.onclick=()=>{ S.oraFormesOuvert=ouvF?0:1; save(); render(); };
         fb.appendChild(tete);
-        if(ouv){
+        if(ouvF){
           const ul=el("div","formeslist");
           acc.forEach(([k,lab,lec])=>{
             const on=ff.length?ff.includes(k):true;
@@ -4788,10 +4821,39 @@ VIEWS.oral=m=>{
         cfg.appendChild(fb);
       }
     }
-    const dispo=oraLotEcrit().filter(x=>(S.oraGenres||["mot","conj","phrase","lecture"]).includes(x.genre));
-    cfg.appendChild(el("div","note",
-      "<b>"+dispo.length+"</b> énoncé"+(dispo.length>1?"s":"")+" à prononcer avec ces réglages."));
+  } else if(!lectSrc){
+    cfg.appendChild(el("div","sec","Portée"));
+    const l4=el("div","filters");
+    [["jusqua","jusqu'à mon chapitre"],["seul","ce chapitre seul"],["cible","mes chapitres ciblés"]]
+      .forEach(([k,lab])=>{
+        const b=el("button","chip"+((S.oraPortee||"jusqua")===k?" on":""),lab);
+        b.onclick=()=>{
+          if(k==="cible"&&!(S.cible||[]).length){
+            toast("Choisissez d'abord des chapitres dans 稽古"); return;
+          }
+          S.oraPortee=k; save(); render();
+        };
+        l4.appendChild(b);
+      });
+    cfg.appendChild(l4);
   }
+
+  /* --- comment ça se déroule --- */
+  cfg.appendChild(el("div","sec","Déroulement"));
+  const l1=el("div","filters");
+  [["lent",1.35,"Posé"],["normal",1,"Normal"],["vif",0.72,"Vif"]].forEach(([k,v,lab])=>{
+    const on=(S.oraTempo||1)===v;
+    const b=el("button","chip"+(on?" on":""),lab);
+    b.onclick=()=>{ S.oraTempo=v; save(); render(); };
+    l1.appendChild(b);
+  });
+  [["","Ordre aléatoire"],["lecon","Par leçon"]].forEach(([k,lab])=>{
+    const on=(S.oraOrdre||"")===k;
+    const b=el("button","chip"+(on?" on":""),lab);
+    b.onclick=()=>{ S.oraOrdre=k; save(); render(); };
+    l1.appendChild(b);
+  });
+  cfg.appendChild(l1);
 
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   const l3=el("div","ctrl"); l3.style.marginTop="10px";
@@ -4800,11 +4862,19 @@ VIEWS.oral=m=>{
   be.disabled=!SR;
   be.onclick=()=>{ S.oraEcoute=S.oraEcoute?0:1; save(); render(); };
   l3.appendChild(be);
+  const bRaz=el("button","btn","Tout réinitialiser");
+  bRaz.onclick=()=>{
+    S.oraSource="oral"; S.oraGenres=null; S.oraVoies=null; S.oraLectUsages=null;
+    S.oraPortee="jusqua"; S.oraTempo=1; S.oraOrdre=""; S.formesCible=[];
+    save(); render();
+  };
+  l3.appendChild(bRaz);
   cfg.appendChild(l3);
   cfg.appendChild(el("div","note", SR
     ? "Si vous l'activez, l'application écoute votre réponse et la compare au corrigé. Elle a besoin du micro et, sur certains navigateurs, d'une connexion."
-    : "Votre navigateur ne propose pas la reconnaissance vocale. Le reste du module fonctionne sans elle."));
+    : "Votre navigateur ne propose pas la reconnaissance vocale : la séance se déroule sans correction automatique."));
   m.appendChild(cfg);
+  }
 
   /* ---- la séance ---- */
   const box=el("div","card oralbox");
@@ -4928,7 +4998,10 @@ VIEWS.oral=m=>{
       if(parG[g].length) lot.push(parG[g].pop());
       else if(dispo.every(k=>!parG[k].length)) break;
     }
-    shuffle(lot);
+    /* Le tirage est aléatoire par défaut. « Par leçon » sert à réviser dans
+       l'ordre de la progression, utile quand on reprend un chapitre précis. */
+    if(S.oraOrdre==="lecon") lot.sort((a,b)=>(a.l||0)-(b.l||0));
+    else shuffle(lot);
     oraSess={lot:lot,i:0,faits:0};
     oraEtat="marche"; oraJeton++;
     oraTientEveille(); oraOuvreRoute();
