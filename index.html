@@ -2029,6 +2029,50 @@ function jpCite(str){
   const f=S.furi; S.furi=0;
   try{ return jp(str); } finally{ S.furi=f; }
 }
+/* Un mot correspond-il à la recherche ? Le vocabulaire est stocké en forme
+   ~ます : sans précaution, chercher たべる ou 食べる ne rend rien, alors que
+   c'est l'entrée sous laquelle le mot se cherche et celle que le conjugueur
+   affiche en titre. On teste donc aussi les formes conjuguées, et l'on
+   accepte le romaji en le convertissant en kana. */
+function motMatch(w,q){
+  if(!q) return true;
+  const brut=String(q).trim();
+  if(!brut) return true;
+  const bas=brut.toLowerCase();
+  /* le sens en français */
+  if(String(w.f||"").toLowerCase().includes(bas)) return true;
+  /* les formes écrites telles quelles */
+  const cibles=[w.k||"", w.j||""];
+  /* saisie en lettres : on la convertit en kana avant de comparer */
+  const kana=isLatin(brut)?toKanaFull(bas):null;
+  const essais=[brut];
+  if(kana) essais.push(kana, toKata(kana));
+  for(const c of cibles)
+    for(const e of essais)
+      if(e && c.includes(e)) return true;
+  /* les formes conjuguées. forms() ne couvre que les verbes : les adjectifs
+     passent par adjTable, sans quoi 高くない ou 静かな ne se trouvaient pas. */
+  const toutes=[];
+  if(["v1","v2","v3"].includes(w.c)){
+    const f=forms(w);
+    if(f){
+      Object.keys(f).forEach(k=>{ if(k!=="kanji"&&typeof f[k]==="string") toutes.push(f[k]); });
+      if(f.kanji) Object.keys(f.kanji).forEach(k=>{
+        if(typeof f.kanji[k]==="string") toutes.push(f.kanji[k]); });
+    }
+  } else if(["ai","na"].includes(w.c)){
+    [true,false].forEach(kana=>{
+      const t=adjTable(w,true,kana);
+      if(t) t.forEach(r=>{ if(r.val) toutes.push(r.val); });
+    });
+    /* な-adjectif épithète : 静かな, qui ne figure dans aucune ligne du tableau */
+    if(w.c==="na"){ toutes.push((w.j||w.k)+"な"); toutes.push(w.k+"な"); }
+  }
+  for(const c of toutes)
+    for(const e of essais)
+      if(e && c.includes(e)) return true;
+  return false;
+}
 function disp(w){ return (S.script==="kana"||!w.j)?w.k:w.j; }
 function sub(w){ return (S.script==="kana"||!w.j)?(w.j||""):w.k; }
 
@@ -3997,13 +4041,7 @@ VIEWS.dico=m=>{
     if(dcat==="q"&&w.c!=="q") return false;
     if(dq){
       const q=dq.toLowerCase();
-      let ok=w.k.includes(dq)||w.j.includes(dq)||w.f.toLowerCase().includes(q);
-      /* pour les verbes, on cherche aussi la forme du dictionnaire (たべる, 食べる) */
-      if(!ok&&["v1","v2","v3"].includes(w.c)){
-        const f=forms(w);
-        if(f&&(f.辞書.includes(dq)||(f.kanji&&f.kanji.辞書&&f.kanji.辞書.includes(dq)))) ok=true;
-      }
-      if(!ok) return false;
+      if(!motMatch(w,dq)) return false;
     }
     return true;
   }
@@ -7822,7 +7860,7 @@ VIEWS.conjug=m=>{
   const box=el("div"); m.appendChild(box);
   function draw(q){
     box.innerHTML="";
-    vs.filter(w=>!q||w.k.includes(q)||w.j.includes(q)||w.f.toLowerCase().includes(q.toLowerCase())).slice(0,60).forEach(w=>{
+    vs.filter(w=>motMatch(w,q)).slice(0,60).forEach(w=>{
       const rows=anyTable(w,cjAll); if(!rows||!rows.length) return;
       const c=el("div","card");
       /* Le titre porte la forme neutre — celle du dictionnaire pour un verbe,
