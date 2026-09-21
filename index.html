@@ -495,6 +495,10 @@ button.stat{font:inherit;width:100%}
 .bb-co span{white-space:nowrap;font-size:0.8125rem;color:var(--tx)}
 .bb-co b{font-weight:700}
 .bb-mo{display:block;margin-top:4px}
+.bb-eq{font-style:normal;color:var(--mut);font-size:0.7188rem;font-weight:400}
+.bb-eql{stroke:var(--mut);stroke-width:.9;opacity:.45;stroke-dasharray:2 3}
+.bb-eqp{fill:none;stroke:var(--mut);stroke-width:1.4;opacity:.85}
+.bb-eqt{font-family:var(--ui);font-size:0.5312rem;fill:var(--mut);opacity:.9}
 .bunbu-svg{width:172px;height:172px}
 /* Les deux voies sur l'accueil */
 .voies{padding:14px}
@@ -3742,9 +3746,12 @@ VIEWS.home=m=>{
 
   /* ---- où en suis-je : une voie, ou les deux côte à côte ---- */
   m.appendChild(blocVoies(nw,nk));
-  /* Le plan n'a de sens que pour qui avance sur les deux axes : sur un seul
-     manuel, un point qui glisse le long d'un bord n'apprend rien. */
-  if((D.parcours||[]).length>1 && avance("m")>0 && avance("y")>0)
+  /* Le plan s'affiche dès qu'un axe est entamé. Je l'avais d'abord réservé
+     à ceux qui avancent sur les deux, en jugeant qu'un point glissant le
+     long d'un bord n'apprenait rien — c'était vrai avant que le plan ne
+     porte la position équivalente sur l'axe non commencé. Il répond
+     maintenant à « où en serais-je dans l'autre manuel ». */
+  if((D.parcours||[]).length>1 && (avance("m")>0 || avance("y")>0))
     m.appendChild(carteBunbu(nw));
 
   /* ---- accès au répertoire complet ---- */
@@ -3876,6 +3883,24 @@ function planBunbu(taille){
     if(!c.length) return;
     g += `<text class="bb-ct" x="${px(c[0][0]).toFixed(1)}" y="${d - 7}" text-anchor="middle">${esc(R.j)}</text>`;
   });
+  /* Repère creux sur l'axe non entamé : la position qui ouvrirait autant de
+     vocabulaire dans l'autre manuel. Il rend le plan lisible à qui n'en suit
+     qu'un seul. */
+  const eqx = (x === 0 && y > 0) ? projetteM(etendue(x, y)) : 0;
+  const eqy = (y === 0 && x > 0) ? projetteY(etendue(x, y)) : 0;
+  if(eqx || eqy){
+    /* Le repère se pose sur l'axe de l'autre manuel, à l'origine de celui
+       qu'on suit : « si j'avais fait ce livre-là, j'en serais à peu près
+       là ». Le placer à la verticale du point actuel laissait entendre que
+       l'élève y est déjà, ce qui n'est pas ce qu'il dit. */
+    const ex = eqx ? eqx / NX : 0, ey = eqy ? eqy / NY : 0;
+    g += `<line class="bb-eql" x1="${px(x/NX).toFixed(1)}" y1="${py(y/NY).toFixed(1)}"
+      x2="${px(ex).toFixed(1)}" y2="${py(ey).toFixed(1)}"/>`;
+    g += `<circle class="bb-eqp" cx="${px(ex).toFixed(1)}" cy="${py(ey).toFixed(1)}" r="4"/>`;
+    g += `<text class="bb-eqt" x="${px(ex).toFixed(1)}" y="${(py(ey) - 9).toFixed(1)}"
+      text-anchor="${eqy ? "start" : "middle"}">≈ ${eqx || eqy}</text>`;
+  }
+
   /* guides et point de l'élève */
   const ux = x / NX, uy = y / NY;
   g += `<line class="bb-gu" x1="${px(0)}" y1="${py(uy).toFixed(1)}" x2="${px(ux).toFixed(1)}" y2="${py(uy).toFixed(1)}"/>`;
@@ -3910,8 +3935,10 @@ function carteBunbu(nw){
   }
   /* Un axe par ligne : à 390 pixels, « 文 20 / 50 · 武 12 / 18 » se coupait
      entre le 12 et le 18, ce qui rendait la seconde coordonnée illisible. */
+  const eqM=equivalent("m"), eqY=equivalent("y");
+  const ligne=(k,v,n2,eq,u)=>`<span>${k} <b>${v}</b> / ${n2}${eq?` <i class="bb-eq">≈ ${u} ${eq}</i>`:""}</span>`;
   l.innerHTML=`<b>${esc(RG.n)}</b>
-    <span class="bb-co"><span>文 <b>${x}</b> / ${PAR.m.n}</span><span>武 <b>${y}</b> / ${PAR.y.n}</span></span>
+    <span class="bb-co">${ligne("文",x,PAR.m.n,eqM,PAR.m.u)}${ligne("武",y,PAR.y.n,eqY,PAR.y.u)}</span>
     <span class="bb-mo">${nw} mots ouverts</span>${reste}`;
   box.appendChild(l);
   c.appendChild(box);
