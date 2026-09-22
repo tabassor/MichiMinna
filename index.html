@@ -10077,6 +10077,39 @@ VIEWS.manuel=m=>{
       MANUELS=null; render(); toast(val?"Renommé":"Nom d\'affichage retiré");
     };
     c.appendChild(rn);
+    /* Rattacher un volume à l'autre manuel : l'import le range dans celui
+       qu'on suit au moment où on l'ajoute, et l'on trouve rarement les deux
+       livres le même jour. */
+    if((D.parcours||[]).length>1){
+      const autre=(D.parcours||[]).find(x=>x.id!==volPar(v));
+      if(autre){
+        const mv=el("button","btn","→ "+esc(autre.nom));
+        mv.style.marginTop="6px"; mv.style.fontSize="12.5px"; mv.style.marginRight="6px";
+        mv.title="Rattacher ce volume à "+autre.nom;
+        mv.onclick=async()=>{
+          if(!confirm("Rattacher « "+volNom(v)+" » au manuel "+autre.nom+" ?\n\nSes "+autre.uu+" couvertes restent "+v.lmin+" à "+v.lmax+" — ajustez-les ensuite si besoin.")) return;
+          await mPut(Object.assign({},v,{par:autre.id}));
+          MANUELS=null; render(); toast("Rattaché à "+autre.nom);
+        };
+        c.appendChild(mv);
+      }
+      /* Corriger l'étendue sans ré-importer : elle a été saisie dans l'unité
+         du manuel actif au moment de l'import, qui n'est pas toujours le bon. */
+      const et=el("button","btn","Leçons couvertes");
+      et.style.marginTop="6px"; et.style.fontSize="12.5px"; et.style.marginRight="6px";
+      const PV=PAR[volPar(v)]||PAR.m;
+      et.textContent=PV.uu.charAt(0).toUpperCase()+PV.uu.slice(1)+" couvertes";
+      et.onclick=async()=>{
+        const a1=prompt("Première "+PV.u+" couverte par ce volume ("+PV.nom+") :", String(v.lmin||1));
+        if(a1===null) return;
+        const a2=prompt("Dernière "+PV.u+" couverte :", String(v.lmax||PV.n));
+        if(a2===null) return;
+        const lo=Math.max(1,Math.min(PV.n,+a1||1)), hi=Math.max(lo,Math.min(PV.n,+a2||PV.n));
+        await mPut(Object.assign({},v,{lmin:lo,lmax:hi}));
+        MANUELS=null; render(); toast(PV.u+"s "+lo+" à "+hi);
+      };
+      c.appendChild(et);
+    }
     if(v.pages){
       const off=el("button","btn","Régler le décalage PDF ↔ livre");
       off.style.marginTop="6px"; off.style.fontSize="12.5px";
@@ -10126,7 +10159,16 @@ VIEWS.manuel=m=>{
   inp.type="file"; inp.accept="application/pdf"; inp.style.display="none";
   inp.onchange=async()=>{
     const f=inp.files[0]; if(!f) return;
-    const P0=parc(), NP=P0.n;
+    /* On demande le manuel : le supposer être celui qu'on suit rangeait un
+       volume du premier livre dans le second, sans moyen de le dire. */
+    let P0=parc();
+    const L2=(D.parcours||[]);
+    if(L2.length>1){
+      const autre=L2.find(x=>x.id!==P0.id);
+      if(autre && !confirm("Ce fichier est-il un volume de « "+P0.nom+" » ?\n\nOK = "+P0.nom+"\nAnnuler = "+autre.nom))
+        P0=autre;
+    }
+    const NP=P0.n;
     const lmin=+prompt("Première "+P0.u+" couverte par ce fichier ("+P0.nom+") ?","1")||1;
     const lmax=+prompt("Dernière "+P0.u+" couverte ?",String(Math.min(NP,lmin+Math.ceil(NP/2)-1)))||NP;
     const id="m"+Date.now().toString(36);
@@ -10143,7 +10185,7 @@ VIEWS.manuel=m=>{
         const det=pdfDetecteLecons(pages);
         const nDet=Object.keys(det).length;
         if(nDet){
-          const PG=pagesP();
+          const PG=pagesP(P0.id);
           if(confirm(nDet+" pages de leçon détectées dans le PDF. Préremplir l'index ?")){
             Object.keys(det).forEach(k=>{ PG[k]=det[k]; });
             save();
@@ -10161,7 +10203,7 @@ VIEWS.manuel=m=>{
         }
       } catch(e){ toast("Extraction échouée : "+e.message); }
     }
-    await mPut({id:id,nom:f.name,f:f,par:S.par||"m",lmin:lmin,lmax:lmax,pages:pages,idxVocab:idxVocab,offset:offset});
+    await mPut({id:id,nom:f.name,f:f,par:P0.id,lmin:lmin,lmax:lmax,pages:pages,idxVocab:idxVocab,offset:offset});
     MANUELS=null; render(); toast("Volume importé"+(pages?" — texte extrait":""));
   };
   const bi=el("button","btn p w","Importer un PDF");
