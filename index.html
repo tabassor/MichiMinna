@@ -3949,9 +3949,24 @@ VIEWS.home=m=>{
   /* le cadran de la pastille centrale porte déjà la progression des huit
      rangs : l'échelle en pastilles faisait doublon, elle est retirée */
 
-  pv.appendChild(el("div","chemin-etat",
-    nx.length? nx.length+" nœud"+(nx.length>1?"s":"")+" ouvert"+(nx.length>1?"s":"")+" à ce rang"
-             : "Tous les nœuds sont acquis — l'épreuve de rang vous attend."));
+  /* L'accueil annonçait l'épreuve sans jamais dire où la passer : elle se
+     lance depuis la pastille 試 au centre de la roue, sur l'écran du chemin.
+     L'annonce devient donc le chemin qui y mène. */
+  if(nx.length){
+    pv.appendChild(el("div","chemin-etat",
+      nx.length+" nœud"+(nx.length>1?"s":"")+" ouvert"+(nx.length>1?"s":"")+" à ce rang"));
+  } else {
+    const pr=testPret(tstate().rang);
+    if(pr){
+      const be=el("button","btn p w","試 Passer l'épreuve de rang");
+      be.style.marginTop="10px";
+      be.onclick=()=>go("arbre");
+      pv.appendChild(be);
+    } else {
+      pv.appendChild(el("div","chemin-etat",
+        "Tous les nœuds à votre portée sont acquis — avancez dans votre manuel pour ouvrir l'épreuve."));
+    }
+  }
 
   /* Plus de bouton carré : la pastille centrale mène au chemin, chaque voie
      à sa branche. Un seul geste reste utile — tirer un nœud au hasard. */
@@ -4199,6 +4214,14 @@ function blocVoies(nw,nk){
     const eqv=n?0:equivalent(p.id);
     const b=el("button","voie"+(actif?" on":""));
     b.dataset.p=p.id;
+    /* Le grand nombre dit la progression RÉELLE, et rien d'autre : il portait
+       l'équivalence (« ≈13 »), qu'on lisait comme un avancement alors que la
+       voie n'était pas commencée. L'équivalence reste dessinée par l'arc
+       fantôme de l'anneau, et nommée au survol. */
+    b.title = actif ? (p.nom+" — voie suivie") :
+      (n ? (p.nom+" — reprendre à la "+p.u+" "+n)
+         : (eqv ? (p.nom+" — non commencé ; votre autre voie vaut environ la "+p.u+" "+eqv)
+                : (p.nom+" — non commencé")));
     /* L'arc d'équivalence appartient au SVG : posé après sa balise fermante,
        il n'était tout simplement pas dessiné. */
     const fe=eqv?Math.min(1,eqv/p.n):0;
@@ -4208,7 +4231,7 @@ function blocVoies(nw,nk){
             stroke-dashoffset="${(264-264*fe).toFixed(1)}"/>`:""}
           <circle class="an-fg" cx="48" cy="48" r="42" stroke-dasharray="264"
             stroke-dashoffset="${(264-264*f).toFixed(1)}"/></svg>
-        <span class="voie-n"><b>${n||(eqv?"≈"+eqv:"—")}</b><u>/ ${p.n}</u></span></span>
+        <span class="voie-n"><b>${n||"—"}</b><u>/ ${p.n}</u></span></span>
       <span class="voie-j jpx">${esc(p.j)}</span>
       <span class="voie-l">${esc(p.nom)}</span>`;
     b.onclick=()=>{
@@ -7970,9 +7993,13 @@ VIEWS.arbre=m=>{
   const R=RANG(vueRang);
   const bes=besoinRang(vueRang), acq=fragAcquis(vueRang);
   const manque0=fragManquants(vueRang);
-  const reste0=noeudsDuRang(vueRang).filter(n=>!estFait(n.id)).length;
+  /* Ce qui reste, ce sont les nœuds que l'élève peut couvrir : exiger aussi
+     ceux dont son manuel n'enseigne pas la matière lui fermait l'épreuve à
+     jamais. C'est `testPret` qui tranche — il porte la règle du rang, elle
+     n'était appelée nulle part. */
+  const reste0=noeudsDuRang(vueRang).filter(n=>couvre(n)&&!estFait(n.id)).length;
   const estRangCourant = vueRang===T.rang;
-  const pret0=!manque0.length&&!reste0&&estRangCourant;
+  const pret0=estRangCourant&&testPret(vueRang);
   const dejaFranchi=!manque0.length&&!reste0&&!estRangCourant;
   const estMaitre0=!!R.maitre;
   const c=el("div","card");
@@ -8050,7 +8077,7 @@ VIEWS.arbre=m=>{
 
   /* test de rang */
   const manque=fragManquants(T.rang);
-  const reste=noeudsDuRang(T.rang).filter(n=>!estFait(n.id)).length;
+  const reste=noeudsDuRang(T.rang).filter(n=>couvre(n)&&!estFait(n.id)).length;
   /* La pastille centrale porte désormais le lancement de l'épreuve : cette
      carte n'en rappelle que les règles et ce qui reste à réunir. */
   const tb=el("div","card");
