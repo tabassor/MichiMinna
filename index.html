@@ -548,7 +548,6 @@ button.stat{font:inherit;width:100%}
 .voie-j{font-size:0.875rem;color:var(--dim);line-height:1.2;margin-top:2px}
 .voie.on .voie-j{color:var(--vp)}
 .voie-l{font-size:0.7812rem;font-weight:600;text-align:center;line-height:1.25}
-.voie-e{font-size:0.6562rem;color:var(--mut)}
 .an-eq{fill:none;stroke:var(--mut);stroke-width:4;opacity:.4;stroke-linecap:round}
 .voies-p{margin-top:12px;font-size:0.7188rem;color:var(--mut);text-align:center}
 /* Choix de la voie : deux manuels, deux axes, une seule progression affichée */
@@ -3296,10 +3295,19 @@ function render(){
   /* Le report des acquis ne se fait qu'une fois, au premier rendu : tstate()
      est appelé partout, on ne peut pas l'y loger sans récursion. */
   if(!_REP){ _REP=true; try{ reportArbre(); }catch(e){} }
-  const m=$("#v"); m.innerHTML="";
+  /* La position est relevée AVANT de vider l'écran : une fois #v vidé, le
+     document se rétracte et le navigateur a déjà ramené le défilement à
+     zéro — c'est ce qui rendait une première tentative sans effet. */
+  const m=$("#v");
+  const yAvant=(window.scrollY||document.documentElement.scrollTop||0);
+  m.innerHTML="";
   /* l'animation d'entrée ne se relance qu'en cas de changement de vue :
      un simple rafraîchissement sur place ne doit pas faire clignoter la page */
   const memeVue = (m.dataset.vue===view+"|"+param);
+  /* Rafraîchir un écran sur place en changeait la hauteur — basculer de voie
+     depuis l'accueil faisait sauter la page sous le doigt. On retient la
+     position et on la repose. */
+  const y0 = memeVue ? yAvant : 0;
   m.dataset.vue=view+"|"+param;
   m.className=""; m.dataset.pv="";
   if(!memeVue){ void m.offsetWidth; m.className="anim "+(navDir==="back"?"nav-back":"nav-fwd"); }
@@ -3322,6 +3330,10 @@ function render(){
   $("#avaBtn").textContent = u?[...u.n][0]:"・";
   drawVoies();
   drawNav();
+  /* On repose la position tout de suite, et une seule fois : une reprise
+     différée écraserait l'ajustement que l'appelant peut faire ensuite pour
+     garder sous le doigt l'élément touché. */
+  if(memeVue&&y0) window.scrollTo(0,y0);
 }
 /* un kanji cliquable ouvre sa fiche, où que l'on se trouve */
 /* Dans un mot, chaque kanji est une cible posée par-dessus la cible du mot.
@@ -4198,9 +4210,17 @@ function blocVoies(nw,nk){
             stroke-dashoffset="${(264-264*f).toFixed(1)}"/></svg>
         <span class="voie-n"><b>${n||(eqv?"≈"+eqv:"—")}</b><u>/ ${p.n}</u></span></span>
       <span class="voie-j jpx">${esc(p.j)}</span>
-      <span class="voie-l">${esc(p.nom)}</span>
-      <span class="voie-e">${actif?"voie suivie · ajuster":(n?"reprendre":(eqv?"≈ "+esc(p.u)+" "+eqv:"commencer"))}</span>`;
-    b.onclick=()=>{ if(actif) ouvreReglageChapitre(); else { changeParcours(p.id); render(); } };
+      <span class="voie-l">${esc(p.nom)}</span>`;
+    b.onclick=()=>{
+      if(actif){ ouvreReglageChapitre(); return; }
+      /* Les deux voies n'ont pas la même hauteur au-dessus de ces cartes —
+         rang, plan, compteurs. Conserver le seul défilement ne suffit donc
+         pas : on garde la carte touchée à la même place sous le doigt. */
+      const t0=b.getBoundingClientRect().top;
+      changeParcours(p.id); render();
+      const nb=document.querySelector('.voie[data-p="'+p.id+'"]');
+      if(nb){ const d=nb.getBoundingClientRect().top-t0; if(Math.abs(d)>1) window.scrollBy(0,d); }
+    };
     g.appendChild(b);
   });
   c.appendChild(g);
