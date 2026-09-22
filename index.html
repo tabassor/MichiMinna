@@ -95,6 +95,18 @@ header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:8px;
 .chip{border:1px solid var(--line);background:var(--surf);border-radius:999px;padding:6px 11px;font-size:0.8125rem;color:var(--mut);white-space:nowrap}
 .chip.on{background:var(--ai);border-color:var(--ai);color:var(--on);font-weight:700}
 .chip.sm{padding:5px 9px;font-size:0.75rem}
+/* Sélecteur d'univers : deux cases, la voie suivie remplie de sa couleur.
+   Basculer ne perd rien — chaque voie garde sa progression — et le changement
+   se voit aussitôt dans toute l'application, donc un doigt qui glisse se
+   rattrape d'un second geste. */
+.vsel{display:inline-flex;align-items:stretch;border:1px solid var(--line);
+  border-radius:999px;overflow:hidden;background:var(--surf)}
+.vsel:empty{display:none}
+.vsel button{border:0;background:none;padding:5px 8px;font-size:0.8438rem;line-height:1.2;
+  color:var(--dim);font-family:var(--disp);cursor:pointer}
+.vsel button.on{color:var(--on);font-weight:700}
+.vsel button[data-p="m"].on{background:var(--vm)}
+.vsel button[data-p="y"].on{background:var(--vy)}
 .ava{width:34px;height:34px;border-radius:50%;border:1px solid color-mix(in srgb,var(--ai) 45%,var(--line));
   background:radial-gradient(circle at 34% 28%,
     color-mix(in srgb,var(--ai) 6%,var(--surf)),
@@ -1657,7 +1669,11 @@ nav button.on .jp{filter:drop-shadow(0 1px 0 var(--pa-hi))
 .vchip.v-m{border-color:var(--vm);color:var(--vm)}
 .vchip.v-y{border-color:var(--vy);color:var(--vy)}
 .vchip.v-c,.vchip.fixe{cursor:default}
-.vchip.v-c{border-style:dashed}
+.vprov{display:inline-block;margin-top:9px;font-size:0.7812rem;color:var(--mut);line-height:1.5}
+.vprov em{font-style:normal;color:var(--tx);white-space:nowrap}
+.vprov em .jpx{font-size:0.8438rem}
+.vprov .vp-m{color:var(--vm)}
+.vprov .vp-y{color:var(--vy)}
 /* Ambiance : le titre de l'écran prend la couleur de la voie quand le contenu
    en dépend. Ailleurs il reste dans la couleur du texte — un écran commun ne
    doit appartenir à personne. */
@@ -1838,6 +1854,7 @@ nav button.on .jp{filter:drop-shadow(0 1px 0 var(--pa-hi))
       <button class="chip sm" id="searchBtn" title="Rechercher">🔍</button>
       <button class="chip sm" id="scriptBtn" title="Kanji ou kana">漢</button>
       <button class="chip sm" id="furiBtn" title="Furigana">ふ</button>
+      <div class="vsel" id="vsel" role="group" aria-label="Manuel suivi"></div>
     </div>
   </header>
   <main id="v"></main>
@@ -1959,19 +1976,19 @@ function derniersJours(n){
 }
 
 const THEMES={
-"urushi":{n:"漆",f:"Laque et or",d:1,skin:1,v:{bg:"#0E1116",surf:"#161A21",surf2:"#1E232C",line:"#2C3340",tx:"#EFEBE1",mut:"#A3A79F",dim:"#71766F",ai:"#D9A441",take:"#4FBE93",shu:"#E2593F",yama:"#C9A227",vm:"#D9A441",vy:"#B7BEFF",on:"#101010",onG:"#101010",onR:"#101010"}},
-"ai":{n:"藍",f:"Indigo",d:1,v:{bg:"#0B1322",surf:"#131F36",surf2:"#1B2B49",line:"#25395E",tx:"#E7EDF8",mut:"#8FA2C4",dim:"#5E7299",ai:"#5B8DEF",take:"#4FBF9B",shu:"#E0604B",yama:"#E3B23C",vm:"#5B8DEF",vy:"#CE77CF",on:"#101010",onG:"#101010",onR:"#101010"}},
-"washi":{n:"和紙",f:"Papier",d:0,v:{bg:"#EEF1F5",surf:"#FFFFFF",surf2:"#F5F7FA",line:"#D9E0EA",tx:"#122038",mut:"#55698A",dim:"#8496AF",ai:"#2F6BD8",take:"#0E7D5E",shu:"#C13A25",yama:"#96690F",vm:"#2F6BD8",vy:"#98359A",on:"#FFFFFF",onG:"#FFFFFF",onR:"#FFFFFF"}},
-"sakura":{n:"桜",f:"Cerisier",d:0,v:{bg:"#FDF3F6",surf:"#FFFFFF",surf2:"#FBE9EF",line:"#F0CFDA",tx:"#381D29",mut:"#7E5163",dim:"#AE8494",ai:"#D23B7B",take:"#0F7C57",shu:"#C0392B",yama:"#96690F",vm:"#D23B7B",vy:"#1C5DD3",on:"#FFFFFF",onG:"#FFFFFF",onR:"#FFFFFF"}},
-"yuzu":{n:"柚子",f:"Agrumes",d:0,v:{bg:"#FDF8EA",surf:"#FFFFFF",surf2:"#FBF1D8",line:"#EDDFBB",tx:"#312716",mut:"#6E5A34",dim:"#A08C60",ai:"#B8730A",take:"#0F7A4E",shu:"#C0392B",yama:"#8A6A12",vm:"#B8730A",vy:"#5765B9",on:"#101010",onG:"#FFFFFF",onR:"#FFFFFF"}},
-"sora":{n:"空",f:"Ciel",d:0,v:{bg:"#EFF7FD",surf:"#FFFFFF",surf2:"#E4F1FB",line:"#C9E0F1",tx:"#0F2837",mut:"#456C84",dim:"#7A99AD",ai:"#0A6FB0",take:"#0E7D5E",shu:"#C13A25",yama:"#96690F",vm:"#0A6FB0",vy:"#8A4E99",on:"#FFFFFF",onG:"#FFFFFF",onR:"#FFFFFF"}},
-"sumi":{n:"墨",f:"Encre",d:0,v:{bg:"#F7F7F4",surf:"#FFFFFF",surf2:"#EFEFEB",line:"#D5D5CE",tx:"#14140F",mut:"#4E4E45",dim:"#84847A",ai:"#26261F",take:"#1D6E42",shu:"#B0301F",yama:"#8A6A12",vm:"#26261F",vy:"#19204E",on:"#FFFFFF",onG:"#FFFFFF",onR:"#FFFFFF"}},
-"yozakura":{n:"夜桜",f:"Nuit rose",d:1,v:{bg:"#17101E",surf:"#211829",surf2:"#2C2036",line:"#3E2F4C",tx:"#F3EAF6",mut:"#B79EC3",dim:"#806B8C",ai:"#F06CA8",take:"#56C08A",shu:"#E9614F",yama:"#E9B84A",vm:"#F06CA8",vy:"#569FFF",on:"#101010",onG:"#101010",onR:"#101010"}},
-"shibuya":{n:"渋谷",f:"Néon",d:1,v:{bg:"#07080E",surf:"#10121C",surf2:"#171A28",line:"#272C42",tx:"#EAF0FF",mut:"#98A2C2",dim:"#646E8E",ai:"#22E3D6",take:"#8BF248",shu:"#FF4D8D",yama:"#FFD23D",vm:"#22E3D6",vy:"#94A4FF",on:"#101010",onG:"#101010",onR:"#101010"}},
-"shinkai":{n:"深海",f:"Grands fonds",d:1,v:{bg:"#061418",surf:"#0C2028",surf2:"#123038",line:"#1E4652",tx:"#E3F2F5",mut:"#8FB6C0",dim:"#5C848E",ai:"#33D6C8",take:"#8ADB6E",shu:"#F4705B",yama:"#F0C24A",vm:"#33D6C8",vy:"#9F94EE",on:"#101010",onG:"#101010",onR:"#101010"}},
-"pop":{n:"ポップ",f:"Pop",d:0,skin:1,v:{bg:"#F2F4F8",surf:"#FFFFFF",surf2:"#E8ECF4",line:"#C7D0E0",tx:"#141A2B",mut:"#4C5A70",dim:"#7C89A3",ai:"#4C36E8",take:"#0E8F5E",shu:"#E01E5A",yama:"#B76E00",vm:"#4C36E8",vy:"#850090",on:"#FFFFFF",onG:"#101010",onR:"#FFFFFF"}},
-"kawaii":{n:"かわいい",f:"Kawaii",d:0,skin:1,v:{bg:"#FFF3F8",surf:"#FFFFFF",surf2:"#FFE7F1",line:"#F5C6DC",tx:"#3B1E33",mut:"#7A4A66",dim:"#A97B93",ai:"#C0387E",take:"#0F7A55",shu:"#D9342B",yama:"#9A6A00",vm:"#C0387E",vy:"#0059C2",on:"#FFFFFF",onG:"#FFFFFF",onR:"#FFFFFF"}},
-"retro":{n:"レトロ",f:"Arcade",d:1,skin:1,v:{bg:"#12102A",surf:"#1B1840",surf2:"#252152",line:"#38326E",tx:"#F2EEFF",mut:"#B3A9E0",dim:"#7E74AE",ai:"#00E0FF",take:"#5CF07A",shu:"#FF5C8A",yama:"#FFD84D",vm:"#00E0FF",vy:"#C1B9FF",on:"#101010",onG:"#101010",onR:"#101010"}}
+"urushi":{n:"漆",f:"Laque et or",d:1,skin:1,v:{bg:"#0E1116",surf:"#161A21",surf2:"#1E232C",line:"#2C3340",tx:"#EFEBE1",mut:"#A3A79F",dim:"#71766F",ai:"#D9A441",take:"#4FBE93",shu:"#E2593F",yama:"#C9A227",vm:"#D9A441",vy:"#B7BEFF",on:"#101010",onG:"#101010",onR:"#101010"},vo:{m:{bg:"#12100F",surf:"#1B1916",surf2:"#24221E",line:"#34312C",ai:"#D9A441",on:"#111111"},y:{bg:"#0E0D21",surf:"#15172C",surf2:"#1D2037",line:"#2C304A",ai:"#B7BEFF",on:"#111111"}}},
+"ai":{n:"藍",f:"Indigo",d:1,v:{bg:"#0B1322",surf:"#131F36",surf2:"#1B2B49",line:"#25395E",tx:"#E7EDF8",mut:"#8FA2C4",dim:"#5E7299",ai:"#5B8DEF",take:"#4FBF9B",shu:"#E0604B",yama:"#E3B23C",vm:"#5B8DEF",vy:"#CE77CF",on:"#101010",onG:"#101010",onR:"#101010"},vo:{m:{bg:"#0A1127",surf:"#111E3A",surf2:"#182A4D",line:"#223862",ai:"#5B8DEF",on:"#111111"},y:{bg:"#160D26",surf:"#201539",surf2:"#2A1E4A",line:"#362E5D",ai:"#CE77CF",on:"#111111"}}},
+"washi":{n:"和紙",f:"Papier",d:0,v:{bg:"#EEF1F5",surf:"#FFFFFF",surf2:"#F5F7FA",line:"#D9E0EA",tx:"#122038",mut:"#55698A",dim:"#8496AF",ai:"#2F6BD8",take:"#0E7D5E",shu:"#C13A25",yama:"#96690F",vm:"#2F6BD8",vy:"#98359A",on:"#FFFFFF",onG:"#FFFFFF",onR:"#FFFFFF"},vo:{m:{bg:"#E9F1FE",surf:"#FFFFFF",surf2:"#F3F7FD",line:"#CFE0FC",ai:"#2F6BD8",on:"#FFFFFF"},y:{bg:"#F9E7FB",surf:"#FFFFFF",surf2:"#FBF2FD",line:"#F1CCF7",ai:"#98359A",on:"#FFFFFF"}}},
+"sakura":{n:"桜",f:"Cerisier",d:0,v:{bg:"#FDF3F6",surf:"#FFFFFF",surf2:"#FBE9EF",line:"#F0CFDA",tx:"#381D29",mut:"#7E5163",dim:"#AE8494",ai:"#D23B7B",take:"#0F7C57",shu:"#C0392B",yama:"#96690F",vm:"#D23B7B",vy:"#1C5DD3",on:"#FFFFFF",onG:"#FFFFFF",onR:"#FFFFFF"},vo:{m:{bg:"#FFF2F6",surf:"#FFFFFF",surf2:"#FFE7EE",line:"#FFC2D8",ai:"#D23B7B",on:"#FFFFFF"},y:{bg:"#F0F6FF",surf:"#FFFFFF",surf2:"#E5EFFF",line:"#C2DAFF",ai:"#1C5DD3",on:"#FFFFFF"}}},
+"yuzu":{n:"柚子",f:"Agrumes",d:0,v:{bg:"#FDF8EA",surf:"#FFFFFF",surf2:"#FBF1D8",line:"#EDDFBB",tx:"#312716",mut:"#6E5A34",dim:"#A08C60",ai:"#B8730A",take:"#0F7A4E",shu:"#C0392B",yama:"#8A6A12",vm:"#B8730A",vy:"#5765B9",on:"#101010",onG:"#FFFFFF",onR:"#FFFFFF"},vo:{m:{bg:"#FFF7EE",surf:"#FFFFFF",surf2:"#FFEEDD",line:"#FFD7A7",ai:"#B8730A",on:"#111111"},y:{bg:"#F6F8FF",surf:"#FFFFFF",surf2:"#ECF1FF",line:"#D3DEFF",ai:"#5765B9",on:"#FFFFFF"}}},
+"sora":{n:"空",f:"Ciel",d:0,v:{bg:"#EFF7FD",surf:"#FFFFFF",surf2:"#E4F1FB",line:"#C9E0F1",tx:"#0F2837",mut:"#456C84",dim:"#7A99AD",ai:"#0A6FB0",take:"#0E7D5E",shu:"#C13A25",yama:"#96690F",vm:"#0A6FB0",vy:"#8A4E99",on:"#FFFFFF",onG:"#FFFFFF",onR:"#FFFFFF"},vo:{m:{bg:"#EEF7FF",surf:"#FFFFFF",surf2:"#E2F1FF",line:"#BCE1FF",ai:"#0A6FB0",on:"#FFFFFF"},y:{bg:"#FDF1FF",surf:"#FFFFFF",surf2:"#FBE7FF",line:"#F8C9FF",ai:"#8A4E99",on:"#FFFFFF"}}},
+"sumi":{n:"墨",f:"Encre",d:0,v:{bg:"#F7F7F4",surf:"#FFFFFF",surf2:"#EFEFEB",line:"#D5D5CE",tx:"#14140F",mut:"#4E4E45",dim:"#84847A",ai:"#26261F",take:"#1D6E42",shu:"#B0301F",yama:"#8A6A12",vm:"#26261F",vy:"#19204E",on:"#FFFFFF",onG:"#FFFFFF",onR:"#FFFFFF"},vo:{m:{bg:"#F8F8EE",surf:"#FFFFF6",surf2:"#EFEFE9",line:"#D5D5CC",ai:"#26261F",on:"#FFFFFF"},y:{bg:"#F3F6FF",surf:"#FFFFFF",surf2:"#E8EEFF",line:"#C2D2FF",ai:"#19204E",on:"#FFFFFF"}}},
+"yozakura":{n:"夜桜",f:"Nuit rose",d:1,v:{bg:"#17101E",surf:"#211829",surf2:"#2C2036",line:"#3E2F4C",tx:"#F3EAF6",mut:"#B79EC3",dim:"#806B8C",ai:"#F06CA8",take:"#56C08A",shu:"#E9614F",yama:"#E9B84A",vm:"#F06CA8",vy:"#569FFF",on:"#101010",onG:"#101010",onR:"#101010"},vo:{m:{bg:"#1C0D1D",surf:"#271427",surf2:"#321A34",line:"#452849",ai:"#F06CA8",on:"#111111"},y:{bg:"#0C1029",surf:"#121837",surf2:"#182147",line:"#213160",ai:"#569FFF",on:"#111111"}}},
+"shibuya":{n:"渋谷",f:"Néon",d:1,v:{bg:"#07080E",surf:"#10121C",surf2:"#171A28",line:"#272C42",tx:"#EAF0FF",mut:"#98A2C2",dim:"#646E8E",ai:"#22E3D6",take:"#8BF248",shu:"#FF4D8D",yama:"#FFD23D",vm:"#22E3D6",vy:"#94A4FF",on:"#101010",onG:"#101010",onR:"#101010"},vo:{m:{bg:"#040A0C",surf:"#0A151A",surf2:"#0E1D25",line:"#18313D",ai:"#22E3D6",on:"#111111"},y:{bg:"#07061B",surf:"#0F0D29",surf2:"#151435",line:"#25284E",ai:"#94A4FF",on:"#111111"}}},
+"shinkai":{n:"深海",f:"Grands fonds",d:1,v:{bg:"#061418",surf:"#0C2028",surf2:"#123038",line:"#1E4652",tx:"#E3F2F5",mut:"#8FB6C0",dim:"#5C848E",ai:"#33D6C8",take:"#8ADB6E",shu:"#F4705B",yama:"#F0C24A",vm:"#33D6C8",vy:"#9F94EE",on:"#101010",onG:"#101010",onR:"#101010"},vo:{m:{bg:"#021716",surf:"#042324",surf2:"#063434",line:"#0B4B4B",ai:"#33D6C8",on:"#111111"},y:{bg:"#0A0F23",surf:"#111933",surf2:"#182A43",line:"#26405D",ai:"#9F94EE",on:"#111111"}}},
+"pop":{n:"ポップ",f:"Pop",d:0,skin:1,v:{bg:"#F2F4F8",surf:"#FFFFFF",surf2:"#E8ECF4",line:"#C7D0E0",tx:"#141A2B",mut:"#4C5A70",dim:"#7C89A3",ai:"#4C36E8",take:"#0E8F5E",shu:"#E01E5A",yama:"#B76E00",vm:"#4C36E8",vy:"#850090",on:"#FFFFFF",onG:"#101010",onR:"#FFFFFF"},vo:{m:{bg:"#F0F3FF",surf:"#FFFFFF",surf2:"#E6EAFF",line:"#BFCAFF",ai:"#4C36E8",on:"#FFFFFF"},y:{bg:"#FEEBFE",surf:"#FFFFFF",surf2:"#FDDBFE",line:"#F5B5FC",ai:"#850090",on:"#FFFFFF"}}},
+"kawaii":{n:"かわいい",f:"Kawaii",d:0,skin:1,v:{bg:"#FFF3F8",surf:"#FFFFFF",surf2:"#FFE7F1",line:"#F5C6DC",tx:"#3B1E33",mut:"#7A4A66",dim:"#A97B93",ai:"#C0387E",take:"#0F7A55",shu:"#D9342B",yama:"#9A6A00",vm:"#C0387E",vy:"#0059C2",on:"#FFFFFF",onG:"#FFFFFF",onR:"#FFFFFF"},vo:{m:{bg:"#FFF3F7",surf:"#FFFFFF",surf2:"#FFE5F0",line:"#FFBCDB",ai:"#C0387E",on:"#FFFFFF"},y:{bg:"#F1F7FF",surf:"#FFFFFF",surf2:"#E4EFFF",line:"#B9D8FF",ai:"#0059C2",on:"#FFFFFF"}}},
+"retro":{n:"レトロ",f:"Arcade",d:1,skin:1,v:{bg:"#12102A",surf:"#1B1840",surf2:"#252152",line:"#38326E",tx:"#F2EEFF",mut:"#B3A9E0",dim:"#7E74AE",ai:"#00E0FF",take:"#5CF07A",shu:"#FF5C8A",yama:"#FFD84D",vm:"#00E0FF",vy:"#C1B9FF",on:"#101010",onG:"#101010",onR:"#101010"},vo:{m:{bg:"#0D1327",surf:"#131C3B",surf2:"#1B254C",line:"#283866",ai:"#00E0FF",on:"#111111"},y:{bg:"#140935",surf:"#1E1445",surf2:"#281F54",line:"#3A316C",ai:"#C1B9FF",on:"#111111"}}}
 };
 /* Chaque voie tire sa couleur du thème : la palette reste cohérente d'un
    thème à l'autre, et la voie reste reconnaissable à l'intérieur de chacun. */
@@ -1981,6 +1998,13 @@ function applyTheme(){
   const t=THEMES[S.theme]||THEMES.ai;
   const r=document.documentElement;
   for(const k in t.v) r.style.setProperty("--"+k,t.v[k]);
+  /* L'univers par-dessus le thème : le thème donne la matière — clarté des
+     fonds, texte, couleurs de sens — et l'univers donne l'encre. Les fonds
+     sont teintés de la teinte de la voie à clarté constante (calculé par
+     voies.py, vérifié en contraste), et l'accent devient celui de la voie.
+     Deux univers du même thème sont deux papiers de la même main. */
+  const VO=(t.vo&&t.vo[S.par||"m"])||null;
+  if(VO) for(const k in VO) r.style.setProperty("--"+k,VO[k]);
   r.dataset.t=t.d?"dark":"light";
   /* --vv : la couleur de la voie suivie, quel que soit le thème. Un parcours
      qui n'aurait pas la sienne retombe sur l'accent. */
@@ -1991,7 +2015,7 @@ function applyTheme(){
   r.dataset.gloss=S.gloss?"1":"0";
   r.dataset.big=(S.fs||1)>=1.5?"1":"0";
   const mt=document.querySelector('meta[name=theme-color]');
-  if(mt) mt.setAttribute("content",t.v.bg);
+  if(mt) mt.setAttribute("content",(VO&&VO.bg)||t.v.bg);
 }
 
 /* ================= utilitaires ================= */
@@ -3110,6 +3134,23 @@ window.addEventListener("popstate",()=>{
   popping=false;
 });
 const NAV=[["home","家","Accueil"],["arbre","道","Le chemin"],["dico","辞","Dico"],["kanji","字","Kanji"],["shugyo","修","Entraîner"]];
+/* Le sélecteur d'univers, dans l'en-tête : présent sur tous les écrans, donc
+   toujours sous le pouce. Il n'apparaît qu'à partir de deux manuels. */
+function drawVoies(){
+  const n=$("#vsel"); if(!n) return;
+  const L=(D.parcours||[]);
+  if(L.length<2){ n.innerHTML=""; return; }
+  n.innerHTML="";
+  L.forEach(p=>{
+    const on=p.id===(S.par||"m");
+    const b=el("button",on?"on":"",esc(p.mk||p.nom.charAt(0)));
+    b.dataset.p=p.id;
+    b.title=p.nom+(on?" — voie suivie":" — basculer");
+    b.setAttribute("aria-pressed",on?"true":"false");
+    b.onclick=()=>{ if(on) return; changeParcours(p.id); render(); };
+    n.appendChild(b);
+  });
+}
 function drawNav(){
   const n=$("#nav"); n.innerHTML="";
   NAV.forEach(([v,j,f])=>{
@@ -3148,9 +3189,17 @@ function pastilleVoie(){
     return b;
   }
   if(ECRAN_COMMUN[view]){
-    const s=el("span","vchip v-c");
-    s.innerHTML=`<span class="jpx">共</span>commun aux deux voies`;
-    s.title="Cet écran ne dépend d'aucun manuel : il réunit tout ce que vous avez rencontré, d'un côté comme de l'autre.";
+    /* Ces écrans réunissent les deux progressions : les nommer d'une seule
+       voie serait faux. On dit d'où vient ce qui est ouvert — c'est ce qui
+       rend cohérent l'ensemble des kanji ou des mots affichés. Chaque marque
+       à sa couleur ; les voies non entamées ne s'invitent pas. */
+    const parts=(D.parcours||[]).filter(p=>avance(p.id)>0);
+    if(!parts.length) return null;
+    const s=el("span","vprov");
+    s.innerHTML="ouvert par "+parts.map(p=>
+      `<em class="vp-${p.id}"><span class="jpx">${esc(p.mk||"")}</span> ${esc(p.u)} ${avance(p.id)}</em>`
+    ).join(" · ");
+    s.title="Cet écran réunit ce que vous avez rencontré sur les deux manuels.";
     return s;
   }
   return null;
@@ -3220,6 +3269,7 @@ function render(){
   $("#furiBtn").className = "chip sm"+(S.furi?" on":"");
   const u=USERS.find(x=>x.id===UID);
   $("#avaBtn").textContent = u?[...u.n][0]:"・";
+  drawVoies();
   drawNav();
 }
 /* un kanji cliquable ouvre sa fiche, où que l'on se trouve */
