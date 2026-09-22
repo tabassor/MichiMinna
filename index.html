@@ -774,6 +774,13 @@ button.stat{font:inherit;width:100%}
 .dj-face{font-family:var(--disp);font-size:4.75rem;line-height:1;color:var(--tx)}
 .dj-dos{font-size:1.25rem;color:var(--ai);min-height:26px;font-family:var(--disp)}
 .dojocpt{text-align:center;font-size:0.75rem;color:var(--dim);margin-top:10px}
+.vol{border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surf2);
+  padding:13px 14px;margin-bottom:12px}
+.vol:last-child{margin-bottom:0}
+.vol-t{font-family:var(--disp);font-size:1.0312rem;line-height:1.35;word-break:break-word}
+.vol-m{font-size:0.7812rem;color:var(--mut);margin-top:6px;line-height:1.6}
+.vol-b{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
+.vol-b .btn{font-size:0.7812rem;padding:6px 11px}
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;margin-top:10px}
 .pcell{display:flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:var(--r-sm);padding:4px 6px}
 .pcell-l{font-size:0.6875rem;color:var(--ai);min-width:26px;background:none;border:0;padding:0;cursor:pointer;font-weight:600}
@@ -10029,114 +10036,212 @@ function boutonManuel(l){
   return b;
 }
 
+/* ============ la bibliothèque ============
+   Trois notions distinctes, longtemps confondues dans cette vue :
+   — le volume (un fichier PDF sur l'appareil),
+   — le manuel auquel il se rattache (ou aucun : un document libre),
+   — l'index page ↔ leçon, qui appartient au manuel et non au parcours suivi.
+   D'où un groupe par manuel, avec son propre index, visible quel que soit
+   le parcours actif : on perdait l'index du premier manuel dès qu'on suivait
+   le second. */
+const LIBRE="_";
+const parDe = v => PAR[volPar(v)] || null;
+
+/* Rattachement d'un volume. Trois choix ne tiennent pas dans un confirm() ;
+   on ouvre une feuille, plus lisible et sans ordre implicite. */
+function choisirManuel(jp, sous, actuel, cb){
+  const back=document.createElement("div"); back.className="sheet";
+  const box=el("div","sheetbox");
+  box.innerHTML=`<div class="sheethead">
+      <div><div class="jpx" style="font-size:1.375rem;line-height:1.2;color:var(--ai)">${esc(jp)}</div>
+        <div style="font-size:0.8125rem;color:var(--mut);margin-top:2px">${esc(sous)}</div></div>
+      <button class="ico" id="cmX">✕</button></div>`;
+  const l=el("div"); l.style.marginTop="12px";
+  const opt=(id,nom,detail)=>{
+    const b=el("button","btn w");
+    b.style.cssText="text-align:left;display:block;margin-bottom:8px;padding:11px 12px;white-space:normal";
+    b.innerHTML=`<div style="font-size:0.9062rem">${esc(nom)}${id===actuel?' <span class="tag">actuel</span>':""}</div>
+      <div style="font-size:0.75rem;color:var(--mut);margin-top:3px;line-height:1.5">${esc(detail)}</div>`;
+    b.onclick=()=>{ back.remove(); cb(id); };
+    l.appendChild(b);
+  };
+  (D.parcours||[]).forEach(p=>opt(p.id,p.nom,
+    p.n+" "+p.uu+" · les boutons 本 de l'application ouvriront ce volume"));
+  opt(LIBRE,"Document libre",
+    "Simple lecture : aucun lien avec une leçon, aucun index de pages");
+  box.appendChild(l);
+  back.appendChild(box);
+  document.body.appendChild(back);
+  $("#cmX",box).onclick=()=>back.remove();
+  back.onclick=e=>{ if(e.target===back) back.remove(); };
+}
+
+/* Ouvre le volume qui couvre une leçon d'un manuel donné — actif ou non. */
+function ouvrirLecon(P,l){
+  const v=manuelDe(l,P.id);
+  if(!v){ toast("Aucun volume ne couvre cette "+P.u); return; }
+  const pg=pagesP(P.id)[l];
+  ouvrirBlobPDF(v,(pg&&pg>0)?pg:1);
+}
+
 VIEWS.manuel=m=>{
-  head(m,"本冊","Votre exemplaire, sur cet appareil",
-    "Importez le PDF du manuel que vous possédez : il reste sur cet appareil, "+
-    "n'est ni envoyé, ni partagé, ni inclus dans vos sauvegardes. En indiquant "+
-    "à quelle page commence chaque leçon — l'application sait souvent les "+
-    "détecter seule — tous les boutons 本 de l'application ouvrent le manuel "+
-    "directement à la bonne page.");
+  head(m,"本冊","Vos livres, sur cet appareil",
+    "Importez le PDF des manuels que vous possédez : ils restent sur cet "+
+    "appareil, ne sont ni envoyés, ni partagés, ni inclus dans vos "+
+    "sauvegardes. En indiquant à quelle page commence chaque leçon — "+
+    "l'application sait souvent les détecter seule — tous les boutons 本 "+
+    "ouvrent le bon volume à la bonne page. Vous pouvez aussi y déposer "+
+    "n'importe quel autre PDF, en document libre, et vous en servir comme "+
+    "d'une liseuse.");
   if(MANUELS===null){ chargeManuels().then(render);
     m.appendChild(el("div","empty","<b>…</b>Lecture en cours.")); return; }
 
-  /* --- les volumes importés --- */
-  const c=el("div","card");
-  c.appendChild(el("div","sec","Volumes"));
-  if(!MANUELS.length) c.appendChild(el("div","empty","<b>—</b>Aucun volume importé."));
-  MANUELS.forEach(v=>{
-    const d=el("div","word");
-    const marqueTexte = v.pages ? ' <span class="tag" style="border-color:var(--take);color:var(--take)">texte extrait</span>' : "";
-    const marqueDec = (v.pages&&v.offset) ? ' <span class="tag" title="page PDF pour la page 1 imprimée">décalage +'+(v.offset-1)+'</span>' : "";
-    d.innerHTML=`<div class="l"><div class="k" style="font-size:0.9375rem">${esc(volNom(v))}${v.nomAffichage?' <span class="tag" style="border-color:var(--mut);color:var(--mut)" title="Nom du fichier : '+esc(v.nom)+'">renommé</span>':""}</div>
-      <div class="f">${esc((PAR[volPar(v)]||PAR.m).nom)} · ${esc((PAR[volPar(v)]||PAR.m).uu)} ${v.lmin} à ${v.lmax} · ${Math.round((v.f.size||0)/1048576)} Mo${marqueTexte}${marqueDec}</div></div>
-      <div class="r"><button class="btn p" style="padding:6px 10px;font-size:0.8125rem">本 Ouvrir</button><button class="ico" title="Retirer ce volume">✕</button></div>`;
-    const [bo,bx]=d.querySelectorAll(".r > button");
-    bo.onclick=e=>{ e.stopPropagation();
-      /* ouvrirManuel lit l'index de pages du parcours actif : on ouvre donc
-         directement le volume quand il appartient à l'autre manuel */
-      if(volPar(v)===(S.par||"m")) ouvrirManuel(v.lmin);
-      else ouvrirBlobPDF(v, (S.pages&&S.pages[volPar(v)]&&S.pages[volPar(v)][v.lmin])||1); };
-    bx.onclick=async e=>{
-      e.stopPropagation();
-      if(!confirm("Retirer « "+volNom(v)+" » de cet appareil ?")) return;
-      await mDel(v.id); MANUELS=null; render();
+  /* ---------- import ---------- */
+  async function importe(f,pid){
+    const P0=PAR[pid]||null;
+    let lmin=null,lmax=null;
+    if(P0){
+      lmin=+prompt("Première "+P0.u+" couverte par ce fichier ("+P0.nom+") ?","1")||1;
+      lmax=+prompt("Dernière "+P0.u+" couverte ?",
+        String(Math.min(P0.n,lmin+Math.ceil(P0.n/2)-1)))||P0.n;
+      lmin=Math.max(1,Math.min(P0.n,lmin)); lmax=Math.max(lmin,Math.min(P0.n,lmax));
+    }
+    const doIt=confirm("Extraire le texte de ce PDF pour activer la recherche "+
+      "interne"+(P0?", l'auto-détection des pages de leçon":"")+" et l'analyse "+
+      "à partir d'une page ?\n\npdf.js sera chargé une fois depuis un CDN public.");
+    let pages=null, idxVocab=null, offset=null;
+    if(doIt){
+      try{
+        toast("Extraction en cours…");
+        pages=await pdfExtraire(f);
+        idxVocab=pdfIndexeVocab(pages, words(50));
+        if(P0){
+          const det=pdfDetecteLecons(pages), nDet=Object.keys(det).length;
+          if(nDet){
+            const PG=pagesP(P0.id);
+            if(confirm(nDet+" pages de leçon détectées dans le PDF. Préremplir l'index de "+P0.nom+" ?")){
+              Object.keys(det).forEach(k=>{ PG[k]=det[k]; });
+              save();
+            }
+          }
+        }
+        const sug=pdfDetecteDecalage(pages);
+        if(sug){
+          if(confirm("Le PDF semble démarrer à la page « 1 » imprimée à sa page PDF "+sug+". Utiliser ce décalage pour les numéros de page ?")) offset=sug;
+        } else {
+          const rep=prompt("Décalage entre le PDF et la numérotation du livre : à quelle page PDF se trouve la page imprimée « 1 » ? (Laissez vide si le PDF n'a pas de préliminaires.)","");
+          const v0=+rep; if(v0>0) offset=v0;
+        }
+      } catch(e){ toast("Extraction échouée : "+e.message); }
+    }
+    await mPut({id:"m"+Date.now().toString(36),nom:f.name,f:f,par:pid,
+      lmin:lmin,lmax:lmax,pages:pages,idxVocab:idxVocab,offset:offset});
+    MANUELS=null; render(); toast("Document importé"+(pages?" — texte extrait":""));
+  }
+
+  const inp=document.createElement("input");
+  inp.type="file"; inp.accept="application/pdf"; inp.style.display="none";
+  inp.onchange=()=>{
+    const f=inp.files[0]; if(!f) return;
+    inp.value="";
+    choisirManuel("取込",'« '+f.name+' »',null,pid=>importe(f,pid));
+  };
+
+  const ci=el("div","card");
+  ci.appendChild(el("div","sec","Bibliothèque"));
+  const nLib=MANUELS.filter(v=>!parDe(v)).length;
+  ci.appendChild(el("div","note", MANUELS.length
+    ? MANUELS.length+" document"+(MANUELS.length>1?"s":"")+" sur cet appareil"+
+      (nLib?" · dont "+nLib+" en lecture libre":"")+"."
+    : "Aucun document pour l'instant. Importez le PDF d'un manuel, ou n'importe quel autre livre à lire."));
+  const bi=el("button","btn p w","Importer un PDF");
+  bi.style.marginTop="12px";
+  bi.onclick=()=>inp.click();
+  ci.appendChild(inp); ci.appendChild(bi);
+  m.appendChild(ci);
+
+  if(!MANUELS.length) return;
+
+  /* ---------- un volume ---------- */
+  function blocVolume(cont,v){
+    const P=parDe(v);
+    const d=el("div","vol");
+    const bd=[];
+    if(v.nomAffichage) bd.push('<span class="tag" title="Nom du fichier : '+esc(v.nom)+'">renommé</span>');
+    if(v.pages) bd.push('<span class="tag" style="border-color:var(--take);color:var(--take)">texte extrait</span>');
+    if(v.pages&&v.offset) bd.push('<span class="tag" title="Page PDF où se trouve la page imprimée 1">décalage +'+(v.offset-1)+'</span>');
+    const couv = P
+      ? P.uu+" "+(v.lmin||1)+" à "+(v.lmax||P.n)
+      : "lecture libre";
+    d.innerHTML=`<div class="vol-t">${esc(volNom(v))}</div>
+      <div class="vol-m">${esc(couv)} · ${Math.round((v.f.size||0)/1048576)} Mo</div>
+      ${bd.length?'<div class="vol-m">'+bd.join(" ")+"</div>":""}
+      <div class="vol-b"></div>`;
+    const br=d.querySelector(".vol-b");
+    const bt=(lab,titre,fn)=>{
+      const x=el("button","btn",lab);
+      if(titre) x.title=titre;
+      x.onclick=fn; br.appendChild(x); return x;
     };
-    c.appendChild(d);
-    /* Sur les volumes déjà importés sans extraction : proposer de la lancer
-       maintenant, sans devoir ré-importer le fichier. */
-    /* Renommer : donne un nom lisible aux fichiers dont le nom d'origine
-       est peu parlant (téléchargements, suffixes techniques). Le nom du
-       fichier réel n'est pas modifié. */
-    const rn=el("button","btn","Renommer");
-    rn.style.marginTop="6px"; rn.style.fontSize="12.5px"; rn.style.marginRight="6px";
-    rn.onclick=async()=>{
-      const rep=prompt("Nom d\'affichage pour ce volume :\n(Vide = revenir au nom du fichier.)", volNom(v));
+
+    bt("本 Ouvrir",null,()=>{
+      if(P) ouvrirLecon(P, v.lmin||1);
+      else ouvrirBlobPDF(v,1);
+    }).className="btn p";
+
+    bt("Renommer","Un nom lisible ; le fichier n'est pas modifié",async()=>{
+      const rep=prompt("Nom d'affichage pour ce document :\n(Vide = revenir au nom du fichier.)", volNom(v));
       if(rep===null) return;
       const val=rep.trim();
       await mPut(Object.assign({},v,{nomAffichage: val||null}));
-      MANUELS=null; render(); toast(val?"Renommé":"Nom d\'affichage retiré");
-    };
-    c.appendChild(rn);
-    /* Rattacher un volume à l'autre manuel : l'import le range dans celui
-       qu'on suit au moment où on l'ajoute, et l'on trouve rarement les deux
-       livres le même jour. */
-    if((D.parcours||[]).length>1){
-      const autre=(D.parcours||[]).find(x=>x.id!==volPar(v));
-      if(autre){
-        const mv=el("button","btn","→ "+esc(autre.nom));
-        mv.style.marginTop="6px"; mv.style.fontSize="12.5px"; mv.style.marginRight="6px";
-        mv.title="Rattacher ce volume à "+autre.nom;
-        mv.onclick=async()=>{
-          if(!confirm("Rattacher « "+volNom(v)+" » au manuel "+autre.nom+" ?\n\nSes "+autre.uu+" couvertes restent "+v.lmin+" à "+v.lmax+" — ajustez-les ensuite si besoin.")) return;
-          await mPut(Object.assign({},v,{par:autre.id}));
-          MANUELS=null; render(); toast("Rattaché à "+autre.nom);
-        };
-        c.appendChild(mv);
-      }
-      /* Corriger l'étendue sans ré-importer : elle a été saisie dans l'unité
-         du manuel actif au moment de l'import, qui n'est pas toujours le bon. */
-      const et=el("button","btn","Leçons couvertes");
-      et.style.marginTop="6px"; et.style.fontSize="12.5px"; et.style.marginRight="6px";
-      const PV=PAR[volPar(v)]||PAR.m;
-      et.textContent=PV.uu.charAt(0).toUpperCase()+PV.uu.slice(1)+" couvertes";
-      et.onclick=async()=>{
-        const a1=prompt("Première "+PV.u+" couverte par ce volume ("+PV.nom+") :", String(v.lmin||1));
-        if(a1===null) return;
-        const a2=prompt("Dernière "+PV.u+" couverte :", String(v.lmax||PV.n));
-        if(a2===null) return;
-        const lo=Math.max(1,Math.min(PV.n,+a1||1)), hi=Math.max(lo,Math.min(PV.n,+a2||PV.n));
-        await mPut(Object.assign({},v,{lmin:lo,lmax:hi}));
-        MANUELS=null; render(); toast(PV.u+"s "+lo+" à "+hi);
-      };
-      c.appendChild(et);
-    }
-    if(v.pages){
-      const off=el("button","btn","Régler le décalage PDF ↔ livre");
-      off.style.marginTop="6px"; off.style.fontSize="12.5px";
-      off.onclick=async()=>{
-        const rep=prompt("À quelle page PDF se trouve la page imprimée « 1 » ? (Vide pour retirer le décalage.)", String(v.offset||""));
-        if(rep===null) return;
-        const v0=+rep;
-        await mPut(Object.assign({},v,{offset:v0>0?v0:null}));
-        MANUELS=null; render(); toast(v0>0?"Décalage enregistré":"Décalage retiré");
-      };
-      c.appendChild(off);
-    }
-    if(!v.pages){
-      const ex=el("button","btn","Extraire le texte (une fois)");
-      ex.style.marginTop="6px"; ex.style.fontSize="12.5px";
-      ex.onclick=async()=>{
+      MANUELS=null; render(); toast(val?"Renommé":"Nom d'affichage retiré");
+    });
+
+    bt("Rattacher…","À quel manuel appartient ce fichier ?",()=>{
+      choisirManuel("移動","« "+volNom(v)+" »",volPar(v),async pid=>{
+        if(pid===volPar(v)) return;
+        const Q=PAR[pid]||null;
+        const maj={par:pid};
+        if(!Q){ maj.lmin=null; maj.lmax=null; }
+        else if(!P){ maj.lmin=1; maj.lmax=Q.n; }
+        else { maj.lmin=Math.min(Q.n,v.lmin||1); maj.lmax=Math.min(Q.n,v.lmax||Q.n); }
+        await mPut(Object.assign({},v,maj));
+        MANUELS=null; render();
+        toast(Q?("Rattaché à "+Q.nom+" — vérifiez l'étendue"):"Passé en document libre");
+      });
+    });
+
+    if(P) bt("Étendue","Première et dernière "+P.u+" de ce volume",async()=>{
+      const a1=prompt("Première "+P.u+" couverte par ce volume ("+P.nom+") :",String(v.lmin||1));
+      if(a1===null) return;
+      const a2=prompt("Dernière "+P.u+" couverte :",String(v.lmax||P.n));
+      if(a2===null) return;
+      const lo=Math.max(1,Math.min(P.n,+a1||1)), hi=Math.max(lo,Math.min(P.n,+a2||P.n));
+      await mPut(Object.assign({},v,{lmin:lo,lmax:hi}));
+      MANUELS=null; render(); toast(P.u+"s "+lo+" à "+hi);
+    });
+
+    if(v.pages) bt("Décalage PDF ↔ livre","Écart entre la pagination du PDF et celle du livre",async()=>{
+      const rep=prompt("À quelle page PDF se trouve la page imprimée « 1 » ? (Vide pour retirer le décalage.)", String(v.offset||""));
+      if(rep===null) return;
+      const v0=+rep;
+      await mPut(Object.assign({},v,{offset:v0>0?v0:null}));
+      MANUELS=null; render(); toast(v0>0?"Décalage enregistré":"Décalage retiré");
+    });
+    else {
+      const ex=bt("Extraire le texte","Une seule fois ; active la recherche interne",async()=>{
         ex.disabled=true; ex.textContent="Extraction en cours…";
         try{
           const pages=await pdfExtraire(v.f);
           const idxVocab=pdfIndexeVocab(pages, words(50));
-          const det=pdfDetecteLecons(pages);
-          const nDet=Object.keys(det).length;
-          if(nDet){
-            const PG=pagesP(volPar(v));
-            if(confirm(nDet+" pages de leçon détectées. Préremplir l'index ?")){
-              Object.keys(det).forEach(k=>{ PG[k]=det[k]; });
-              save();
+          if(P){
+            const det=pdfDetecteLecons(pages), nDet=Object.keys(det).length;
+            if(nDet){
+              const PG=pagesP(P.id);
+              if(confirm(nDet+" pages de leçon détectées. Préremplir l'index de "+P.nom+" ?")){
+                Object.keys(det).forEach(k=>{ PG[k]=det[k]; });
+                save();
+              }
             }
           }
           let offset=v.offset||null;
@@ -10149,135 +10254,100 @@ VIEWS.manuel=m=>{
           }
           await mPut(Object.assign({},v,{pages:pages,idxVocab:idxVocab,offset:offset}));
           MANUELS=null; render(); toast("Texte extrait");
-        } catch(e){ ex.disabled=false; ex.textContent="Extraire le texte (une fois)"; toast("Échec : "+e.message); }
-      };
-      c.appendChild(ex);
+        } catch(e){ ex.disabled=false; ex.textContent="Extraire le texte"; toast("Échec : "+e.message); }
+      });
     }
+
+    bt("Retirer","Effacer ce fichier de l'appareil",async()=>{
+      if(!confirm("Retirer « "+volNom(v)+" » de cet appareil ?")) return;
+      await mDel(v.id); MANUELS=null; render();
+    }).style.marginLeft="auto";
+
+    cont.appendChild(d);
+  }
+
+  /* ---------- l'index des pages d'un manuel ---------- */
+  function blocIndex(cont,P){
+    const PG=pagesP(P.id), NP=P.n;
+    let nPages=0, nAttendu=0;
+    for(let l=1;l<=NP;l++) if(manuelDe(l,P.id)){ nAttendu++; if(PG[l]) nPages++; }
+    const t=el("div","sec");
+    t.innerHTML="Page de chaque "+esc(P.u)+
+      (nAttendu?' <b style="color:var(--take);letter-spacing:0">· '+nPages+"/"+nAttendu+"</b>":"");
+    t.style.margin="20px 0 0";
+    cont.appendChild(t);
+    if(!nAttendu){
+      cont.appendChild(el("div","note","Aucune "+P.u+" n'est couverte par les volumes ci-dessus. Réglez leur étendue pour renseigner l'index."));
+      return;
+    }
+    cont.appendChild(el("div","note","Ouvrez le volume, relevez le numéro de page affiché par votre lecteur, et saisissez-le. Une seule fois."));
+    const g=el("div","pgrid");
+    for(let l=1;l<=NP;l++){
+      if(!manuelDe(l,P.id)) continue;
+      const w=el("div","pcell");
+      const lab=document.createElement("button");
+      lab.className="pcell-l"; lab.type="button";
+      lab.textContent=P.u.charAt(0).toUpperCase()+l;
+      lab.title="Ouvrir à cette "+P.u;
+      lab.disabled=!PG[l];
+      lab.onclick=()=>ouvrirLecon(P,l);
+      w.appendChild(lab);
+      const i2=document.createElement("input");
+      i2.type="number"; i2.min="1"; i2.inputMode="numeric";
+      i2.value=(PG[l]||""); i2.placeholder="—";
+      i2.onchange=()=>{
+        const v2=+i2.value;
+        if(v2>0) PG[l]=v2; else delete PG[l];
+        save();
+        lab.disabled=!PG[l];
+      };
+      w.appendChild(i2);
+      g.appendChild(w);
+    }
+    cont.appendChild(g);
+    const cc=el("div","ctrl"); cc.style.margin="12px 0 0";
+    const bp=el("button","btn","Remplir par pas régulier");
+    bp.onclick=()=>{
+      const p1=+prompt("Page de la "+P.u+" 1 ?","")||0;
+      if(!p1) return;
+      const pas=+prompt("Combien de pages par "+P.u+", en moyenne ?","8")||8;
+      for(let l=1;l<=NP;l++) if(manuelDe(l,P.id)) PG[l]=p1+(l-1)*pas;
+      save(); render(); toast("Index prérempli — ajustez au besoin");
+    };
+    const bz=el("button","btn","Tout effacer");
+    bz.onclick=()=>{ if(confirm("Effacer tout l'index des pages de "+P.nom+" ?")){ S.pages[P.id]={}; save(); render(); } };
+    cc.appendChild(bp); cc.appendChild(bz);
+    cont.appendChild(cc);
+  }
+
+  /* ---------- un groupe par manuel, puis les documents libres ---------- */
+  (D.parcours||[]).forEach(P=>{
+    const vs=MANUELS.filter(v=>volPar(v)===P.id);
+    if(!vs.length) return;
+    const actif=(S.par||"m")===P.id;
+    sectionRepliable(m,"manuel:g:"+P.id,
+      esc(P.nom)+' <b style="letter-spacing:0;color:var(--mut);font-weight:400">· '+
+        vs.length+" volume"+(vs.length>1?"s":"")+"</b>"+
+        (actif?' <span class="tag" style="border-color:var(--ai);color:var(--ai)">suivi</span>':""),
+      actif, c=>{
+        vs.forEach(v=>blocVolume(c,v));
+        blocIndex(c,P);
+      });
   });
 
-  const inp=document.createElement("input");
-  inp.type="file"; inp.accept="application/pdf"; inp.style.display="none";
-  inp.onchange=async()=>{
-    const f=inp.files[0]; if(!f) return;
-    /* On demande le manuel : le supposer être celui qu'on suit rangeait un
-       volume du premier livre dans le second, sans moyen de le dire. */
-    let P0=parc();
-    const L2=(D.parcours||[]);
-    if(L2.length>1){
-      const autre=L2.find(x=>x.id!==P0.id);
-      if(autre && !confirm("Ce fichier est-il un volume de « "+P0.nom+" » ?\n\nOK = "+P0.nom+"\nAnnuler = "+autre.nom))
-        P0=autre;
-    }
-    const NP=P0.n;
-    const lmin=+prompt("Première "+P0.u+" couverte par ce fichier ("+P0.nom+") ?","1")||1;
-    const lmax=+prompt("Dernière "+P0.u+" couverte ?",String(Math.min(NP,lmin+Math.ceil(NP/2)-1)))||NP;
-    const id="m"+Date.now().toString(36);
-    /* Extraction du texte (option 3) : pdf.js chargé une fois depuis CDN,
-       texte stocké avec le fichier, index vocab construit dans la foulée. */
-    const doIt=confirm("Extraire le texte de ce PDF pour activer la recherche interne, l'auto-détection des pages de leçon et l'analyse à partir d'une page ?\n\npdf.js sera chargé une fois depuis un CDN public.");
-    let pages=null, idxVocab=null;
-    let offset=null;
-    if(doIt){
-      try{
-        toast("Extraction en cours…");
-        pages=await pdfExtraire(f);
-        idxVocab=pdfIndexeVocab(pages, words(50));
-        const det=pdfDetecteLecons(pages);
-        const nDet=Object.keys(det).length;
-        if(nDet){
-          const PG=pagesP(P0.id);
-          if(confirm(nDet+" pages de leçon détectées dans le PDF. Préremplir l'index ?")){
-            Object.keys(det).forEach(k=>{ PG[k]=det[k]; });
-            save();
-          }
-        }
-        /* Décalage entre page imprimée dans le livre et page PDF —
-           utile pour l'analyse d'une page, la recherche et les repères
-           de fiches. On propose l'auto-détection, sinon on laisse vide. */
-        const sug=pdfDetecteDecalage(pages);
-        if(sug){
-          if(confirm("Le PDF semble démarrer à la page « 1 » imprimée à sa page PDF "+sug+". Utiliser ce décalage pour les numéros de page ?")) offset=sug;
-        } else {
-          const rep=prompt("Décalage entre le PDF et la numérotation du livre : à quelle page PDF se trouve la page imprimée « 1 » ? (Laissez vide si le PDF n'a pas de préliminaires.)","");
-          const v0=+rep; if(v0>0) offset=v0;
-        }
-      } catch(e){ toast("Extraction échouée : "+e.message); }
-    }
-    await mPut({id:id,nom:f.name,f:f,par:P0.id,lmin:lmin,lmax:lmax,pages:pages,idxVocab:idxVocab,offset:offset});
-    MANUELS=null; render(); toast("Volume importé"+(pages?" — texte extrait":""));
-  };
-  const bi=el("button","btn p w","Importer un PDF");
-  bi.onclick=()=>inp.click();
-  c.appendChild(inp); c.appendChild(bi);
-  m.appendChild(c);
+  const libres=MANUELS.filter(v=>!parDe(v));
+  if(libres.length) sectionRepliable(m,"manuel:g:libre",
+    'Autres documents <b style="letter-spacing:0;color:var(--mut);font-weight:400">· '+
+      libres.length+"</b>", false, c=>{
+      c.appendChild(el("div","note","Des PDF sans lien avec une leçon : lecture, recherche, rien d'autre."));
+      libres.forEach(v=>blocVolume(c,v));
+    });
 
-  if(!MANUELS.length) return;
-  /* Une fois au moins un volume importé, l'index des pages et les réglages
-     passent sous un pli : on n'y revient qu'à l'occasion. */
-
-  /* --- l'index des pages --- */
-  const PG=pagesP(), NP=parcN();
-  /* Combien de leçons ont déjà leur page ? Si l'index est rempli, on replie. */
-  let nPages=0;
-  for(let l=1;l<=NP;l++) if(manuelDe(l)&&PG[l]) nPages++;
-  let nAttendu=0;
-  for(let l=1;l<=NP;l++) if(manuelDe(l)) nAttendu++;
-  const indexFait = nAttendu>0 && nPages>=nAttendu*0.8;
-  const ix=el("div","card");
-  ix.appendChild(el("div","note","Ouvrez le PDF, relevez le numéro de page affiché par votre lecteur, et saisissez-le. Une seule fois."));
-  const g=el("div","pgrid");
-  for(let l=1;l<=NP;l++){
-    if(!manuelDe(l)) continue;
-    /* Le label enveloppait autrefois l'input entier ; un clic sur l'étiquette
-       « L7 » focalisait donc la case. En passant à un div on peut faire de
-       cette étiquette un bouton d'ouverture. */
-    const w=el("div","pcell");
-    const lab=document.createElement("button");
-    lab.className="pcell-l"; lab.type="button"; lab.textContent="L"+l;
-    lab.title="Ouvrir le manuel à cette leçon";
-    lab.disabled=!PG[l];
-    lab.onclick=()=>ouvrirManuel(l);
-    w.appendChild(lab);
-    const i2=document.createElement("input");
-    i2.type="number"; i2.min="1"; i2.inputMode="numeric";
-    i2.value=(PG[l]||""); i2.placeholder="—";
-    i2.onchange=()=>{
-      const v2=+i2.value;
-      if(v2>0) PG[l]=v2; else delete PG[l];
-      save();
-      /* On rafraîchit l'état du bouton sans refaire tout le rendu. */
-      lab.disabled=!PG[l];
-    };
-    w.appendChild(i2);
-    g.appendChild(w);
-  }
-  ix.appendChild(g);
-
-  const cc=el("div","ctrl"); cc.style.marginTop="12px";
-  const bp=el("button","btn","Remplir par pas régulier");
-  bp.onclick=()=>{
-    const p1=+prompt("Page de la "+parc().u+" 1 ?","")||0;
-    if(!p1) return;
-    const pas=+prompt("Combien de pages par "+parc().u+", en moyenne ?","8")||8;
-    for(let l=1;l<=NP;l++) if(manuelDe(l)) PG[l]=p1+(l-1)*pas;
-    save(); render();
-    toast("Index prérempli — ajustez au besoin");
-  };
-  const bz=el("button","btn","Tout effacer");
-  bz.onclick=()=>{ if(confirm("Effacer tout l'index des pages de "+parc().nom+" ?")){ S.pages[S.par||"m"]={}; save(); render(); } };
-  cc.appendChild(bp); cc.appendChild(bz);
-  ix.appendChild(cc);
-  sectionRepliable(m,"manuel:index",
-    "À quelle page commence chaque leçon ?"+(nPages?' <b style="color:var(--take)">· '+nPages+"/"+nAttendu+"</b>":""),
-    !indexFait, c2=>{ while(ix.firstChild) c2.appendChild(ix.firstChild); });
-
-  /* Recherche plein texte dans les PDF importés qui ont été extraits.
-     Simple parcours de chaque page ; on affiche les pages qui contiennent
-     la requête, avec un extrait autour, et un lien pour ouvrir la page. */
+  /* ---------- recherche plein texte ---------- */
   const avecTexte=MANUELS.filter(v=>v.pages&&v.pages.length);
   if(avecTexte.length){
     const rs=el("div","card");
-    rs.appendChild(el("div","sec","Rechercher dans le PDF"));
+    rs.appendChild(el("div","sec","Rechercher dans les PDF"));
     const q=document.createElement("input"); q.type="text"; q.className="search";
     q.placeholder="Ex : « すみません », « ~ましょう », « 家族 »";
     rs.appendChild(q);
@@ -10873,7 +10943,11 @@ async function aideLancePDF(v, imp, forceRefresh){
   try{ imgB64=await pdfPageImage(v, np, 1600); }
   catch(e){ aideErreur("Impossible de rendre la page : "+e.message); aideBusy=false; return; }
 
-  const question="Analyse cette page du manuel "+(PAR[volPar(v)]||parc()).nom+" — c'est la page "+imp+" imprimée dans le livre. Elle est envoyée en image telle que je la vois.";
+  /* Un volume libre n'appartient à aucun manuel : le nommer « Minna » ferait
+     raisonner Gemini sur un livre que l'élève n'a pas sous les yeux. */
+  const PQ=parDe(v);
+  const question="Analyse cette page "+(PQ?("du manuel "+PQ.nom):("du document « "+volNom(v)+" »"))+
+    " — c'est la page "+imp+" imprimée dans le livre. Elle est envoyée en image telle que je la vois.";
   aideMsg.push({role:"user", parts:[{text:question},{inlineData:{mimeType:"image/jpeg",data:imgB64}}],
     affiche:"Analyse de la page "+imp+" (imprimée)",
     source:{vol:v.id, page:imp}});
@@ -11077,7 +11151,7 @@ VIEWS.aide=m=>{
     const selV=document.createElement("select"); selV.className="search"; selV.style.flex="2";
     volsTexte.forEach(v=>{
       const o=document.createElement("option"); o.value=v.id;
-      o.textContent=volNom(v)+" — "+((PAR[volPar(v)]||PAR.m).nom);
+      o.textContent=volNom(v)+" — "+(parDe(v)?parDe(v).nom:"document libre");
       selV.appendChild(o);
     });
     const numP=document.createElement("input"); numP.type="number"; numP.min="1"; numP.className="search"; numP.style.flex="1"; numP.placeholder="p. imprimée";
