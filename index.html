@@ -2885,15 +2885,55 @@ function expand(a){
 }
 /* 9時 ≡ 九時 ≡ ９時 : les nombres s'écrivent de trois façons */
 const K2A={"〇":"0","一":"1","二":"2","三":"3","四":"4","五":"5","六":"6","七":"7","八":"8","九":"9"};
+/* Les nombres s'ecrivent en chiffres, en kanji et en kana : 3000, 三千 et
+   さんぜん sont le meme nombre. Sans quoi « さんぜんえん » etait refuse contre
+   « 三千円 ». On ne convertit une suite en kana que si elle porte une unite
+   (じゅう, ひゃく, せん, まん) ou qu'un compteur la suit : sans cette precaution,
+   le ご de ごはん deviendrait un 5. */
+const NUMK={"いち":1,"に":2,"さん":3,"よん":4,"し":4,"ご":5,"ろく":6,"ろっ":6,
+  "なな":7,"しち":7,"はち":8,"はっ":8,"きゅう":9,"く":9};
+const NUMU={"じゅう":10,"じゅっ":10,"じっ":10,"ひゃく":100,"びゃく":100,"ぴゃく":100,
+  "せん":1000,"ぜん":1000,"まん":10000};
+const CPT=/^(じかん|じ|ふん|ぷん|えん|にん|まい|さつ|ほん|ぼん|ぽん|こ|かい|がい|だい|ねん|がつ|にち|ど|つ)/;
+function numKana(t){
+  const str=String(t); let out="", i=0;
+  const cles=Object.keys(NUMK).concat(Object.keys(NUMU)).sort((a,b)=>b.length-a.length);
+  while(i<str.length){
+    let tot=0, cur=0, j=i, unite=false, vu=false;
+    for(;;){
+      let pris=null;
+      for(const c of cles) if(str.startsWith(c,j)){ pris=c; break; }
+      if(!pris) break;
+      if(NUMK[pris]!==undefined){ cur=NUMK[pris]; }
+      else{
+        const u=NUMU[pris]; unite=true;
+        if(u===10000){ tot=(tot+(cur||1))*10000; cur=0; }
+        else { tot+=(cur||1)*u; cur=0; }
+      }
+      vu=true; j+=pris.length;
+    }
+    const val=tot+cur;
+    if(vu && (unite||CPT.test(str.slice(j)))){ out+=String(val); i=j; }
+    else { out+=str[i]; i++; }
+  }
+  return out;
+}
 function numNorm(t){
   t=String(t).replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
-  /* kanji simples et dizaines : 十五 → 15, 二十 → 20, 三十分 → 30分 */
-  t=t.replace(/[一二三四五六七八九]?十[一二三四五六七八九]?/g,m=>{
-    const d=m.indexOf("十"), a=m.slice(0,d), b=m.slice(d+1);
-    const A=a?+K2A[a]:1, B=b?+K2A[b]:0;
-    return String(A*10+B);
+  /* kanji : 十五 vers 15, 二十 vers 20, 三千 vers 3000, 五百 vers 500 */
+  t=t.replace(/[〇一二三四五六七八九十百千万]+/g,m=>{
+    let tot=0,cur=0,ok=false;
+    for(const c of m){
+      if(K2A[c]!==undefined){ cur=+K2A[c]; ok=true; }
+      else if(c==="十"){ tot+=(cur||1)*10; cur=0; ok=true; }
+      else if(c==="百"){ tot+=(cur||1)*100; cur=0; ok=true; }
+      else if(c==="千"){ tot+=(cur||1)*1000; cur=0; ok=true; }
+      else if(c==="万"){ tot=(tot+(cur||1))*10000; cur=0; ok=true; }
+      else return m;
+    }
+    return ok?String(tot+cur):m;
   });
-  return t.replace(/[〇一二三四五六七八九]/g,c=>K2A[c]);
+  return numKana(t);
 }
 /* しんかんせんで ともだちと ≡ ともだちと しんかんせんで */
 function blocks(t){
@@ -2904,6 +2944,37 @@ function blocks(t){
 /* Lecture en kana d'une phrase entière : « 駅まで三十分かかります » devient
    « えきまでさんじゅっぷんかかります ». Sans cela, une réponse saisie tout en
    hiragana était refusée dès que la phrase comptait plus d'un mot. */
+/* Lecture d'un mot tel qu'il est ecrit dans la phrase, forme conjuguee comprise.
+   Le segmenteur rend l'entree du dictionnaire (起きます / おきます) meme quand la
+   phrase porte une autre forme (起きる). Prendre la lecture de l'entree telle
+   quelle donnait « おきます » pour 起きる, « はなします » pour 話す : la reponse
+   de l'eleve ecrite en kana etait alors refusee alors qu'elle etait juste. On ne
+   retient donc de l'entree que la correspondance radical-kanji vers radical-kana,
+   et on la reporte sur la forme reellement ecrite. */
+function lireToken(tok,info){
+  if(!/[\u4e00-\u9fff]/.test(tok)) return tok;
+  if(D.rd[tok]) return D.rd[tok];
+  const j=info&&info.j&&String(info.j).split("・")[0];
+  const k=info&&info.k&&String(info.k).split("・")[0];
+  if(!k||/[\u4e00-\u9fff]/.test(k)) return (D.rs&&D.rs[tok])||null;
+  if(!j||j===tok) return k;
+  /* compteur : l'entree est ecrite « ~円 / ~えん ». Le nombre reste tel quel,
+     seul le compteur passe en kana ; numNorm rapprochera ensuite les ecritures. */
+  if(j.indexOf("～")===0||j.indexOf("〜")===0){
+    const jj=j.slice(1), kk=k.slice(1);
+    if(jj&&kk&&tok.length>jj.length&&tok.slice(-jj.length)===jj) return tok.slice(0,-jj.length)+kk;
+  }
+  /* suffixe kana commun aux deux ecritures : le reste est le radical */
+  let n=0;
+  while(n<j.length&&n<k.length){
+    const c=j[j.length-1-n];
+    if(c!==k[k.length-1-n]||/[\u4e00-\u9fff]/.test(c)) break;
+    n++;
+  }
+  const rj=j.slice(0,j.length-n), rk=k.slice(0,k.length-n);
+  if(rj&&rk&&tok.indexOf(rj)===0) return rk+tok.slice(rj.length);
+  return (D.rs&&D.rs[tok])||null;
+}
 function lecturePhrase(t){
   const str=String(t);
   if(!/[\u4e00-\u9fff]/.test(str)) return str;
@@ -2912,9 +2983,7 @@ function lecturePhrase(t){
   try{
     return segment(str).map(([tok,info],i,tab)=>{
       if(!/[\u4e00-\u9fff]/.test(tok)) return tok;
-      const lu = D.rd[tok] ||
-        (info&&info.k&&!/[\u4e00-\u9fff]/.test(info.k)?info.k.split("・")[0]:null) ||
-        (D.rs&&D.rs[tok]);
+      const lu = lireToken(tok,info);
       /* un kanji suffixe collé à un mot étranger garde sa lecture sino-japonaise */
       if(tok.length===1&&SUF[tok]&&i>0&&!/[\u4e00-\u9fff]/.test(tab[i-1][0]||"")) return SUF[tok];
       return lu||tok;
@@ -12179,15 +12248,30 @@ function questionsVoie(vid){
 }
 
 let sess=null, poolCache=null, poolCh=null;
+/* Un leurre qui se lit comme la bonne reponse rend celle-ci fausse : le QCM
+   juge par identite de chaine, et l'eleve qui choisit 歯 ou は -- le meme mot,
+   l'un en kanji, l'autre en kana -- est compte faux avec raison de se plaindre.
+   On ecarte donc du vivier toute proposition qui n'est que l'autre ecriture de
+   la reponse attendue, ou qui s'afficherait a l'identique. */
+function memeEcrit(a,b){
+  a=String(a); b=String(b);
+  if(norm(a)===norm(b)) return true;
+  const kj=x=>/[\u4e00-\u9fff]/.test(x);
+  if(kj(a)===kj(b)) return false;              /* on ne vise que kanji contre kana */
+  const K=kj(a)?a:b, N=kj(a)?b:a;
+  const lu=D.rd[K]||readingOf(K);
+  if(lu&&norm(String(lu).split("・")[0])===norm(N)) return true;
+  return (D.rev[N]||[]).some(x=>norm(x)===norm(K));
+}
 function opts(correct,pool){
-  const o=[correct], p=shuffle(pool.filter(x=>x&&x!==correct));
+  const o=[correct], p=shuffle(pool.filter(x=>x&&x!==correct&&!memeEcrit(x,correct)));
   for(const x of p){ if(o.length>=4)break; if(!o.includes(x))o.push(x); }
   return shuffle(o);
 }
 function optsRanked(correct,...pools){        /* puise d'abord dans le vivier le plus proche */
   const o=[correct];
   for(const pool of pools){
-    for(const x of shuffle((pool||[]).filter(x=>x&&x!==correct))){
+    for(const x of shuffle((pool||[]).filter(x=>x&&x!==correct&&!memeEcrit(x,correct)))){
       if(o.length>=4) break; if(!o.includes(x)) o.push(x);
     }
     if(o.length>=4) break;
@@ -12742,14 +12826,22 @@ VIEWS.shugyo=m=>{
     return done ? jp(t) : jpn(t);
   };
   const g=el("div","opts");
-  q.o.forEach(o=>{
+  /* deux propositions peuvent porter des valeurs differentes et s'afficher
+     a l'identique (開いて pour あいて comme pour ひらいて). L'eleve choisit alors
+     au hasard entre deux libelles identiques. On n'en garde qu'une. */
+  const brut=o=>String((S.script!=="kana"&&q.oj&&q.oj[o])?q.oj[o]:o);
+  let liste=q.o.filter(o=>o===q.a||brut(o)!==brut(q.a));
+  if(liste.length<2) liste=q.o;
+  liste.forEach(o=>{
     const isA=o===q.a;
     const bt=el("button","opt"+(done?(isA?" ok":(o===chosen?" no":"")):""), showJ(o));
     /* une fois répondu, chaque proposition s'ouvre : les leurres aussi s'apprennent */
     if(done&&!["kan","rad"].includes(q.type)) bt.innerHTML=jpw(q.oj&&q.oj[o]?q.oj[o]:o);
     bt.dataset.v=o;
     if(!done) bt.onclick=()=>{
-      const ok=isA;
+      /* filet : une proposition venue des donnees et non du vivier peut encore
+         etre la bonne reponse dans l'autre ecriture. On ne la compte pas fausse. */
+      const ok=isA||(q.type!=="kanr"&&memeEcrit(o,q.a));
       sess.ans[sess.i]=o;
       if(!ok) requeue(q);
       answer(q,ok);
