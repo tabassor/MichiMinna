@@ -1,5 +1,5 @@
 /* みち — service worker */
-const V = 'michi-7a84330a7f';
+const V = 'michi-609371cfbc';
 const ASSETS = ["./", "./manifest.webmanifest", "./icon-192.763e0885.png", "./icon-512.d6112b92.png", "./icon-maskable-192.c4df9da1.png", "./icon-maskable-512.9ed5431b.png", "./apple-touch-icon.298b71c4.png"];
 
 /* Installation instantanée : aucun téléchargement ne doit retarder l'activation,
