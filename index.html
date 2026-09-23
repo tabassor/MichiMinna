@@ -4815,7 +4815,9 @@ VIEWS.lecon=m=>{
   if(D.arbre.some(n=>{const pl=(S.par||"m")==="y"?n.yl:n.ch; return pl&&pl[0]<=L.n&&L.n<=pl[1];})){
     const b5=el("button","btn","Ses nœuds sur le chemin");
     b5.onclick=()=>{ arbreCh=L.n;
-      const cible=D.arbre.find(n=>viseNoeud(n));
+      /* on préfère le rang courant : c'est celui dont l'accueil montre les comptes */
+      const Tr=tstate().rang;
+      const cible=D.arbre.find(n=>n.rang===Tr&&viseNoeud(n))||D.arbre.find(n=>viseNoeud(n));
       if(cible) arbreRang=cible.rang;
       go("arbre"); };
     q.appendChild(b5);
@@ -8102,9 +8104,15 @@ VIEWS.arbre=m=>{
   const c=el("div","card");
   c.style.borderColor="color-mix(in srgb,var(--ai) 34%,var(--line))";
   const rt=el("div","rang-tete");
-  rt.innerHTML=`<span class="eyebrow">Rang ${T.rang+1} sur ${D.rangs.length}${R.jlpt?" · JLPT N"+R.jlpt:""}</span>
+  /* L'entête annonçait le rang courant quand la carte montre le rang consulté :
+     en revenant sur un rang franchi, elle disait « rang 3 » au-dessus des
+     jauges du rang 2, et le compte de fragments contredisait l'accueil, qui
+     lui ne montre jamais que le rang courant. */
+  rt.innerHTML=`<span class="eyebrow">Rang ${vueRang+1} sur ${D.rangs.length}${R.jlpt?" · JLPT N"+R.jlpt:""}${
+      vueRang!==T.rang?' <b style="color:var(--ai)">· consulté</b>':""}</span>
     <h2 class="rang-n">${esc(R.n)} <em>${esc(R.r)}</em></h2>
-    <p class="rang-d">${esc(R.d)}</p>`;
+    <p class="rang-d">${esc(R.d)}</p>${
+      vueRang!==T.rang?'<p class="rang-d" style="color:var(--ai)">Vous en êtes au rang '+(T.rang+1)+' — '+esc(RANG(T.rang).n)+'. Les comptes ci-dessous sont ceux du rang '+(vueRang+1)+'.</p>':""}`;
   c.appendChild(rt);
 
   const rr=el("div","roue");
@@ -8206,7 +8214,13 @@ VIEWS.arbre=m=>{
   {
     const ici=avance(S.par||"m");
     const cible=arbreCh||ici;
-    const nb=cible?D.arbre.filter(n=>{const pl=repY()?n.yl:n.ch;return pl&&pl[0]<=cible&&cible<=pl[1];}).length:0;
+    const dans=n=>{const pl=repY()?n.yl:n.ch;return pl&&pl[0]<=cible&&cible<=pl[1];};
+    const nb=cible?D.arbre.filter(dans).length:0;
+    /* l'écran ne montre qu'un rang : on dit ce qui est visible ici, et le total
+       seulement s'il diffère — sans quoi le compte annoncé et les nœuds
+       surlignés ne s'accordent pas. */
+    const ici2=cible?D.arbre.filter(n=>n.rang===vueRang&&dans(n)).length:0;
+    const cpt=ici2===nb?String(nb):(ici2+" de "+nb);
     if(nb){
       const b=el("button","btn w");
       b.style.marginBottom="12px";
@@ -8214,12 +8228,17 @@ VIEWS.arbre=m=>{
          ce bouton ne doit pas peser plus que ce qu'il désigne */
       if(arbreCh){ b.style.borderColor="var(--vv)"; b.style.color="var(--vv)"; }
       b.innerHTML=arbreCh
-        ? `✓ Nœuds ${repY()?"de la leçon":"du chapitre"} ${arbreCh} <span style="opacity:.7">· ${nb} · masquer</span>`
-        : `Montrer les nœuds de ${repY()?"ma leçon":"mon chapitre"} ${ici} <span style="opacity:.55">· ${nb}</span>`;
+        ? `✓ Nœuds ${repY()?"de la leçon":"du chapitre"} ${arbreCh} <span style="opacity:.7">· ${cpt} · masquer</span>`
+        : `Montrer les nœuds de ${repY()?"ma leçon":"mon chapitre"} ${ici} <span style="opacity:.55">· ${cpt}</span>`;
       b.onclick=()=>{
         const avant=arbreRang;
         arbreCh=arbreCh?0:ici;
-        if(arbreCh){ const c2=D.arbre.find(n=>viseNoeud(n)); if(c2) arbreRang=c2.rang; }
+        /* on reste sur le rang affiché s'il porte cette matière : déplacer le
+           rang change toutes les jauges de la carte, et l'élève croirait que
+           son compte de fragments a bougé. */
+        if(arbreCh&&!D.arbre.some(n=>n.rang===arbreRang&&viseNoeud(n))){
+          const c2=D.arbre.find(n=>viseNoeud(n)); if(c2) arbreRang=c2.rang;
+        }
         if(arbreRang!==avant){ render(); return; }
         majSurbrillance(); render();
       };
