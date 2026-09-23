@@ -96,8 +96,6 @@ header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:8px;
 .chip{border:1px solid var(--line);background:var(--surf);border-radius:999px;padding:6px 11px;font-size:0.8125rem;color:var(--mut);white-space:nowrap}
 .chip.on{background:var(--ai);border-color:var(--ai);color:var(--on);font-weight:700}
 .chip.sm{padding:5px 9px;font-size:0.75rem}
-.chip.ici{border-color:var(--vv)}
-.chip.ici:not(.on){color:var(--vv)}
 /* Sélecteur d'univers : deux cases, la voie suivie remplie de sa couleur.
    Basculer ne perd rien — chaque voie garde sa progression — et le changement
    se voit aussitôt dans toute l'application, donc un doigt qui glisse se
@@ -4819,7 +4817,7 @@ VIEWS.lecon=m=>{
     b5.onclick=()=>{ arbreCh=L.n;
       const cible=D.arbre.find(n=>viseNoeud(n));
       if(cible) arbreRang=cible.rang;
-      S.arbreChOuvert=1; save(); go("arbre"); };
+      go("arbre"); };
     q.appendChild(b5);
   }
   m.appendChild(q);
@@ -8200,67 +8198,33 @@ VIEWS.arbre=m=>{
   /* Repli : ce sélecteur de cinquante puces ne sert qu'à l'occasion et
      occupait un écran entier. Il s'ouvre d'un tap, et reste ouvert si un
      chapitre est activement repéré. */
-  const chOuvert = S.arbreChOuvert || !!arbreCh;
-  const P0=parc(), marque=(P0&&P0.mk)||"";
-  const ici=avance(S.par||"m");
-  const pose=l=>{
-    const avant=arbreRang;
-    arbreCh=arbreCh===l?0:l;
-    if(arbreCh){ const cible=D.arbre.find(n=>viseNoeud(n));
-      if(cible) arbreRang=cible.rang; }
-    if(arbreRang!==avant){ render(); return; }   /* changement de rang : redessin nécessaire */
-    majSurbrillance();                            /* sinon, on bascule sur place */
-  };
-  const chb=el("div","card");
-  const chTete=el("button","replitete");
-  chTete.innerHTML=`<span>Repérer ${repY()?"une leçon":"un chapitre"} ${marque?'<span class="jpx" style="color:var(--vv)">'+esc(marque)+"</span>":""}${arbreCh?' <b style="color:var(--ai)">· '+repNomAff()+" "+arbreCh+'</b>':""}</span><i>${chOuvert?"▲":"▾"}</i>`;
-  chTete.onclick=()=>{ S.arbreChOuvert=chOuvert?0:1; save(); render(); };
-  chb.appendChild(chTete);
-  /* raccourci : le point où l'élève en est sur SA voie, en un tap */
-  if(ici&&D.arbre.some(n=>{const p=repPlage(n);return p&&p[0]<=ici&&ici<=p[1];})){
-    const bi=el("button","btn"+(arbreCh===ici?" p":"")+" w",
-      (arbreCh===ici?"✓ ":"")+"Montrer les nœuds de "+(repY()?"ma leçon ":"mon chapitre ")+ici);
-    bi.style.marginTop="10px";
-    bi.onclick=()=>{ if(!S.arbreChOuvert&&arbreCh!==ici){ S.arbreChOuvert=1; save(); } pose(ici); };
-    chb.appendChild(bi);
-  }
-  if(!chOuvert){ m.appendChild(chb); }
-  else {
-  chb.appendChild(el("div",null,'<span style="font-size:0.8125rem;color:var(--mut)">'+
-    (repY()?"Choisissez une leçon du second manuel"
-          :"Choisissez un chapitre du Minna no Nihongo")+
-    " : ses nœuds sont mis en évidence, où qu'ils se trouvent dans l'arbre. Le découpage suit votre voie — la leçon 6 n'a pas les mêmes nœuds que le chapitre 6.</span>"));
-  const chr2=el("div","filters"); chr2.style.marginTop="10px";
-  const c0=el("button","chip"+(arbreCh?"":" on"),"Aucun");
-  c0.dataset.ch=0;
-  c0.onclick=()=>{ arbreCh=0; majSurbrillance(); };
-  chr2.appendChild(c0);
-  for(let l=1;l<=repFin();l++){
-    const nb=D.arbre.filter(n=>{const p=repPlage(n);return p&&p[0]<=l&&l<=p[1];}).length;
-    if(!nb) continue;
-    const b=el("button","chip"+(arbreCh===l?" on":"")+(l===ici?" ici":""));
-    b.dataset.ch=l;
-    b.innerHTML=`${l} <span style="opacity:.55">${nb}</span>`;
-    b.title=repNomAff()+" "+l+" — "+nb+" nœuds";
-    b.onclick=()=>pose(l);
-    chr2.appendChild(b);
-  }
-  chb.appendChild(chr2);
-  /* la puce active peut être hors de la bande visible : on l'y amène */
-  if(arbreCh) setTimeout(()=>{ const a=chr2.querySelector('.chip[data-ch="'+arbreCh+'"]');
-    if(a&&chr2.scrollWidth>chr2.clientWidth) chr2.scrollLeft=Math.max(0,a.offsetLeft-chr2.clientWidth/2+a.offsetWidth/2); },0);
-  const rec=el("div","note"); rec.id="chres";
-  rec.style.display=arbreCh?"block":"none";
-  /* le relevé est posé ici aussi : quand le repérage change de rang, la vue est
-     redessinée et la mise à jour sur place n'a pas lieu. */
-  if(arbreCh){
-    const hits=D.arbre.filter(viseNoeud), parRang={};
-    hits.forEach(n=>parRang[n.rang]=(parRang[n.rang]||0)+1);
-    rec.textContent=(repY()?"Leçon ":"Chapitre ")+arbreCh+" : "+hits.length+" nœud"+(hits.length>1?"s":"")+
-      ", "+Object.keys(parRang).map(r=>RANG(+r).j+" ("+parRang[r]+")").join(", ")+".";
-  }
-  chb.appendChild(rec);
-  m.appendChild(chb);
+  /* Repérage de la leçon ou du chapitre en cours : un seul bouton, qui montre
+     ou masque. La voie décide de ce qu'il désigne — un nœud porte deux repères,
+     `ch` pour le premier manuel, `yl` pour le second, et la leçon 6 n'a pas les
+     mêmes nœuds que le chapitre 6. Pour viser une autre leçon que la sienne,
+     l'écran de cette leçon a son propre bouton : pas besoin d'un sélecteur ici. */
+  {
+    const ici=avance(S.par||"m");
+    const cible=arbreCh||ici;
+    const nb=cible?D.arbre.filter(n=>{const pl=repY()?n.yl:n.ch;return pl&&pl[0]<=cible&&cible<=pl[1];}).length:0;
+    if(nb){
+      const b=el("button","btn w");
+      b.style.marginBottom="12px";
+      /* actif : on marque d'un liseré à la couleur de la voie, pas d'un aplat —
+         ce bouton ne doit pas peser plus que ce qu'il désigne */
+      if(arbreCh){ b.style.borderColor="var(--vv)"; b.style.color="var(--vv)"; }
+      b.innerHTML=arbreCh
+        ? `✓ Nœuds ${repY()?"de la leçon":"du chapitre"} ${arbreCh} <span style="opacity:.7">· ${nb} · masquer</span>`
+        : `Montrer les nœuds de ${repY()?"ma leçon":"mon chapitre"} ${ici} <span style="opacity:.55">· ${nb}</span>`;
+      b.onclick=()=>{
+        const avant=arbreRang;
+        arbreCh=arbreCh?0:ici;
+        if(arbreCh){ const c2=D.arbre.find(n=>viseNoeud(n)); if(c2) arbreRang=c2.rang; }
+        if(arbreRang!==avant){ render(); return; }
+        majSurbrillance(); render();
+      };
+      m.appendChild(b);
+    }
   }
 
   /* sélecteur de rang : l'arbre entier est visible */
@@ -8384,9 +8348,6 @@ VIEWS.arbre=m=>{
 
 /* bascule les surbrillances sans redessiner la vue : le défilement est conservé */
 function majSurbrillance(){
-  document.querySelectorAll(".chip[data-ch]").forEach(b=>{
-    b.classList.toggle("on", +b.dataset.ch===arbreCh);
-  });
   const vise=viseNoeud;
   document.querySelectorAll("[data-nid]").forEach(e=>{
     const n=NIDX[e.dataset.nid];
