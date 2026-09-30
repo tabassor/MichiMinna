@@ -5209,6 +5209,12 @@ VIEWS.dico=m=>{
     dlesson,v=>{dlesson=v;render();}));
   pastille("★","Favoris",dfav?"Oui":"Non",dfav,()=>{dfav=!dfav;render();});
   m.appendChild(fl);
+  /* le dictionnaire étendu, signalé en haut : en bas de liste, il fallait
+     franchir trois cents mots du manuel pour apprendre qu'il existait */
+  const raccourci=el("button","btn w","大辞典 — parcourir les "+D.jm.length.toLocaleString("fr-FR")+" entrées du dictionnaire étendu ▸");
+  raccourci.style.cssText="margin:0 0 12px;font-size:0.8125rem";
+  raccourci.onclick=()=>{ jq=dq; jPage=1; go("jmdict"); };
+  m.appendChild(raccourci);
   const box=el("div","card"); m.appendChild(box);
   function match(w){
     if(dth&&!(w.th&&w.th.includes(dth))) return false;
@@ -5232,8 +5238,11 @@ VIEWS.dico=m=>{
        n'entrent donc dans aucun filtre de leçon. */
     const ws=stock().filter(match);
     box.innerHTML="";
-    box.appendChild(el("div","sec",`${ws.length} entrée${ws.length>1?"s":""}`));
-    if(!ws.length){box.appendChild(el("div","empty","<b>空</b>Rien ne correspond à cette recherche."));return;}
+    box.appendChild(el("div","sec",`${ws.length} entrée${ws.length>1?"s":""} du vocabulaire étudié`));
+    /* Pas de retour anticipé : un mot absent du manuel doit encore être cherché
+       dans le dictionnaire étendu, plus bas. Le « rien ne correspond » arrêtait
+       l'écran avant — exactement quand l'étendu servait le plus. */
+    if(!ws.length) box.appendChild(el("div","empty","<b>空</b>Rien dans le vocabulaire étudié."));
     ws.slice(0,300).forEach(w=>{
       const id=w.k+"|"+w.l, isf=S.fav.includes(id);
       /* Pour les verbes, l'entrée principale est la forme du dictionnaire —
@@ -5295,33 +5304,27 @@ VIEWS.dico=m=>{
     });
     if(ws.length>300) box.appendChild(el("div","note","Seules les 300 premières entrées sont affichées. Affinez la recherche ou filtrez par chapitre."));
 
-    /* Le dictionnaire étendu à la suite, dans le même écran : le séparer
-       en rubrique n'apportait rien puisque la recherche est la même. On ne
-       montre que ce qui n'est pas déjà dans le vocabulaire du manuel. */
+    /* Le dictionnaire étendu à la suite, dans le même écran, sur TOUTES ses
+       entrées. Il n'apparaissait qu'après une recherche et se limitait aux mots
+       « courants » : les 2 384 entrées rares ne sortaient jamais, et l'écran
+       n'annonçait que les ~2 000 mots du manuel — d'où l'impression d'un
+       dictionnaire pauvre. On n'y montre que ce qui n'est pas déjà plus haut. */
+    const ext0=el("div","sec",`大辞典 — Dictionnaire étendu · ${D.jm.length.toLocaleString("fr-FR")} entrées`);
+    box.appendChild(ext0);
+    box.appendChild(el("div","note","Hors du manuel : ces entrées ne comptent pas dans votre progression. Source : JMdict, projet EDRDG."));
+    let ext=[];
     if(dq.trim().length>=1){
       const vus=new Set(ws.map(w=>w.k+"|"+w.j));
-      let ext=[];
-      try{ ext=jmSearch(dq,true,40).filter(w=>!vus.has(w[1]+"|"+w[0])); }catch(e){}
-      if(ext.length){
-        box.appendChild(el("div","sec","大辞典 — Dictionnaire étendu"));
-        box.appendChild(el("div","note","Hors du manuel : ces entrées ne comptent pas dans votre progression."));
-        ext.slice(0,25).forEach(w=>{
-          const d=el("div","word");
-          d.innerHTML=`<div class="l"><div class="k">${motCliquable(w[0],w[1])}</div>
-            <div class="f">${esc(w[2].split(" ¶ ")[0])}${
-              w[3]?` <span class="tag">${esc(w[3].split("").map(x=>JPOS[x]).filter(Boolean).join(", "))}</span>`:""}</div></div>
-            <div class="r"><button class="ico">🔊</button></div>`;
-          d.querySelector(".ico").onclick=e=>{ e.stopPropagation(); say(w[1]||w[0]); };
-          box.appendChild(d);
-        });
-        if(ext.length>25){
-          const pl=el("button","btn w","Voir les "+ext.length+" résultats étendus");
-          pl.style.marginTop="10px";
-          pl.onclick=()=>{ jq=dq; go("jmdict"); };
-          box.appendChild(pl);
-        }
-      }
+      try{ ext=jmSearch(dq,false,200).filter(w=>!vus.has(w[1]+"|"+w[0])); }catch(e){}
+      if(!ext.length) box.appendChild(el("div","empty","<b>無</b>Aucune entrée étendue ne correspond."));
+      ext.slice(0,25).forEach(w=>box.appendChild(jmLigne(w,false)));
     }
+    const pl=el("button","btn w",
+      ext.length>25?"Voir les "+(ext.length>=200?"200+":ext.length)+" résultats étendus"
+                   :"Parcourir les "+D.jm.length.toLocaleString("fr-FR")+" entrées");
+    pl.style.marginTop="10px";
+    pl.onclick=()=>{ jq=ext.length>25?dq:""; jPage=1; go("jmdict"); };
+    if(ext.length>25||!dq.trim()) box.appendChild(pl);
   }
   list();
 };
@@ -9820,7 +9823,33 @@ const JPOS={n:"nom","1":"verbe I","2":"verbe II","3":"verbe III",i:"adj. い",a:
   o:"adj. の",d:"adverbe",e:"expression",j:"interjection",p:"pronom",t:"particule",
   c:"conjonction",u:"compteur",m:"nombre",f:"préfixe",s:"suffixe",x:"auxiliaire",
   g:"adjectif",v:"transitif",w:"intransitif"};
-let jq="", jComOnly=true;
+/* « Tout le dictionnaire » par défaut : les entrées rares portent leur étiquette,
+   les cacher d'office ne faisait que les rendre introuvables. */
+let jq="", jComOnly=false, jPage=1;
+const JPAGE=100;
+/* une entrée du dictionnaire étendu : `complet` montre tous les sens et la lecture */
+function jmLigne(w,complet){
+  const has=complet&&words(50).find(x=>x.k===w[1]||(w[0]&&x.j===w[0]));
+  const d=el("div","word");
+  d.innerHTML=`<div class="l"><div class="k">${motCliquable(w[0],w[1])}${
+      (complet&&w[0]&&S.script!=="kana")?` <em>${esc(w[1])}</em>`:""}</div>
+    <div class="f">${esc(complet?w[2].split(" ¶ ").join(" · "):w[2].split(" ¶ ")[0])}
+      ${w[3]?`<span class="tag">${esc(w[3].split("").map(x=>JPOS[x]).filter(Boolean).join(", "))}</span>`:""}
+      ${has?`<span class="tag" style="border-color:var(--take);color:var(--take)">L${has.l}</span>`:""}
+      ${w[4]?"":'<span class="tag">rare</span>'}</div></div>
+    <div class="r"><button class="ico">🔊</button></div>`;
+  d.querySelector(".ico").onclick=e=>{e.stopPropagation();say(w[1]||w[0]);};
+  return d;
+}
+/* ordre de parcours : celui des kana, comme un dictionnaire papier */
+let JM_TRI=null;
+function jmTri(){
+  if(!JM_TRI){
+    const h=t=>String(t).replace(/[\u30a1-\u30f6]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60));
+    JM_TRI=D.jm.map((w,i)=>[h(w[1]),i]).sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:a[1]-b[1]).map(x=>x[1]);
+  }
+  return JM_TRI;
+}
 function jmSearch(q,onlyCommon,max){
   q=q.trim(); if(!q) return [];
   const lat=isLatin(q), knFull=lat?toKanaFull(q):null;
@@ -9857,45 +9886,46 @@ function jmSearch(q,onlyCommon,max){
   return res.slice(0,max||60).map(r=>D.jm[r[2]]);
 }
 VIEWS.jmdict=m=>{
-  head(m,"大辞典","Dictionnaire étendu — 15 338 mots au-delà du manuel");
+  head(m,"大辞典","Dictionnaire étendu — "+D.jm.length.toLocaleString("fr-FR")+" mots au-delà du manuel");
   const inp=el("input","search");
   inp.placeholder="Français, kanji, kana ou rōmaji…"; inp.value=jq;
   m.appendChild(inp);
   const f=el("div","filters");
   const c1=el("button","chip"+(jComOnly?" on":""),"Mots courants");
   const c2=el("button","chip"+(jComOnly?"":" on"),"Tout le dictionnaire");
-  c1.onclick=()=>{jComOnly=true;render();}; c2.onclick=()=>{jComOnly=false;render();};
+  c1.onclick=()=>{jComOnly=true;jPage=1;render();}; c2.onclick=()=>{jComOnly=false;jPage=1;render();};
   f.appendChild(c1); f.appendChild(c2); m.appendChild(f);
   const box=el("div"); m.appendChild(box);
   setTimeout(()=>inp.focus(),60);
   let dt=null;
   const run=()=>{
     box.innerHTML="";
+    /* Sans recherche, le dictionnaire se feuillette : toutes les entrées, dans
+       l'ordre des kana, par pages de cent. Il n'affichait avant qu'une invite. */
     if(jq.trim().length<1){
-      box.appendChild(el("div","empty","<b>辞</b>Cherchez un mot en français, en japonais ou en rōmaji.<br>Ce dictionnaire complète celui du manuel : il couvre le vocabulaire courant bien au-delà des 50 leçons."));
+      const tous=jmTri().map(i=>D.jm[i]).filter(w=>!jComOnly||w[4]);
+      const n=Math.min(tous.length,jPage*JPAGE);
+      box.appendChild(el("div","sec",tous.length.toLocaleString("fr-FR")+" entrées · "+n.toLocaleString("fr-FR")+" affichées"));
+      const c=el("div","card");
+      tous.slice(0,n).forEach(w=>c.appendChild(jmLigne(w,true)));
+      box.appendChild(c);
+      if(n<tous.length){
+        const plus=el("button","btn w","Afficher "+Math.min(JPAGE,tous.length-n)+" de plus");
+        plus.style.marginTop="10px";
+        plus.onclick=()=>{ jPage++; const y=window.scrollY; render(); window.scrollTo(0,y); };
+        box.appendChild(plus);
+      }
       return;
     }
-    const r=jmSearch(jq,jComOnly,60);
+    const r=jmSearch(jq,jComOnly,200);
     if(!r.length){ box.appendChild(el("div","empty","<b>無</b>Aucun résultat."+(jComOnly?"<br>Essayez « Tout le dictionnaire ».":""))); return; }
-    box.appendChild(el("div","sec",r.length+(r.length>=60?"+":"")+" résultat"+(r.length>1?"s":"")));
+    box.appendChild(el("div","sec",r.length+(r.length>=200?"+":"")+" résultat"+(r.length>1?"s":"")));
     const c=el("div","card");
-    r.forEach(w=>{
-      const has=words().find(x=>x.k===w[1]||(w[0]&&x.j===w[0]));
-      const d=el("div","word");
-      d.innerHTML=`<div class="l"><div class="k">${motCliquable(w[0],w[1])}${
-          (w[0]&&S.script!=="kana")?` <em>${esc(w[1])}</em>`:""}</div>
-        <div class="f">${esc(w[2].split(" ¶ ").join(" · "))}
-          ${w[3]?`<span class="tag">${esc(w[3].split("").map(x=>JPOS[x]).filter(Boolean).join(", "))}</span>`:""}
-          ${has?`<span class="tag" style="border-color:var(--take);color:var(--take)">L${has.l}</span>`:""}
-          ${w[4]?"":'<span class="tag">rare</span>'}</div></div>
-        <div class="r"><button class="ico">🔊</button></div>`;
-      d.querySelector(".ico").onclick=e=>{e.stopPropagation();say(w[0]||w[1]);};
-      c.appendChild(d);
-    });
+    r.forEach(w=>c.appendChild(jmLigne(w,true)));
     box.appendChild(c);
     box.appendChild(el("div","note","Les mots déjà présents dans votre manuel portent leur numéro de leçon en vert. Source : JMdict/EDICT, projet EDRDG."));
   };
-  inp.oninput=e=>{jq=e.target.value;clearTimeout(dt);dt=setTimeout(run,180);};
+  inp.oninput=e=>{jq=e.target.value;jPage=1;clearTimeout(dt);dt=setTimeout(run,180);};
   run();
 };
 
