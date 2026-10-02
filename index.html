@@ -96,6 +96,23 @@ header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:8px;
   line-height:1.5}
 @media(max-width:380px){ .brand small{display:none} }
 .hbtn{margin-left:auto;display:flex;gap:6px;align-items:center}
+/* Avant que le profil soit créé et la mise en place faite, l'application n'a
+   rien à montrer qui soit enregistré : on retire la barre du bas et les
+   commandes d'en-tête, qui laissaient explorer — et perdre — des séances
+   jouées sans profil. */
+body.seuil nav, body.seuil .hbtn, body.seuil #avaBtn{visibility:hidden}
+.mep{display:flex;gap:12px;align-items:flex-start}
+.mep-n{flex:0 0 30px;height:30px;border-radius:50%;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:0.8125rem;color:var(--mut)}
+.mep-n.ok{border-color:var(--take);color:var(--take)}
+.mep-c{flex:1;min-width:0}
+.mep-c h3{margin:2px 0 4px}
+.mep-c .mep-t{font-size:0.8438rem;color:var(--mut);line-height:1.55}
+.mep-c .ctrl{margin:10px 0 0;justify-content:flex-start;flex-wrap:wrap}
+.mep-etat{font-size:0.7812rem;margin-top:8px;color:var(--mut)}
+.chdep{margin-top:12px}
+.chdep .ch-val{font-size:0.875rem;margin-bottom:6px}
+.chdep input[type=range]{width:100%;accent-color:var(--ai)}
+.mep-c .filters{flex-wrap:wrap;overflow:visible;gap:6px}
 .chip{border:1px solid var(--line);background:var(--surf);border-radius:999px;padding:6px 11px;font-size:0.8125rem;color:var(--mut);white-space:nowrap}
 .chip.on{background:var(--ai);border-color:var(--ai);color:var(--on);font-weight:700}
 .chip.sm{padding:5px 9px;font-size:0.75rem}
@@ -1981,11 +1998,11 @@ async function switchUser(id){
   const sp=document.getElementById("splash");
   if(sp) setTimeout(()=>sp.remove(),2050);
   tickDay(); sess=null; stack=[]; chargeManuels().then(()=>{ if(MANUELS.length) render(); });
-  go(S.guide?"home":"guide",null,false);
+  go(S.guide===0?"guide":"home",null,false);
   try{ history.replaceState({michi:0},"",location.href);
        history.pushState({michi:0},"",location.href); }catch(e){}
 }
-async function createUser(name,niveau,parcours){
+async function createUser(name,niveau,parcours,chapitre){
   const id="u"+Date.now().toString(36);
   USERS.push({id:id,n:name||"Élève"}); await saveUsers(); await switchUser(id);
   if(parcours && PAR[parcours]){
@@ -1995,8 +2012,18 @@ async function createUser(name,niveau,parcours){
   /* le mode grand débutant doit être choisi, pas découvert par hasard */
   if(niveau==="debut"){ S.kana=1; S.ch=1; }
   else if(niveau==="kana"){ S.kana=0; S.ch=1; }
-  else if(niveau==="deja"){ S.kana=0; }
-  S.guide=0; save(); render();
+  else if(niveau==="deja"){
+    S.kana=0;
+    /* Le chapitre en cours doit être posé AVANT que l'arbre existe : tstate()
+       ne le lit qu'une fois, à la construction, pour créditer ce qui précède.
+       Le régler ensuite depuis l'accueil laissait l'élève au rang 0, sans un
+       nœud acquis — c'est ce que promettait, sans le tenir, l'option
+       « J'ai déjà étudié ». */
+    const P=PAR[S.par]||parc();
+    S.ch=Math.max(1,Math.min(P.n,chapitre||1)); S.prog[S.par]=S.ch;
+  }
+  S.tree=null; poolCache=null;
+  S.guide=0; save(); guideEtape=0; go("guide",null,false);
 }
 /* le jour change selon le fuseau choisi, pas selon UTC */
 function today(d){
@@ -3663,6 +3690,7 @@ function render(){
   if(S.theme==="sumi")S.theme="washi";
   if(!THEMES[S.theme])S.theme="urushi";
   applyTheme();
+  try{ document.body.classList.toggle("seuil", view==="welcome" || (!!UID && S.guide===0 && (view==="guide"||view==="mep"))); }catch(e){}
   /* Le report des acquis ne se fait qu'une fois, au premier rendu : tstate()
      est appelé partout, on ne peut pas l'y loger sans récursion. */
   if(!_REP){ _REP=true; try{ reportArbre(); }catch(e){} }
@@ -3843,25 +3871,17 @@ VIEWS.users=m=>{
     reglage(c2,"Fuseau horaire",tzName(S.tz||"auto"),
       ()=>{ const i2=TZ.indexOf(S.tz||"auto"); S.tz=TZ[(i2+1)%TZ.length]; tickDay(); save(); render(); },
       "Détermine le changement de jour");
-    reglage(c2,"Revoir la présentation","3 écrans",
+    reglage(c2,"Revoir la présentation",GUIDE.length+" écrans",
       ()=>{ guideEtape=0; go("guide"); });
+    reglage(c2,"Mise en place",mepFaits()+" / 4 faites",
+      ()=>{ go("mep"); },"Installation, sauvegarde, clavier, rythme");
   });
 
 
-  if(PROMPT||!INSTALLED){
+  if(!INSTALLED){
     const ic=el("div","card");
     ic.appendChild(el("h3",null,"Installation"));
-    if(PROMPT){
-      ic.appendChild(el("div",null,'<span style="font-size:0.8125rem;color:var(--mut)">Installez-la comme une vraie application : icône correcte, plein écran, et données mieux protégées.</span>'));
-      const ib=el("button","btn p w","Installer l\'application");
-      ib.style.marginTop="10px";
-      ib.onclick=async()=>{ ib.disabled=true; PROMPT.prompt();
-        const r=await PROMPT.userChoice; PROMPT=null;
-        ib.textContent = r.outcome==="accepted" ? "Installation lancée ✓" : "Installation refusée"; };
-      ic.appendChild(ib);
-    }else{
-      ic.appendChild(el("div",null,'<span style="font-size:0.8125rem;color:var(--mut)">Cette copie tourne dans un onglet. Pour l\'installer avec son icône, il faut l\'ouvrir depuis une adresse HTTPS ; le fichier local n\'est pas installable.</span>'));
-    }
+    remplitInstallation(ic);
     m.appendChild(ic);
   }
 
@@ -3978,15 +3998,7 @@ VIEWS.users=m=>{
     const bc=el("div","ctrl"); bc.style.marginTop="10px";
     const ex=el("button","btn p","Exporter");
     ex.onclick=()=>{
-      const u=USERS.find(x=>x.id===UID);
-      const blob=JSON.stringify({v:2,name:u?u.n:"",date:new Date().toISOString().slice(0,10),state:S},null,1);
-      const nom="michi-"+((u&&u.n)||"profil").replace(/\W+/g,"")+"-"+new Date().toISOString().slice(0,10)+".json";
-      let ok=false;
-      try{ const a=document.createElement("a");
-        a.href=URL.createObjectURL(new Blob([blob],{type:"application/json"}));
-        a.download=nom; document.body.appendChild(a); a.click(); a.remove(); ok=true;
-      }catch(e){}
-      try{ navigator.clipboard.writeText(blob); }catch(e){}
+      const ok=exporteProfil();
       ex.textContent=ok?"Enregistré ✓":"Copié ✓";
       setTimeout(()=>ex.textContent="Exporter",2200);
     };
@@ -4037,7 +4049,7 @@ VIEWS.users=m=>{
     dz.appendChild(rb); m.appendChild(dz);
   }
 };
-let bienNom="", bienNiv=null, bienPar="m";
+let bienNom="", bienNiv=null, bienPar="m", bienCh=1;
 VIEWS.welcome=m=>{
   m.appendChild(el("h1",null,'<span class="jpx" style="font-size:2.125rem">ようこそ</span>'));
   m.appendChild(el("p",null,'<span style="font-size:0.875rem;color:var(--mut)">Créez un profil pour enregistrer votre progression.</span>'));
@@ -4059,7 +4071,7 @@ VIEWS.welcome=m=>{
       b.innerHTML=`<span class="nj jpx" style="font-size:0.9375rem">${esc(P.j.slice(0,4))}</span>
         <span class="nt"><b>${esc(P.nom)}</b><span>${P.n} ${esc(P.uu)}${P.grades?" · deux grades par leçon":""}</span></span>
         <span class="ngo">${bienPar===P.id?"✓":""}</span>`;
-      b.onclick=()=>{bienPar=P.id;render();};
+      b.onclick=()=>{bienPar=P.id;bienCh=1;render();};
       lp.appendChild(b);
     });
     cp.appendChild(lp);
@@ -4072,7 +4084,7 @@ VIEWS.welcome=m=>{
   const l=el("div");
   [["debut","仮","Je débute vraiment","Je ne lis pas encore les kana — l'application commencera par les hiragana."],
    ["kana","字","Je lis les kana","Hiragana et katakana acquis, je commence le vocabulaire."],
-   ["deja","進","J'ai déjà étudié","Vous choisirez votre point de départ juste après."]
+   ["deja","進","J'ai déjà étudié","Indiquez où vous en êtes : ce qui précède sera compté comme acquis."]
   ].forEach(([k,j,t,d])=>{
     const b=el("button","nivrow"+(bienNiv===k?" on":""));
     b.innerHTML=`<span class="nj jpx">${j}</span>
@@ -4082,19 +4094,68 @@ VIEWS.welcome=m=>{
     l.appendChild(b);
   });
   c2.appendChild(l);
+  /* Le point de départ se choisit ici, avant la création du profil : c'est
+     la seule façon de créditer correctement l'arbre (voir createUser). */
+  if(bienNiv==="deja"){
+    const P=PAR[bienPar]||parc(), U=P.u;
+    bienCh=Math.max(1,Math.min(P.n,bienCh));
+    const d=el("div","chdep");
+    const lib=()=>`<b>${esc(U.charAt(0).toUpperCase()+U.slice(1))} en cours : ${bienCh}</b> / ${P.n} · ${esc(P.nom)}`+
+      `<div class="note" style="margin:6px 0 0">${bienCh>1?"Les "+esc(P.uu)+" 1 à "+(bienCh-1)+(/^le/.test(P.uu)?" seront comptées comme acquises.":" seront comptés comme acquis."):"Rien ne sera compté comme acquis : vous partez du début du manuel."}</div>`;
+    const v=el("div","ch-val",lib());
+    const rg=document.createElement("input"); rg.type="range"; rg.min=1; rg.max=P.n; rg.value=bienCh;
+    rg.setAttribute("aria-label",U+" en cours");
+    rg.oninput=e=>{ bienCh=+e.target.value; v.innerHTML=lib(); };
+    d.appendChild(v); d.appendChild(rg);
+    c2.appendChild(d);
+  }
   m.appendChild(c2);
 
   const cc=el("div","ctrl");
   const b2=el("button","btn p w","Commencer");
   b2.disabled=!bienNiv;
   b2.onclick=()=>{
-    const n=bienNom.trim()||"Élève", niv=bienNiv, par=bienPar;
-    bienNom=""; bienNiv=null;
-    createUser(n,niv,par);
+    const n=bienNom.trim()||"Élève", niv=bienNiv, par=bienPar, ch=bienCh;
+    bienNom=""; bienNiv=null; bienCh=1;
+    createUser(n,niv,par,ch);
   };
   cc.appendChild(b2); m.appendChild(cc);
-  if(!bienNiv) m.appendChild(el("div","note","Choisissez une réponse : elle détermine par quoi l'application commence. Vous pourrez en changer à tout moment dans votre profil."));
+  if(!bienNiv) m.appendChild(el("div","note","Choisissez une réponse : elle détermine par quoi l'application commence."));
+
+  /* Changer de téléphone ne doit pas obliger à créer un profil factice pour
+     aller chercher l'import dans les réglages : on restaure d'ici. */
+  const rs=el("div","card");
+  rs.appendChild(el("div","sec","Vous avez déjà une sauvegarde ?"));
+  rs.appendChild(el("div",null,'<span style="font-size:0.8125rem;color:var(--mut)">Un fichier <b>michi-….json</b> exporté depuis un autre appareil : le profil est recréé tel quel, avec sa progression.</span>'));
+  const fi=document.createElement("input");
+  fi.type="file"; fi.accept=".json,application/json,text/plain"; fi.style.display="none";
+  const bi=el("button","btn w","Restaurer une sauvegarde"); bi.style.marginTop="10px";
+  bi.onclick=()=>fi.click();
+  fi.onchange=()=>{
+    const f=fi.files&&fi.files[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=()=>restaureNouveauProfil(String(r.result));
+    r.onerror=()=>alert("Le fichier n'a pas pu être lu.");
+    r.readAsText(f); fi.value="";
+  };
+  rs.appendChild(bi); rs.appendChild(fi);
+  m.appendChild(rs);
 };
+async function restaureNouveauProfil(txt){
+  let o=null;
+  try{ o=JSON.parse(txt); }catch(e){}
+  if(!o||!o.state){ alert("Ce fichier n'est pas une sauvegarde みち valide."); return; }
+  const id="u"+Date.now().toString(36);
+  /* une sauvegarde vient de quelqu'un qui connaît l'application : pas de guide */
+  const st=Object.assign({},o.state,{guide:1});
+  await sSet("michi:u:"+id, JSON.stringify(st));
+  USERS.push({id:id,n:(o.name||"Élève").slice(0,20)}); await saveUsers();
+  await switchUser(id);
+  try{ tstate(); }catch(e){}
+  const nq=Object.keys(S.srs||{}).length;
+  setTimeout(()=>alert("Sauvegarde restaurée : "+parc().u+" "+S.ch+", "+
+    nq+" question"+(nq>1?"s":"")+" dans l'historique."),60);
+}
 
 /* ================= accueil ================= */
 VIEWS.home=m=>{
@@ -4180,8 +4241,24 @@ VIEWS.home=m=>{
         ? (bil.faux
             ? `<b style="color:var(--shu)">${bil.faux} erreur${bil.faux>1?"s":""} à corriger</b> · ${bil.dues} révision${bil.dues>1?"s":""} échue${bil.dues>1?"s":""}`
             : `${bil.dues} révision${bil.dues>1?"s":""} échue${bil.dues>1?"s":""} — le rythme normal de la mémoire.`)
-        : "Rien d'échu : le tirage suit vos hésitations passées.");
+        : (Object.keys(S.srs||{}).length
+            ? "Rien d'échu : le tirage suit vos hésitations passées."
+            : "Première séance : touchez le cercle pour commencer."));
   m.appendChild(etat);
+
+  /* la mise en place inachevée reste visible, sans être imposée */
+  if(mepFaits()<4 && !mepEtat().cache){
+    const c=el("div","card");
+    const reste=[INSTALLED?"":"installer l'application", S.exporte?"":"faire une sauvegarde",
+      mepEtat().clavier?"":"ajouter le clavier japonais", mepEtat().rythme?"":"régler votre rythme"].filter(Boolean).join(" · ");
+    c.innerHTML=`<div class="sec" style="margin-bottom:6px">準備 · Mise en place · ${mepFaits()} sur 4</div>
+      <div style="font-size:0.8438rem;color:var(--mut);line-height:1.55">Reste à ${esc(reste)}.</div>`;
+    const cc=el("div","ctrl"); cc.style.marginTop="10px"; cc.style.justifyContent="flex-start";
+    const go1=el("button","btn p","Continuer"); go1.onclick=()=>go("mep");
+    const hide=el("button","btn","Masquer"); hide.onclick=()=>{ mepEtat().cache=1; save(); render(); };
+    cc.appendChild(go1); cc.appendChild(hide); c.appendChild(cc);
+    m.appendChild(c);
+  }
 
   /* ---- reprendre où l'on s'était arrêté ---- */
   const rp=S.reprise;
@@ -7323,50 +7400,40 @@ VIEWS.progres=m=>{
 
 /* ================= premier lancement : trois écrans ================= */
 let guideEtape=0;
+/* Le guide dit comment l'application est faite ; il ne règle rien. Ce qu'il
+   faut faire le premier jour — installer, sauvegarder, le clavier, le rythme —
+   a son propre écran, 準備, qui suit. Le guide comptait sept écrans dont deux
+   n'étaient que des consignes de réglage noyées dans le texte. */
 const GUIDE=[
  {j:"道", t:"Un chemin, pas une liste",
-  c:"みち range le japonais en un arbre de compétences : huit rangs, du premier kana au niveau N1. "+
-    "À chaque rang, des dizaines de nœuds — un paquet de mots, une forme verbale, une poignée de kanji — "+
-    "qu'on valide à 90 % de bonnes réponses.",
-  d:"Vous choisissez l'ordre des nœuds. Le rang suivant, lui, ne s'ouvre qu'après son épreuve."},
+  c:"みち range le japonais en un arbre : huit rangs, du premier kana au niveau N1. "+
+    "Chaque rang compte des dizaines de nœuds — un paquet de mots, une forme verbale, une poignée de kanji. "+
+    "Un nœud s'acquiert à 90 % de bonnes réponses.",
+  d:"Vous choisissez l'ordre des nœuds. Le rang suivant ne s'ouvre qu'après son épreuve."},
  {j:"五行", t:"Cinq voies avancent ensemble",
   c:"<b style='color:#6FBF73'>木</b> le vocabulaire · <b style='color:#E2593F'>火</b> les verbes · "+
     "<b style='color:#C08A4A'>土</b> la grammaire · <b style='color:#B3C6DB'>金</b> les kanji · "+
     "<b style='color:#4FA8D8'>水</b> l'expression et l'écoute.<br><br>"+
-    "Chaque nœud terminé donne des fragments de son élément. L'épreuve de rang les exige tous les cinq, "+
-    "et certains nœuds sont marqués impératifs : aucun nombre de fragments ne les remplace.",
-  d:"Une quinzaine de nœuds restent ouverts à tout moment."},
+    "Chaque nœud acquis remplit la jauge de sa voie. L'épreuve de rang demande les cinq — "+
+    "et quelques nœuds, marqués impératifs, ne se remplacent par rien.",
+  d:"Trois nœuds par voie sont ouverts à la fois ; le nombre se règle dans votre profil."},
+ {j:"日", t:"Une séance par jour",
+  c:"Le cercle de l'accueil est l'objectif du jour. La révision espacée choisit ce qui revient, "+
+    "et d'autant plus tôt que vous avez hésité.<br><br>"+
+    "Les mots qui résistent vraiment sont rassemblés dans vos bêtes noires — on peut y coller une photo à soi, "+
+    "qui tient souvent mieux qu'une traduction.",
+  d:"Une séance courte tous les jours vaut mieux qu'une longue le dimanche."},
  {j:"本", t:"Deux manuels, une seule progression",
   c:"<b>文</b> みんなの日本語, cinquante chapitres. <b>武</b> ゆたかに日本語, dix-huit leçons. "+
-    "Vous en suivez un — et l'autre en parallèle quand vous le voulez : les deux avancent chacun de leur côté "+
-    "et se rejoignent dans le même rang.<br><br>"+
-    "Ce que vous voyez à l'écran suit le manuel choisi : les exercices, les nœuds du chapitre, les tableaux de référence.",
-  d:"Le manuel se change à tout moment depuis l'accueil, sans rien perdre."},
- {j:"日", t:"Une séance par jour",
-  c:"Le cercle de l'accueil est l'objectif du jour : vingt questions par défaut, à régler dans votre profil. "+
-    "La révision espacée choisit ce qui revient, et d'autant plus tôt que vous avez hésité.<br><br>"+
-    "Les mots qui résistent vraiment sont rassemblés à part, dans vos bêtes noires — avec la possibilité d'y coller "+
-    "une photo à vous, qui tient souvent mieux qu'une traduction.",
-  d:"Une séance courte tous les jours vaut mieux qu'une longue le dimanche."},
+    "Vous en suivez un, et l'autre en parallèle si vous le voulez : chacun avance de son côté, "+
+    "et tous deux se rejoignent dans le même rang.<br><br>"+
+    "Les exercices, les nœuds du chapitre et les tableaux de référence suivent le manuel choisi.",
+  d:"On change de manuel à tout moment depuis l'en-tête (文 · 武), sans rien perdre."},
  {j:"筆", t:"Écrire, tracer, dire",
-  c:"Beaucoup d'exercices se répondent en saisissant le mot ; le rōmaji fonctionne — « tabete » vaut たべて — "+
-    "mais un vrai clavier japonais rend la frappe naturelle.<br><br>"+
-    "Les kanji se tracent au doigt, trait par trait, et l'application dit lequel manque ou sort de son rang. "+
-    "L'atelier oral écoute votre voix et affiche votre courbe de hauteur : il demande le micro. L'enregistrement reste sur l'appareil, "+
-    "sauf si vous demandez vous-même le diagnostic en ligne, qui l'envoie au service dont vous avez fourni la clé.",
-  d:"Android : Gboard → Paramètres → Langues → ajouter « japonais ». iPhone : Réglages → Général → Clavier → Claviers → ajouter « japonais (kana ou rōmaji) »."},
- {j:"季", t:"Les saisons passent",
-  c:"À certains moments de l'année, un pack saisonnier s'ouvre : les mots, les expressions, les repères culturels "+
-    "et les textes d'une fête japonaise, avec ses propres couleurs.<br><br>"+
-    "Il a sa jauge à lui et ne remplit pas celles du chemin — le chemin reste le reflet du manuel. "+
-    "Quand la fenêtre se referme, le bouton disparaît de l'accueil, mais les mots restent au dictionnaire et en révision.",
-  d:"Une étoile est comptée dans votre progression pour chaque saison achevée."},
- {j:"蔵", t:"Tout reste sur cet appareil",
-  c:"Aucune inscription, aucun compte, aucun serveur : votre progression est enregistrée dans le navigateur de ce téléphone, "+
-    "et l'application fonctionne hors ligne une fois installée.<br><br>"+
-    "C'est aussi la contrepartie : effacer les données du navigateur efface la progression. Exportez-la de temps en temps "+
-    "depuis votre profil, et gardez le fichier ailleurs.",
-  d:"L'aide en ligne, elle, ne marche qu'avec votre propre clé et seulement si vous en ajoutez une."}
+  c:"Beaucoup d'exercices se répondent en écrivant le mot, en kana, en kanji ou en rōmaji — « tabete » vaut たべて.<br><br>"+
+    "Les kanji se tracent au doigt, trait par trait. L'atelier oral écoute votre voix et affiche votre courbe "+
+    "de hauteur : il demande le micro, et l'enregistrement reste sur l'appareil.",
+  d:"Dernière étape : quatre réglages à faire tout de suite."}
 ];
 VIEWS.guide=m=>{
   const g=GUIDE[guideEtape];
@@ -7383,19 +7450,170 @@ VIEWS.guide=m=>{
   });
   c.appendChild(pts);
   const cc=el("div","ctrl"); cc.style.marginTop="14px";
+  /* Revu depuis le profil, le guide se referme sur l'accueil ; au premier
+     lancement, il mène à la mise en place, qu'on ne saute pas en même temps
+     que les explications. */
+  const fin=()=>{ guideEtape=0; if(S.guide!==0){ stack=[]; go("home",null,false); } else go("mep",null,false); };
   if(guideEtape<GUIDE.length-1){
     const b1=el("button","btn p","Suivant");
     b1.onclick=()=>{guideEtape++;render();};
     const b2=el("button","btn","Passer");
-    b2.onclick=()=>{ S.guide=1; save(); stack=[]; go("home",null,false); };
+    b2.onclick=fin;
     cc.appendChild(b1); cc.appendChild(b2);
   }else{
-    const b1=el("button","btn p","Commencer");
-    b1.onclick=()=>{ S.guide=1; save(); stack=[]; go("home",null,false); };
+    const b1=el("button","btn p",S.guide!==0?"Terminer":"Continuer");
+    b1.onclick=fin;
     cc.appendChild(b1);
   }
   c.appendChild(cc);
   m.appendChild(c);
+};
+
+/* ================= 準備 — mise en place ================= */
+/* Quatre réglages du premier jour, chacun faisable sur place. Ils étaient
+   décrits dans le texte du guide sans qu'on puisse les faire, et l'installation
+   — la seule protection des données sur iPhone — n'était proposée nulle part
+   avant d'aller la chercher au fond du profil. */
+function plateforme(){
+  try{
+    if(location.protocol==="file:") return "fichier";
+    if(ICON_IOS) return "ios";
+    if(/Android/i.test(navigator.userAgent)) return "android";
+  }catch(e){}
+  return "ordi";
+}
+/* Consigne d'installation selon l'appareil. L'ancien texte disait à tout
+   appareil privé d'invite automatique qu'il fallait une adresse HTTPS — faux
+   sur iPhone, qui n'émet jamais cette invite, même en HTTPS.
+   Le délai de sept jours vient de la documentation de WebKit (Tracking
+   Prevention, « 7-Day Cap on All Script-Writable Storage »), qui en exempte
+   les applications ajoutées à l'écran d'accueil. */
+function remplitInstallation(c,apres){
+  const t=el("div","mep-t");
+  if(INSTALLED){ t.innerHTML="Installée : みち s'ouvre depuis son icône, en plein écran."; c.appendChild(t); return; }
+  if(PROMPT){
+    t.innerHTML="Installez-la comme une application : icône sur l'écran d'accueil, plein écran, fonctionnement hors ligne et données mieux protégées.";
+    c.appendChild(t);
+    const cc=el("div","ctrl");
+    const ib=el("button","btn p","Installer l'application");
+    ib.onclick=async()=>{ ib.disabled=true; PROMPT.prompt();
+      const r=await PROMPT.userChoice; PROMPT=null;
+      ib.textContent = r.outcome==="accepted" ? "Installation lancée ✓" : "Installation refusée";
+      if(apres) apres(); };
+    cc.appendChild(ib); c.appendChild(cc);
+    return;
+  }
+  t.innerHTML={
+    ios:"Dans Safari, touchez le bouton <b>Partager</b> (le carré d'où sort une flèche), puis <b>« Sur l'écran d'accueil »</b>. "+
+        "Ouvrez ensuite みち depuis cette icône.<br><br>"+
+        "Sur iPhone, c'est aussi ce qui protège vos données : Safari efface le stockage d'un site resté sept jours sans visite, "+
+        "sauf pour une application ajoutée à l'écran d'accueil.",
+    android:"Dans Chrome, ouvrez le menu <b>⋮</b> en haut à droite, puis <b>« Installer l'application »</b> "+
+        "(ou « Ajouter à l'écran d'accueil »). Ouvrez ensuite みち depuis cette icône.",
+    ordi:"Dans Chrome ou Edge, l'icône d'installation apparaît à droite de la barre d'adresse. "+
+        "Sur un téléphone, l'installation donne une vraie icône et protège mieux vos données.",
+    fichier:"Cette copie est un fichier ouvert localement : elle ne peut pas s'installer. "+
+        "Ouvrez みち depuis son adresse web pour l'installer."
+  }[plateforme()];
+  c.appendChild(t);
+}
+function mepEtat(){ if(!S.mep||typeof S.mep!=="object") S.mep={}; return S.mep; }
+function mepFaits(){
+  const e=mepEtat();
+  return (INSTALLED?1:0)+(S.exporte?1:0)+(e.clavier?1:0)+(e.rythme?1:0);
+}
+/* Export du profil courant : fichier, et copie dans le presse-papiers en secours.
+   La date est retenue — c'est elle qui dit si la sauvegarde est faite. */
+function exporteProfil(){
+  const u=USERS.find(x=>x.id===UID);
+  const jour=new Date().toISOString().slice(0,10);
+  S.exporte=jour; save();
+  const blob=JSON.stringify({v:2,name:u?u.n:"",date:jour,state:S},null,1);
+  const nom="michi-"+((u&&u.n)||"profil").replace(/\W+/g,"")+"-"+jour+".json";
+  let ok=false;
+  try{ const a=document.createElement("a");
+    a.href=URL.createObjectURL(new Blob([blob],{type:"application/json"}));
+    a.download=nom; document.body.appendChild(a); a.click(); a.remove(); ok=true;
+  }catch(e){}
+  try{ navigator.clipboard.writeText(blob).catch(()=>{}); }catch(e){}   /* la permission refusée rejette une promesse : sans .catch, erreur non interceptée */
+  return ok;
+}
+VIEWS.mep=m=>{
+  const premier=(S.guide===0);
+  if(!premier){ const b=el("button","back","← Retour"); b.onclick=back; m.appendChild(b); }
+  m.appendChild(el("h1",null,'<span class="jpx" style="font-size:2.125rem">準備</span>'));
+  m.appendChild(el("p",null,'<span style="font-size:0.875rem;color:var(--mut)">Mise en place — '+mepFaits()+' sur 4. Chaque point se fait ici, en une minute.</span>'));
+  const e=mepEtat();
+  const item=(n,ok,titre,remplir)=>{
+    const c=el("div","card");
+    const r=el("div","mep");
+    r.appendChild(el("div","mep-n"+(ok?" ok":""),ok?"✓":String(n)));
+    const corps=el("div","mep-c");
+    corps.appendChild(el("h3",null,esc(titre)));
+    remplir(corps);
+    r.appendChild(corps); c.appendChild(r); m.appendChild(c);
+  };
+
+  item(1,INSTALLED,"Installer l'application",c=>remplitInstallation(c,()=>render()));
+
+  item(2,!!S.exporte,"Protéger votre progression",c=>{
+    c.appendChild(el("div","mep-t","Tout reste sur cet appareil : pas de compte, pas de serveur. Effacer les données du navigateur efface donc la progression. "+
+      "Une sauvegarde est un petit fichier à garder ailleurs — c'est aussi elle qui permet de changer de téléphone."));
+    const etat=el("div","mep-etat","Stockage : vérification…"); c.appendChild(etat);
+    (async()=>{
+      if(!navigator.storage||!navigator.storage.persist){ etat.innerHTML='<span style="color:var(--yama)">●</span> Ce navigateur ne garantit pas la conservation des données.'; return; }
+      const ok=await askPersist();
+      etat.innerHTML=ok?'<span style="color:var(--take)">●</span> Stockage protégé : le navigateur ne le videra pas pour faire de la place.'
+                       :'<span style="color:var(--yama)">●</span> Stockage non protégé : le navigateur peut le vider s\'il manque de place. L\'installation règle généralement ce point.';
+    })();
+    const cc=el("div","ctrl");
+    const ex=el("button","btn"+(S.exporte?"":" p"),S.exporte?"Exporter à nouveau":"Faire une première sauvegarde");
+    ex.onclick=()=>{ exporteProfil(); render(); };
+    cc.appendChild(ex); c.appendChild(cc);
+    if(S.exporte) c.appendChild(el("div","mep-etat","Dernière sauvegarde : "+S.exporte.split("-").reverse().join("/")+". Le fichier est dans vos téléchargements ; pour le restaurer : Profil → Sauvegarde → Importer, ou « Restaurer une sauvegarde » à la création d'un profil."));
+  });
+
+  item(3,!!e.clavier,"Ajouter le clavier japonais",c=>{
+    c.appendChild(el("div","mep-t","Le rōmaji suffit pour répondre — « tabete » vaut たべて —, mais le vrai clavier rend la frappe naturelle et propose les kanji.<br><br>"+
+      ({ios:"<b>iPhone</b> : Réglages → Général → Clavier → Claviers → Ajouter un clavier → Japonais (Kana ou Rōmaji). On passe d'un clavier à l'autre avec le globe 🌐.",
+        android:"<b>Android</b> (Gboard) : Paramètres de Gboard → Langues → Ajouter un clavier → Japonais. On passe d'un clavier à l'autre avec le globe 🌐.",
+        ordi:"<b>Ordinateur</b> : ajoutez la méthode de saisie japonaise dans les réglages de langue du système.",
+        fichier:"<b>iPhone</b> : Réglages → Général → Clavier → Claviers → Japonais. <b>Android</b> : Gboard → Langues → Japonais."}[plateforme()])));
+    const cc=el("div","ctrl");
+    if(e.clavier){
+      cc.appendChild(el("span","mep-etat",e.clavier===2?"Vous répondez en rōmaji pour l'instant.":"Clavier japonais ajouté."));
+    }else{
+      const ok=el("button","btn p","C'est fait");
+      ok.onclick=()=>{ e.clavier=1; save(); render(); };
+      const ro=el("button","btn","Je garde le rōmaji");
+      ro.onclick=()=>{ e.clavier=2; save(); render(); };
+      cc.appendChild(ok); cc.appendChild(ro);
+    }
+    c.appendChild(cc);
+  });
+
+  item(4,!!e.rythme,"Régler votre rythme",c=>{
+    c.appendChild(el("div","mep-t","L'objectif du jour remplit le cercle de l'accueil. Les réponses écrites font davantage travailler la mémoire ; le choix multiple va plus vite."));
+    const ligne=(lab,opts,cur,set)=>{
+      c.appendChild(el("div","mep-etat",lab));
+      const f=el("div","filters"); f.style.paddingBottom="0";
+      opts.forEach(([v,t])=>{ const b=el("button","chip"+(cur===v?" on":""),t);
+        b.onclick=()=>{ set(v); e.rythme=1; poolCache=null; save(); render(); }; f.appendChild(b); });
+      c.appendChild(f);
+    };
+    ligne("Questions par jour",[[10,"10"],[20,"20"],[30,"30"],[40,"40"]],S.goal,v=>{S.goal=v;});
+    ligne("Réponses",[["auto","Adaptées"],["saisie","Écrites"],["qcm","À choix"],["mixte","Alternées"]],S.input||"auto",v=>{S.input=v;});
+    c.appendChild(el("div","mep-etat","« Adaptées » : écrites là où la saisie est formatrice ; à choix pour le sens des kanji, les radicaux, les kana et les formules longues."));
+    if(!e.rythme){ const cc=el("div","ctrl"); const ok=el("button","btn","Garder ces réglages");
+      ok.onclick=()=>{ e.rythme=1; save(); render(); }; cc.appendChild(ok); c.appendChild(cc); }
+  });
+
+  m.appendChild(el("div","note","Facultatif, plus tard : l'aide en ligne (解説) fonctionne avec votre propre clé d'accès, à ajouter dans son écran. Sans clé, rien ne quitte l'appareil."));
+  const cc=el("div","ctrl");
+  const fin=el("button","btn p w",premier?(mepFaits()===4?"Commencer":"Commencer — finir plus tard"):"Retour à l'accueil");
+  fin.onclick=()=>{ S.guide=1; save(); stack=[]; go("home",null,false); };
+  cc.appendChild(fin); m.appendChild(cc);
+  if(premier&&mepFaits()<4) m.appendChild(el("div","note","Ce qui reste à faire vous attendra sur l'accueil, et dans Profil → Parcours → Mise en place."));
 };
 
 /* ================= construire une phrase ================= */
@@ -15157,7 +15375,12 @@ async function askPersist(){
     /* l'index des images attachées, pour savoir sans attendre lesquelles existent */
     imgIndex().then(()=>{ if(view==="betes"||view==="shugyo") render(); });
     try{ saisonIndexe(); }catch(e){}
-    tickDay(); view="home"; render();
+    /* un guide fermé en route reprend au lancement suivant : sans cela, la
+       mise en place n'était jamais revue par qui avait quitté l'application
+       au milieu */
+    /* seul un profil créé par l'écran de bienvenue porte guide===0 ; un profil
+       antérieur au guide n'a pas le champ et ne doit pas y être renvoyé */
+    tickDay(); view=(S.guide===0)?"guide":"home"; render();
   } else if(USERS.length){ switchUser(USERS[0].id); }
   else { view="welcome"; render(); }
 })();
