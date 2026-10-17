@@ -1,6 +1,6 @@
 /* みち — service worker */
-const V = 'michi-0018a1526b';
-const ASSETS = ["./", "./manifest.webmanifest", "./icon-192.c52b5989.png", "./icon-512.ebbe8c64.png", "./icon-maskable-192.c393affe.png", "./icon-maskable-512.b7fb55d0.png", "./apple-touch-icon.30688154.png"];
+const V = 'michi-9540e241da';
+const ASSETS = ["./", "./manifest.webmanifest", "./icon-192.4817b2cd.png", "./icon-512.04bc1a22.png", "./icon-maskable-192.86bdaa2c.png", "./icon-maskable-512.fdd788dc.png", "./apple-touch-icon.c50ad88c.png"];
 
 /* Installation instantanée : aucun téléchargement ne doit retarder l'activation,
    sans quoi Chrome ne propose pas l'installation de l'application. */
